@@ -320,3 +320,62 @@ button.secondary { background: #2b3550; color: #fff; box-shadow: 0 6px 0 #1a2034
 }
 #rotate-overlay .rot-inner span { display: block; margin-top: 10px; color: #8194b0; font-size: 14px; font-weight: normal; }
 #rotate-overlay.show { display: flex; }
+
+/* Combo / streak callout */
+#callout {
+  position: absolute;
+  top: 28%; left: 50%;
+  transform: translate(-50%, -50%) scale(0.5);
+  pointer-events: none;
+  z-index: 7;
+  font-size: clamp(28px, 6vw, 56px);
+  font-weight: 900;
+  letter-spacing: 2px;
+  color: var(--accent);
+  text-shadow: 0 4px 0 rgba(0,0,0,0.35), 0 0 22px rgba(255,203,5,0.6);
+  opacity: 0;
+}
+#callout.show { animation: calloutPop 1.15s ease-out; }
+@keyframes calloutPop {
+  0%   { opacity: 0; transform: translate(-50%, -50%) scale(0.4) rotate(-6deg); }
+  18%  { opacity: 1; transform: translate(-50%, -50%) scale(1.18) rotate(2deg); }
+  35%  { transform: translate(-50%, -50%) scale(1.0) rotate(0deg); }
+  80%  { opacity: 1; }
+  100% { opacity: 0; transform: translate(-50%, -56%) scale(1.0); }
+}
+
+/* Settings */
+.icon-btn.corner {
+  position: absolute;
+  top: 12px; right: 12px;
+  z-index: 30;
+  width: 40px; height: 40px;
+  font-size: 18px;
+}
+#settings-panel.panel {
+  position: absolute;
+  top: 58px; right: 12px;
+  z-index: 31;
+  width: 250px;
+  background: var(--panel);
+  border: 1px solid #2b3550;
+  border-radius: 10px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.45);
+}
+#settings-panel h3 { font-size: 14px; letter-spacing: 2px; color: #aeb8d0; }
+.set-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.set-row label { font-size: 13px; color: #c4cde2; }
+.set-row input[type="range"] { flex: 1; max-width: 140px; accent-color: var(--accent); }
+.seg { display: inline-flex; border-radius: 6px; overflow: hidden; border: 1px solid #2b3550; }
+.seg button {
+  background: #1a2233; color: #c4cde2;
+  border: none; padding: 6px 12px; font-size: 12px; font-weight: bold;
+  letter-spacing: 1px; cursor: pointer; box-shadow: none; border-radius: 0;
+}
+.seg button:hover { transform: none; }
+.seg button.active { background: var(--accent); color: #14181f; }
+#settings-panel #settings-close { padding: 8px 14px; font-size: 13px; box-shadow: 0 4px 0 #1a2034; }

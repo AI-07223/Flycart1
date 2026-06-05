@@ -9,7 +9,8 @@
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
-    "vendor": "cp node_modules/colyseus.js/dist/colyseus.js public/vendor/colyseus.js && cp node_modules/three/build/three.module.min.js public/vendor/three.module.min.js && cp node_modules/three/build/three.core.min.js public/vendor/three.core.min.js",
+    "vendor": "cp node_modules/colyseus.js/dist/colyseus.js public/vendor/colyseus.js && cp node_modules/three/build/three.module.min.js public/vendor/three.module.min.js && cp node_modules/three/build/three.core.min.js public/vendor/three.core.min.js && node scripts/vendor-three-addons.mjs",
+    "gen-audio": "node scripts/gen-audio.mjs",
     "clean": "rm -rf dist"
   },
   "dependencies": {

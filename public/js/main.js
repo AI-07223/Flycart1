@@ -19,10 +19,14 @@
     recenter: $("recenter-btn"),
     gyroOpt: $("gyro-opt"), gyroCheck: $("gyro-check"), kbdControls: $("kbd-controls"),
     vignette: $("vignette"), rotate: $("rotate-overlay"),
+    settingsBtn: $("settings-btn"), settingsPanel: $("settings-panel"),
+    qSeg: $("quality-seg"), volMaster: $("vol-master"), volMusic: $("vol-music"), volSfx: $("vol-sfx"),
+    settingsClose: $("settings-close"), callout: $("callout"),
   };
 
   let prevPhase = "playing";
   let prevHp = 100;
+  let streak = 0, lastKill = 0, lastFireSnd = 0;
 
   let mode = "menu"; // menu | playing | paused
   let last = 0;
@@ -109,6 +113,10 @@
         const sp = me.boosting ? 1 : 0.55;
         window.SFX.setEngine(sp, me.boosting);
       }
+      // Fire SFX cadence (approximates the server's fire cooldown).
+      if (me && me.alive && inp.fire && ts / 1000 - lastFireSnd > 0.22) {
+        window.SFX.fire(); lastFireSnd = ts / 1000;
+      }
     } else if (room && room.state) {
       // Paused: still draw the frozen scene.
       window.Renderer.draw(room.state, window.Net.sessionId);
@@ -125,10 +133,11 @@
       els.healthfill.style.width = Math.max(0, (me.hp / G.MAX_HP) * 100) + "%";
       els.respawn.classList.toggle("hidden", me.alive);
 
-      // Damage flash + low-health pulse.
+      // Damage flash + low-health pulse + hit sound.
       if (me.alive && me.hp < prevHp) {
         els.vignette.classList.add("hit");
         setTimeout(() => els.vignette.classList.remove("hit"), 130);
+        window.SFX.hit();
       }
       els.vignette.classList.toggle("low", me.alive && me.hp > 0 && me.hp < 30);
       prevHp = me.hp;
@@ -175,9 +184,28 @@
     setTimeout(() => div.remove(), 3800);
     while (els.killfeed.children.length > 5) els.killfeed.firstChild.remove();
 
-    // "+1" popup over the killer's plane + triumphant sound for my kills.
+    // "+1" popup + audio + juice.
     window.Renderer.killPopup(msg.killer, mine);
-    if (mine) window.SFX.kill();
+    if (victimIsMe) window.SFX.explosion();
+    if (mine) {
+      window.SFX.kill();
+      window.Renderer.hitStop(80);
+      const now = performance.now() / 1000;
+      streak = (now - lastKill < 3) ? streak + 1 : 1;
+      lastKill = now;
+      if (streak >= 2) showCallout(streakName(streak));
+    }
+  }
+
+  function showCallout(text) {
+    els.callout.textContent = text;
+    els.callout.classList.remove("show");
+    void els.callout.offsetWidth; // restart the animation
+    els.callout.classList.add("show");
+  }
+
+  function streakName(s) {
+    return s >= 6 ? "GODLIKE!" : s >= 5 ? "UNSTOPPABLE!" : s >= 4 ? "RAMPAGE!" : s >= 3 ? "TRIPLE SMASH!" : "DOUBLE SMASH!";
   }
 
   function escapeHtml(s) {
@@ -222,6 +250,7 @@
 
     els.mute.addEventListener("click", () => toggleMute());
     els.resume.addEventListener("click", () => togglePause());
+    setupSettings();
 
     window.Input.onPause = () => { if (mode !== "menu") togglePause(); };
     window.Input.onMute = () => toggleMute();
@@ -278,6 +307,30 @@
     const portrait = window.matchMedia && window.matchMedia("(orientation: portrait)").matches;
     const show = window.Input.isTouchDevice() && portrait && mode !== "menu";
     els.rotate.classList.toggle("show", !!show);
+  }
+
+  function setupSettings() {
+    const setOpen = (v) => els.settingsPanel.classList.toggle("hidden", !v);
+    els.settingsBtn.addEventListener("click", () => { window.SFX.uiClick(); setOpen(els.settingsPanel.classList.contains("hidden")); });
+    els.settingsClose.addEventListener("click", () => { window.SFX.uiClick(); setOpen(false); });
+
+    els.qSeg.querySelectorAll("button").forEach((b) => {
+      b.addEventListener("click", () => { window.SFX.uiClick(); window.Quality.set(b.dataset.q, true); refreshQuality(); });
+    });
+    window.Quality.onChange(refreshQuality);
+    refreshQuality();
+
+    const v = window.SFX.vols();
+    els.volMaster.value = Math.round(v.master * 100);
+    els.volMusic.value = Math.round(v.music * 100);
+    els.volSfx.value = Math.round(v.sfx * 100);
+    els.volMaster.addEventListener("input", () => window.SFX.setMaster(els.volMaster.value / 100));
+    els.volMusic.addEventListener("input", () => window.SFX.setMusic(els.volMusic.value / 100));
+    els.volSfx.addEventListener("input", () => window.SFX.setSfx(els.volSfx.value / 100));
+  }
+
+  function refreshQuality() {
+    els.qSeg.querySelectorAll("button").forEach((b) => b.classList.toggle("active", b.dataset.q === window.Quality.current));
   }
 
   window.addEventListener("DOMContentLoaded", init);

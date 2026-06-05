@@ -12,6 +12,9 @@ interface BotBrain {
   targetId: string | null;
   retargetAt: number;
   wander: number;
+  react: number;  // seconds between retargets (lower = sharper)
+  aimErr: number; // radians of random aim jitter (lower = deadlier)
+  lead: number;   // 0..1 fraction of predictive lead applied
 }
 
 const ZERO_INPUT: Input = { turn: 0, boost: false, fire: false };
@@ -248,7 +251,14 @@ export class ArenaRoom extends Room<ArenaState> {
     this.spawn(id, p);
     this.state.players.set(id, p);
     this.inputs.set(id, { ...ZERO_INPUT });
-    this.bots.set(id, { targetId: null, retargetAt: 0, wander: Math.random() * Math.PI * 2 });
+    // Per-bot difficulty spread so encounters vary.
+    const skill = Math.random();
+    this.bots.set(id, {
+      targetId: null, retargetAt: 0, wander: Math.random() * Math.PI * 2,
+      react: 1.2 + (1 - skill) * 2.2,
+      aimErr: 0.02 + (1 - skill) * 0.22,
+      lead: 0.4 + skill * 0.6,
+    });
   }
 
   private thinkBot(id: string, brain: BotBrain) {
@@ -262,31 +272,40 @@ export class ArenaRoom extends Room<ArenaState> {
     if (this.now >= brain.retargetAt || !target || !target.alive || brain.targetId === id) {
       target = this.pickTarget(id, me);
       brain.targetId = target ? this.idOf(target) : null;
-      brain.retargetAt = this.now + 2 + Math.random() * 2;
+      brain.retargetAt = this.now + brain.react + Math.random() * brain.react;
     }
 
     let desired: number;
+    let wantFire = false, wantBoost = false;
+
     if (target) {
-      desired = Math.atan2(target.y - me.y, target.x - me.x);
+      const dx = target.x - me.x, dy = target.y - me.y;
+      const dist = Math.hypot(dx, dy);
+      if (me.hp <= 35 && dist < 520) {
+        // Low on health: turn away from the threat and run.
+        desired = Math.atan2(me.y - target.y, me.x - target.x);
+        wantBoost = true;
+      } else {
+        // Predictive aim: lead the target using its velocity (heading * speed).
+        const tid = brain.targetId as string;
+        const tSpeed = this.speed.get(tid) ?? C.CRUISE_SPEED;
+        const lead = (dist / C.BULLET_SPEED) * brain.lead;
+        const px = target.x + Math.cos(target.angle) * tSpeed * lead;
+        const py = target.y + Math.sin(target.angle) * tSpeed * lead;
+        desired = Math.atan2(py - me.y, px - me.x) + brain.aimErr * (Math.random() * 2 - 1);
+        const aim = Math.abs(((desired - me.angle + Math.PI) % (Math.PI * 2)) - Math.PI);
+        wantFire = aim < 0.16 && dist < 640;
+        wantBoost = dist > 720 && Math.random() < 0.4;
+      }
     } else {
       brain.wander += (Math.random() - 0.5) * 0.6;
       desired = brain.wander;
     }
 
-    // Steer toward desired heading.
-    let diff = ((desired - me.angle + Math.PI) % (Math.PI * 2)) - Math.PI;
-    input.turn = Math.abs(diff) < 0.05 ? 0 : Math.sign(diff);
-
-    // Fire when roughly aimed and target is in range; occasional boost.
-    if (target) {
-      const dx = target.x - me.x, dy = target.y - me.y;
-      const dist = Math.hypot(dx, dy);
-      input.fire = Math.abs(diff) < 0.18 && dist < 620;
-      input.boost = dist > 700 && Math.random() < 0.5;
-    } else {
-      input.fire = false;
-      input.boost = false;
-    }
+    const diff = ((desired - me.angle + Math.PI) % (Math.PI * 2)) - Math.PI;
+    input.turn = Math.abs(diff) < 0.04 ? 0 : Math.sign(diff);
+    input.fire = wantFire;
+    input.boost = wantBoost;
   }
 
   private pickTarget(selfId: string, me: Player): Player | undefined {

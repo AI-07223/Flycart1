@@ -1,12 +1,13 @@
 # 🛩️ SmashCart
 
-Online, top-down **plane combat arena** — fly, shoot, and smash everyone out of the
-sky. Built to be instantly playable and easy to share with friends: click **Quick
-Play** and you're dogfighting in seconds, or spin up a private room and send the
-link. Empty slots are filled with AI bots so a match is never empty.
+Online, **3D plane combat arena** — fly, shoot, and smash everyone out of the sky in
+a bright **arcade-cute** toy world. Built to be instantly playable and easy to share
+with friends: click **Quick Play** and you're dogfighting in seconds, or spin up a
+private room and send the link. Empty slots are filled with AI bots so a match is
+never empty.
 
-Authoritative **Colyseus** multiplayer server + a dependency-free **HTML5 Canvas**
-client, designed to be self-hosted on your own VPS.
+Authoritative **Colyseus** multiplayer server (2D-plane simulation) + a **Three.js**
+3D client, designed to be self-hosted on your own VPS — no CDNs, everything vendored.
 
 ![gameplay](docs/screenshot.png)
 
@@ -21,12 +22,19 @@ client, designed to be self-hosted on your own VPS.
 - **Plays on phones** — on-screen FIRE/BOOST buttons plus **gyro tilt-to-steer**
   (tilt your phone to bank), with a tap-to-recenter button. Falls back to on-screen
   arrows if you turn gyro off.
-- **Juice** — sprite planes with banking, smoke trails, boost flames, bullet tracers,
-  particle explosions, screen shake, hit-stop, a kill feed, floating "+1 SMASH!"
-  popups, a damage vignette, low-health screen pulse, and a minimap.
-- **Procedural audio** — looping background music, engine drone, gunfire, explosions,
-  kill jingle, and UI sounds — all synthesized with the Web Audio API (no audio files).
-- **CC0 art** — plane sprites from Kenney's *Pixel Shmup* pack (public domain).
+- **Arcade-cute 3D** — rounded low-poly toy planes (banking, spinning props) over a
+  toy-island arena (grass, water, blimp, balloons, clouds), with soft/blob shadows,
+  bloom, and a speed-sensing chase camera.
+- **Juice** — boost smoke + flames, bullet tracers, poofy explosions (shockwave ring +
+  sparkles + smoke), screen shake, hit-stop, kill feed, floating "+1 SMASH!" popups,
+  combo / kill-streak callouts, damage vignette, low-health pulse, and a minimap.
+- **Sampled audio** — looping music, engine, gunfire, explosions, kill jingle, and UI
+  sounds (self-hosted WAVs in `public/assets/audio/`), with a master/music/sfx mixer,
+  mute, and a synth fallback if a sample fails to load.
+- **Quality settings** — Low/Med/High tiers (pixel-ratio, bloom, shadows, particles)
+  with automatic FPS-based downscaling, so it stays smooth on mid-range phones.
+- **Self-hosted / CC0** — geometry is procedural; audio is generated-original (CC0);
+  legacy Kenney *Pixel Shmup* sprites remain in-repo (CC0).
 
 ## Controls
 
@@ -49,8 +57,9 @@ motion permission on first start.
 
 - **Server:** Node.js + [Colyseus](https://colyseus.io) `0.16` (`@colyseus/schema` v3),
   Express for static hosting, TypeScript.
-- **Client:** vanilla JS + Canvas 2D, Colyseus browser client vendored at
-  `public/vendor/colyseus.js` (no CDN needed).
+- **Client:** vanilla JS + [Three.js](https://threejs.org) (WebGL) with EffectComposer
+  bloom. Three.js, its post-processing addons, and the Colyseus browser client are all
+  vendored under `public/vendor/` (no CDN needed) and loaded via an import map.
 
 > **Version note:** the stack is pinned to the **Colyseus 0.16 line** because the
 > published browser client (`colyseus.js@0.16.x`) ships schema **v3**, while server
@@ -105,9 +114,11 @@ src/                       Colyseus server (TypeScript)
   schema/ArenaState.ts     synchronized state (players, bullets, timer)
   shared/constants.ts      gameplay tuning
 public/                    static client (served by the server)
-  index.html, css/, js/    UI + canvas client (constants/audio/assets/input/net/render/main)
-  vendor/colyseus.js       vendored browser client
-  assets/                  CC0 sprites (Kenney Pixel Shmup) + CREDITS
+  index.html, css/, js/    UI + 3D client (constants/quality/audio/input/net/render3d/main)
+  vendor/                  vendored colyseus.js + three.module.min.js + jsm post-FX addons
+  assets/audio/            generated-original WAV SFX + music (see scripts/gen-audio.mjs)
+  assets/planes, tiles/    legacy Kenney Pixel Shmup sprites (CC0)
+scripts/                   vendor-three-addons.mjs, gen-audio.mjs (build helpers)
 deploy/                    systemd unit + nginx example
 Dockerfile, docker-compose.yml
 ```
@@ -120,10 +131,16 @@ length, arena size, bot count, etc. — **keep the two files in sync.**
 
 ## Credits
 
-- Plane/tile sprites: **"Pixel Shmup" by Kenney** — [kenney.nl](https://kenney.nl),
-  CC0 1.0 (public domain). See `public/assets/CREDITS.txt`.
+- 3D engine: [Three.js](https://threejs.org) (MIT) — vendored, incl. EffectComposer/
+  UnrealBloomPass post-processing addons.
 - Multiplayer framework: [Colyseus](https://colyseus.io).
+- Audio: **generated-original** arcade SFX + music (CC0), produced by
+  `scripts/gen-audio.mjs`. Drop-in replaceable with Kenney CC0 packs using the same
+  filenames in `public/assets/audio/`.
+- Legacy sprites: **"Pixel Shmup" by Kenney** — [kenney.nl](https://kenney.nl),
+  CC0 1.0 (public domain). See `public/assets/CREDITS.txt`. (Now superseded by the
+  procedural 3D planes; kept in-repo.)
 
 ## License
 
-MIT (code). Bundled art is CC0.
+MIT (code). Bundled audio is generated-original CC0; legacy art is CC0.

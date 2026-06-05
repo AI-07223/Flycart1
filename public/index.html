@@ -6,7 +6,12 @@
   <title>SmashCart — 3D Plane Combat</title>
   <link rel="stylesheet" href="css/style.css" />
   <script type="importmap">
-    { "imports": { "three": "/vendor/three.module.min.js" } }
+    {
+      "imports": {
+        "three": "/vendor/three.module.min.js",
+        "three/addons/": "/vendor/jsm/"
+      }
+    }
   </script>
 </head>
 <body>
@@ -15,6 +20,9 @@
 
     <!-- Damage flash / low-health pulse -->
     <div id="vignette"></div>
+
+    <!-- Big combo / streak callout -->
+    <div id="callout"></div>
 
     <!-- Rotate-to-landscape guard (mobile portrait) -->
     <div id="rotate-overlay">
@@ -91,10 +99,26 @@
       <h2>PAUSED</h2>
       <button id="resume-btn">RESUME</button>
     </div>
+
+    <!-- Settings (audio + graphics) -->
+    <button id="settings-btn" class="icon-btn corner" title="Settings">⚙</button>
+    <div id="settings-panel" class="panel hidden">
+      <h3>SETTINGS</h3>
+      <div class="set-row"><label>Graphics</label>
+        <div class="seg" id="quality-seg">
+          <button data-q="low">Low</button><button data-q="med">Med</button><button data-q="high">High</button>
+        </div>
+      </div>
+      <div class="set-row"><label>Master</label><input type="range" id="vol-master" min="0" max="100" /></div>
+      <div class="set-row"><label>Music</label><input type="range" id="vol-music" min="0" max="100" /></div>
+      <div class="set-row"><label>SFX</label><input type="range" id="vol-sfx" min="0" max="100" /></div>
+      <button id="settings-close" class="secondary">CLOSE</button>
+    </div>
   </div>
 
   <script src="vendor/colyseus.js"></script>
   <script src="js/constants.js"></script>
+  <script src="js/quality.js"></script>
   <script src="js/audio.js"></script>
   <script src="js/assets.js"></script>
   <script src="js/input.js"></script>
