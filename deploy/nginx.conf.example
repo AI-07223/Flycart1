@@ -1,0 +1,39 @@
+# Example nginx reverse proxy for SmashCart, with WebSocket upgrade support.
+# Put your TLS certs in place (e.g. via certbot) and adjust server_name.
+#
+#   sudo cp deploy/nginx.conf.example /etc/nginx/sites-available/smashcart
+#   sudo ln -s /etc/nginx/sites-available/smashcart /etc/nginx/sites-enabled/
+#   sudo nginx -t && sudo systemctl reload nginx
+
+server {
+    listen 80;
+    server_name smashcart.example.com;
+
+    # Redirect to HTTPS once certs are set up (recommended).
+    # return 301 https://$host$request_uri;
+
+    location / {
+        proxy_pass http://127.0.0.1:2567;
+        proxy_http_version 1.1;
+
+        # WebSocket upgrade — required for Colyseus realtime.
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        proxy_read_timeout 600s;
+    }
+}
+
+# HTTPS variant (after certbot):
+# server {
+#     listen 443 ssl http2;
+#     server_name smashcart.example.com;
+#     ssl_certificate     /etc/letsencrypt/live/smashcart.example.com/fullchain.pem;
+#     ssl_certificate_key /etc/letsencrypt/live/smashcart.example.com/privkey.pem;
+#     location / { ... same proxy block as above ... }
+# }

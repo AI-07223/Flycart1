@@ -1,0 +1,25 @@
+# systemd unit for running SmashCart directly on a VPS (no Docker).
+#
+#   sudo cp deploy/smashcart.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now smashcart
+#
+# Assumes the repo is cloned to /opt/smashcart and `npm ci && npm run build`
+# has been run there. Adjust User/WorkingDirectory/paths as needed.
+
+[Unit]
+Description=SmashCart plane combat server
+After=network.target
+
+[Service]
+Type=simple
+User=www-data
+WorkingDirectory=/opt/smashcart
+Environment=NODE_ENV=production
+Environment=PORT=2567
+ExecStart=/usr/bin/node dist/index.js
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

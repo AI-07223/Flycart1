@@ -1,0 +1,29 @@
+{
+  "name": "smashcart",
+  "version": "0.1.0",
+  "description": "SmashCart — online top-down plane combat arena (Colyseus + Canvas)",
+  "license": "MIT",
+  "type": "commonjs",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "vendor": "cp node_modules/colyseus.js/dist/colyseus.js public/vendor/colyseus.js",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@colyseus/monitor": "^0.16.0",
+    "@colyseus/schema": "^3.0.0",
+    "@colyseus/ws-transport": "^0.16.0",
+    "colyseus": "^0.16.0",
+    "express": "^4.21.2"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/node": "^22.10.0",
+    "colyseus.js": "^0.16.22",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}

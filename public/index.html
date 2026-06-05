@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>SmashCart — Online Plane Combat</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <div id="game-wrap">
+    <canvas id="game"></canvas>
+
+    <!-- In-game HUD -->
+    <div id="hud" class="hidden">
+      <div class="hud-row">
+        <div class="hud-item">SCORE <span id="hud-score">0</span></div>
+        <div class="hud-item">TIME <span id="hud-time">--</span></div>
+        <button id="mute-btn" class="icon-btn" title="Mute (M)">🔊</button>
+      </div>
+      <div id="leaderboard"></div>
+    </div>
+
+    <!-- Health bar -->
+    <div id="healthbar" class="hidden"><div id="healthfill"></div></div>
+
+    <!-- Respawn notice -->
+    <div id="respawn" class="hidden">💥 Shot down — respawning…</div>
+
+    <!-- Share bar (private rooms) -->
+    <div id="share-bar" class="hidden">
+      <span>Invite friends:</span>
+      <input id="share-link" readonly />
+      <button id="copy-btn">Copy</button>
+    </div>
+
+    <!-- Round intermission scoreboard -->
+    <div id="intermission" class="overlay hidden">
+      <h2>ROUND OVER</h2>
+      <ol id="final-board"></ol>
+      <p class="muted">Next round in <span id="inter-time">--</span>s</p>
+    </div>
+
+    <!-- Start screen -->
+    <div id="start-screen" class="overlay">
+      <h1>SMASH<span>CART</span></h1>
+      <p class="tagline">Online top-down plane combat. Smash everyone. Be the last bird flying.</p>
+      <input id="name-input" maxlength="14" placeholder="Call sign" />
+      <div class="btn-row">
+        <button id="quickplay-btn">QUICK PLAY</button>
+        <button id="friends-btn" class="secondary">PLAY WITH FRIENDS</button>
+      </div>
+      <div class="controls">
+        <span><kbd>A</kbd><kbd>D</kbd> / <kbd>◀</kbd><kbd>▶</kbd> Steer</span>
+        <span><kbd>W</kbd>/<kbd>Shift</kbd> Boost</span>
+        <span><kbd>Space</kbd> Fire</span>
+        <span><kbd>P</kbd> Pause · <kbd>M</kbd> Mute</span>
+      </div>
+      <p id="status" class="muted"></p>
+    </div>
+
+    <!-- Pause -->
+    <div id="pause-screen" class="overlay hidden">
+      <h2>PAUSED</h2>
+      <button id="resume-btn">RESUME</button>
+    </div>
+  </div>
+
+  <script src="vendor/colyseus.js"></script>
+  <script src="js/constants.js"></script>
+  <script src="js/audio.js"></script>
+  <script src="js/assets.js"></script>
+  <script src="js/input.js"></script>
+  <script src="js/net.js"></script>
+  <script src="js/render.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>
