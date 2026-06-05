@@ -4,6 +4,7 @@ import express from "express";
 import { Server } from "colyseus";
 import { WebSocketTransport } from "@colyseus/ws-transport";
 import { monitor } from "@colyseus/monitor";
+import crypto from "crypto";
 import { ArenaRoom } from "./rooms/ArenaRoom";
 
 const PORT = Number(process.env.PORT) || 2567;
@@ -18,8 +19,32 @@ app.use(express.static(publicDir));
 // Lightweight health check for the VPS / load balancer.
 app.get("/healthz", (_req, res) => res.json({ ok: true }));
 
-// Colyseus dev dashboard (handy while building; lock down in prod).
-app.use("/colyseus", monitor());
+// Colyseus monitor dashboard — protected with HTTP Basic Auth.
+// Credentials come from env (MONITOR_USER / MONITOR_PASS). If no password is
+// configured the dashboard is disabled outright rather than left open.
+const MONITOR_USER = process.env.MONITOR_USER || "admin";
+const MONITOR_PASS = process.env.MONITOR_PASS || "";
+
+function safeEqual(a: string, b: string): boolean {
+  const ab = Buffer.from(a);
+  const bb = Buffer.from(b);
+  return ab.length === bb.length && crypto.timingSafeEqual(ab, bb);
+}
+
+function monitorAuth(req: express.Request, res: express.Response, next: express.NextFunction) {
+  if (!MONITOR_PASS) return res.status(404).end(); // disabled when unconfigured
+  const [scheme, encoded] = (req.headers.authorization || "").split(" ");
+  if (scheme === "Basic" && encoded) {
+    const [user, pass] = Buffer.from(encoded, "base64").toString().split(":");
+    if (safeEqual(user || "", MONITOR_USER) && safeEqual(pass || "", MONITOR_PASS)) {
+      return next();
+    }
+  }
+  res.set("WWW-Authenticate", 'Basic realm="SmashCart Monitor"');
+  return res.status(401).end();
+}
+
+app.use("/colyseus", monitorAuth, monitor());
 
 const server = http.createServer(app);
 const gameServer = new Server({
