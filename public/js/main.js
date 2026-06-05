@@ -18,9 +18,11 @@
     left: $("left-btn"), right: $("right-btn"), boost: $("boost-btn"), fire: $("fire-btn"),
     recenter: $("recenter-btn"),
     gyroOpt: $("gyro-opt"), gyroCheck: $("gyro-check"), kbdControls: $("kbd-controls"),
+    vignette: $("vignette"), rotate: $("rotate-overlay"),
   };
 
   let prevPhase = "playing";
+  let prevHp = 100;
 
   let mode = "menu"; // menu | playing | paused
   let last = 0;
@@ -41,6 +43,7 @@
 
   async function startGame(code) {
     window.SFX.unlock();
+    enterImmersive(); // fullscreen + landscape lock (must run inside the click gesture)
     const name = (els.name.value || "Pilot").slice(0, 14);
     els.status.textContent = "Connecting…";
     els.quick.disabled = els.friends.disabled = true;
@@ -121,6 +124,14 @@
     if (me) {
       els.healthfill.style.width = Math.max(0, (me.hp / G.MAX_HP) * 100) + "%";
       els.respawn.classList.toggle("hidden", me.alive);
+
+      // Damage flash + low-health pulse.
+      if (me.alive && me.hp < prevHp) {
+        els.vignette.classList.add("hit");
+        setTimeout(() => els.vignette.classList.remove("hit"), 130);
+      }
+      els.vignette.classList.toggle("low", me.alive && me.hp > 0 && me.hp < 30);
+      prevHp = me.hp;
     }
 
     // Leaderboard: top 5 by score.
@@ -165,8 +176,7 @@
     while (els.killfeed.children.length > 5) els.killfeed.firstChild.remove();
 
     // "+1" popup over the killer's plane + triumphant sound for my kills.
-    const v = window.Renderer.views.get(msg.killer);
-    if (v) window.Renderer.addPopup(v.x, v.y - 28, mine ? "+1 SMASH!" : "+1", mine ? "#ffd95d" : "#cfe0ff");
+    window.Renderer.killPopup(msg.killer, mine);
     if (mine) window.SFX.kill();
   }
 
@@ -216,6 +226,10 @@
     window.Input.onPause = () => { if (mode !== "menu") togglePause(); };
     window.Input.onMute = () => toggleMute();
 
+    window.addEventListener("orientationchange", updateRotateOverlay);
+    window.addEventListener("resize", updateRotateOverlay);
+    updateRotateOverlay();
+
     requestAnimationFrame((t) => { last = t; loop(t); });
   }
 
@@ -246,6 +260,24 @@
   function toggleMute() {
     const m = window.SFX.toggleMute();
     els.mute.textContent = m ? "🔇" : "🔊";
+  }
+
+  // Go full-screen + lock landscape (best-effort; ignored where unsupported,
+  // e.g. iOS has no orientation lock — the rotate overlay covers that case).
+  function enterImmersive() {
+    const el = document.documentElement;
+    const req = el.requestFullscreen || el.webkitRequestFullscreen || el.msRequestFullscreen;
+    if (req) { try { const r = req.call(el); if (r && r.catch) r.catch(() => {}); } catch (e) {} }
+    if (screen.orientation && screen.orientation.lock) {
+      try { const r = screen.orientation.lock("landscape"); if (r && r.catch) r.catch(() => {}); } catch (e) {}
+    }
+    updateRotateOverlay();
+  }
+
+  function updateRotateOverlay() {
+    const portrait = window.matchMedia && window.matchMedia("(orientation: portrait)").matches;
+    const show = window.Input.isTouchDevice() && portrait && mode !== "menu";
+    els.rotate.classList.toggle("show", !!show);
   }
 
   window.addEventListener("DOMContentLoaded", init);

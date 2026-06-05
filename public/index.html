@@ -3,12 +3,23 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>SmashCart — Online Plane Combat</title>
+  <title>SmashCart — 3D Plane Combat</title>
   <link rel="stylesheet" href="css/style.css" />
+  <script type="importmap">
+    { "imports": { "three": "/vendor/three.module.min.js" } }
+  </script>
 </head>
 <body>
   <div id="game-wrap">
     <canvas id="game"></canvas>
+
+    <!-- Damage flash / low-health pulse -->
+    <div id="vignette"></div>
+
+    <!-- Rotate-to-landscape guard (mobile portrait) -->
+    <div id="rotate-overlay">
+      <div class="rot-inner">📱 ↻<br />Rotate your device<br /><span>Landscape gives you the full cockpit view</span></div>
+    </div>
 
     <!-- In-game HUD -->
     <div id="hud" class="hidden">
@@ -57,7 +68,7 @@
     <!-- Start screen -->
     <div id="start-screen" class="overlay">
       <h1>SMASH<span>CART</span></h1>
-      <p class="tagline">Online top-down plane combat. Smash everyone. Be the last bird flying.</p>
+      <p class="tagline">Online 3D plane combat. Take to the skies, chase 'em down, smash everyone out of the air.</p>
       <input id="name-input" maxlength="14" placeholder="Call sign" />
       <div class="btn-row">
         <button id="quickplay-btn">QUICK PLAY</button>
@@ -88,7 +99,7 @@
   <script src="js/assets.js"></script>
   <script src="js/input.js"></script>
   <script src="js/net.js"></script>
-  <script src="js/render.js"></script>
+  <script type="module" src="js/render3d.js"></script>
   <script src="js/main.js"></script>
 </body>
 </html>
