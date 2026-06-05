@@ -192,6 +192,13 @@ export class ArenaRoom extends Room<ArenaState> {
       this.respawnAt.set(victimId, this.now + C.RESPAWN_DELAY);
       const killer = this.state.players.get(killerId);
       if (killer && killerId !== victimId) killer.score += 1;
+      // Notify clients so they can show a kill feed / "+1" popup.
+      this.broadcast("kill", {
+        killer: killerId,
+        victim: victimId,
+        killerName: killer ? killer.name : "?",
+        victimName: p.name,
+      });
     }
   }
 

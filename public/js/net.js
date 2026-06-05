@@ -16,14 +16,17 @@
       this.client = new Colyseus.Client(this.endpoint());
       this.room = await this.client.joinOrCreate("arena", { name, code });
       this.sessionId = this.room.sessionId;
+      this.room.onMessage("kill", (msg) => { if (this.onKill) this.onKill(msg); });
       return this.room;
     },
 
-    // Send input only when it changes, to keep the wire quiet.
+    onKill: null,
+
+    // Send input only when it changes meaningfully (analog turn for gyro).
     sendInput(turn, boost, fire) {
       if (!this.room) return;
       const l = this.lastSent;
-      if (turn === l.turn && boost === l.boost && fire === l.fire) return;
+      if (Math.abs(turn - l.turn) < 0.04 && boost === l.boost && fire === l.fire) return;
       this.lastSent = { turn, boost, fire };
       this.room.send("input", { turn, boost, fire });
     },

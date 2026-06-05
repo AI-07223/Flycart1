@@ -18,13 +18,19 @@ client, designed to be self-hosted on your own VPS.
   the arena lively.
 - **Fast, one-axis controls** — auto-thrust; you steer, boost, and fire. Anyone gets
   it in five seconds.
+- **Plays on phones** — on-screen FIRE/BOOST buttons plus **gyro tilt-to-steer**
+  (tilt your phone to bank), with a tap-to-recenter button. Falls back to on-screen
+  arrows if you turn gyro off.
 - **Juice** — sprite planes with banking, smoke trails, boost flames, bullet tracers,
-  particle explosions, screen shake, hit-stop, and a minimap.
-- **Procedural audio** — engine drone, gunfire, explosions, and UI sounds synthesized
-  with the Web Audio API (no audio files).
+  particle explosions, screen shake, hit-stop, a kill feed, floating "+1 SMASH!"
+  popups, a damage vignette, low-health screen pulse, and a minimap.
+- **Procedural audio** — looping background music, engine drone, gunfire, explosions,
+  kill jingle, and UI sounds — all synthesized with the Web Audio API (no audio files).
 - **CC0 art** — plane sprites from Kenney's *Pixel Shmup* pack (public domain).
 
 ## Controls
+
+**Desktop**
 
 | Action | Keys |
 | ------ | ---- |
@@ -33,6 +39,11 @@ client, designed to be self-hosted on your own VPS.
 | Fire   | `Space` |
 | Pause  | `P` |
 | Mute   | `M` |
+
+**Mobile** — on-screen **FIRE** and **BOOST** buttons. Steering is **gyro tilt** by
+default (tilt the phone left/right; tap **⟳** to recenter neutral). Uncheck *"Tilt to
+steer"* on the start screen to use on-screen **◀ ▶** arrows instead. iOS prompts for
+motion permission on first start.
 
 ## Tech stack
 

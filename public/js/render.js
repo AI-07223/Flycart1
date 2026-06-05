@@ -15,11 +15,13 @@
     cam: { x: G.ARENA_WIDTH / 2, y: G.ARENA_HEIGHT / 2 },
     views: new Map(), // id -> {x,y,angle,smokeT}
     particles: [],
+    popups: [], // floating text {x,y,vy,life,max,text,color}
     clouds: [],
     seenBullets: new Set(),
     prev: new Map(), // id -> {hp, alive}
     shake: 0,
     hitstop: 0,
+    damageFlash: 0,
     time: 0,
 
     init(canvas) {
@@ -51,6 +53,10 @@
     },
 
     addParticle(p) { this.particles.push(p); },
+
+    addPopup(x, y, text, color) {
+      this.popups.push({ x, y, vy: -42, life: 1.1, max: 1.1, text, color: color || "#ffd95d" });
+    },
 
     burst(x, y, color, n, opts) {
       opts = opts || {};
@@ -87,6 +93,7 @@
         if (p.alive && pr.alive && p.hp < pr.hp) {
           this.burst(v.x, v.y, "#fff2a8", 5, { speed: 110, life: 0.3, r: 3 });
           if (this.nearCam(v)) window.SFX.hit();
+          if (id === myId) this.damageFlash = Math.min(1, this.damageFlash + 0.6);
         }
         if (pr.alive && !p.alive) {
           this.burst(v.x, v.y, "#ff7a3c", 26, { speed: 260, life: 0.7, r: 5, glow: true });
@@ -147,7 +154,17 @@
         if (q.smoke) q.r += dt * 14;
       }
 
+      // Floating popups rise and fade.
+      for (let i = this.popups.length - 1; i >= 0; i--) {
+        const q = this.popups[i];
+        q.life -= dt;
+        if (q.life <= 0) { this.popups.splice(i, 1); continue; }
+        q.y += q.vy * dt;
+        q.vy *= Math.exp(-1.5 * dt);
+      }
+
       if (this.shake > 0) this.shake = Math.max(0, this.shake - dt * 40);
+      if (this.damageFlash > 0) this.damageFlash = Math.max(0, this.damageFlash - dt * 1.8);
     },
 
     nearCam(v) { return this.nearCamXY(v.x, v.y); },
@@ -173,7 +190,41 @@
       this.drawBullets(ctx, state);
       this.drawPlanes(ctx, state, myId);
       this.drawParticles(ctx, true); // glow particles on top
+      this.drawPopups(ctx);
+      this.drawVignette(ctx, state, myId);
       this.drawMinimap(ctx, state, myId);
+    },
+
+    drawPopups(ctx) {
+      ctx.save();
+      ctx.textAlign = "center";
+      for (const q of this.popups) {
+        const t = q.life / q.max;
+        const [sx, sy] = this.worldToScreen(q.x, q.y);
+        ctx.globalAlpha = Math.min(1, t * 1.6);
+        ctx.font = "bold 20px 'Trebuchet MS', sans-serif";
+        ctx.lineWidth = 4;
+        ctx.strokeStyle = "rgba(0,0,0,0.6)";
+        ctx.fillStyle = q.color;
+        ctx.strokeText(q.text, sx, sy);
+        ctx.fillText(q.text, sx, sy);
+      }
+      ctx.restore();
+    },
+
+    drawVignette(ctx, state, myId) {
+      const me = state.players.get(myId);
+      const lowHp = me && me.alive ? Math.max(0, 1 - me.hp / G.MAX_HP) : 0;
+      const intensity = Math.max(this.damageFlash, lowHp > 0.6 ? (lowHp - 0.6) * 1.6 * (0.5 + 0.5 * Math.sin(this.time * 8)) : 0);
+      if (intensity <= 0.01) return;
+      const g = ctx.createRadialGradient(
+        this.vw / 2, this.vh / 2, Math.min(this.vw, this.vh) * 0.3,
+        this.vw / 2, this.vh / 2, Math.max(this.vw, this.vh) * 0.7
+      );
+      g.addColorStop(0, "rgba(255,40,40,0)");
+      g.addColorStop(1, `rgba(255,30,30,${Math.min(0.55, intensity * 0.55)})`);
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, this.vw, this.vh);
     },
 
     drawOcean(ctx) {

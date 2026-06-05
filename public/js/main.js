@@ -13,7 +13,14 @@
     mute: $("mute-btn"),
     share: $("share-bar"), shareLink: $("share-link"), copy: $("copy-btn"),
     inter: $("intermission"), finalBoard: $("final-board"), interTime: $("inter-time"),
+    killfeed: $("killfeed"),
+    touch: $("touch-controls"), steerPad: $("steer-pad"),
+    left: $("left-btn"), right: $("right-btn"), boost: $("boost-btn"), fire: $("fire-btn"),
+    recenter: $("recenter-btn"),
+    gyroOpt: $("gyro-opt"), gyroCheck: $("gyro-check"), kbdControls: $("kbd-controls"),
   };
+
+  let prevPhase = "playing";
 
   let mode = "menu"; // menu | playing | paused
   let last = 0;
@@ -48,6 +55,20 @@
     els.start.classList.add("hidden");
     els.hud.classList.remove("hidden");
     els.health.classList.remove("hidden");
+
+    // Mobile: activate touch controls and (optionally) gyro steering.
+    if (window.Input.isTouchDevice()) {
+      els.touch.classList.remove("hidden");
+      let gyroOn = false;
+      if (els.gyroCheck.checked) gyroOn = await window.Input.enableGyro();
+      if (gyroOn) {
+        els.recenter.classList.remove("hidden"); // tilt steers; show recenter
+      } else {
+        els.steerPad.classList.remove("hidden"); // fall back to arrows
+      }
+    }
+
+    window.SFX.startMusic();
 
     if (code !== "PUBLIC") {
       const url = location.origin + location.pathname + "?room=" + code;
@@ -110,6 +131,13 @@
       `<div class="lb-row ${p.id === myId ? "me" : ""}"><span><span class="rank">${i + 1}.</span> ${escapeHtml(p.name)}${p.bot ? " 🤖" : ""}</span><span>${p.score}</span></div>`
     ).join("");
 
+    // Round phase transitions (sound cues).
+    if (state.phase !== prevPhase) {
+      if (state.phase === "intermission") window.SFX.explosion();
+      else window.SFX.go();
+      prevPhase = state.phase;
+    }
+
     // Intermission scoreboard.
     if (state.phase === "intermission") {
       els.inter.classList.remove("hidden");
@@ -122,6 +150,26 @@
     }
   }
 
+  // ---------- kill feed ----------
+  function onKill(msg) {
+    const myId = window.Net.sessionId;
+    const mine = msg.killer === myId;
+    const victimIsMe = msg.victim === myId;
+
+    // Feed line.
+    const div = document.createElement("div");
+    div.className = "kill-msg" + (mine ? " mine" : "");
+    div.innerHTML = `${escapeHtml(mine ? "You" : msg.killerName)} 💥 <span class="vic">${escapeHtml(victimIsMe ? "You" : msg.victimName)}</span>`;
+    els.killfeed.appendChild(div);
+    setTimeout(() => div.remove(), 3800);
+    while (els.killfeed.children.length > 5) els.killfeed.firstChild.remove();
+
+    // "+1" popup over the killer's plane + triumphant sound for my kills.
+    const v = window.Renderer.views.get(msg.killer);
+    if (v) window.Renderer.addPopup(v.x, v.y - 28, mine ? "+1 SMASH!" : "+1", mine ? "#ffd95d" : "#cfe0ff");
+    if (mine) window.SFX.kill();
+  }
+
   function escapeHtml(s) {
     return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   }
@@ -131,6 +179,16 @@
     window.Renderer.init(els.canvas);
     window.Input.attach();
     window.Assets.load();
+
+    window.Net.onKill = onKill;
+
+    // Show mobile options on touch devices.
+    if (window.Input.isTouchDevice()) {
+      els.gyroOpt.classList.remove("hidden");
+      els.kbdControls.classList.add("hidden");
+      if (!window.Input.gyro.supported) els.gyroCheck.checked = false;
+    }
+    setupTouchButtons();
 
     const urlCode = roomFromUrl();
     if (urlCode) {
@@ -159,6 +217,25 @@
     window.Input.onMute = () => toggleMute();
 
     requestAnimationFrame((t) => { last = t; loop(t); });
+  }
+
+  function setupTouchButtons() {
+    const hold = (el, on) => {
+      const set = (v) => (e) => { e.preventDefault(); on(v); };
+      el.addEventListener("pointerdown", set(true));
+      el.addEventListener("pointerup", set(false));
+      el.addEventListener("pointercancel", set(false));
+      el.addEventListener("pointerleave", set(false));
+    };
+    hold(els.left, (v) => (window.Input.touch.left = v));
+    hold(els.right, (v) => (window.Input.touch.right = v));
+    hold(els.boost, (v) => (window.Input.touch.boost = v));
+    hold(els.fire, (v) => (window.Input.touch.fire = v));
+    els.recenter.addEventListener("pointerdown", (e) => {
+      e.preventDefault();
+      window.Input.recalibrateGyro();
+      window.SFX.uiClick();
+    });
   }
 
   function togglePause() {
