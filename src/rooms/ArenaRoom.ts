@@ -51,6 +51,7 @@ export class ArenaRoom extends Room<ArenaState> {
       if (p && typeof name === "string") p.name = name.slice(0, 14) || p.name;
     });
 
+    this.setPatchRate(33); // ~30Hz broadcasts to match the simulation (smoother clients)
     this.setSimulationInterval((dt) => this.update(dt / 1000));
   }
 

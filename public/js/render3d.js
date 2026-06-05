@@ -42,6 +42,8 @@ import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
   const camPos = new THREE.Vector3(cx, 1200, cz + 1400);
   const camLook = new THREE.Vector3(cx, 0, cz);
   const particles = [];
+  const INTERP_DELAY = 100; // ms render delay for remote snapshot interpolation
+  const predict = { x: 0, z: 0, angle: 0, speed: 0 }; // local-plane client prediction
 
   const R = {
     views: new Map(),
@@ -143,28 +145,44 @@ import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
       hitStop = Math.max(0, hitStop - dt);
       const sdt = hitStop > 0 ? dt * 0.12 : dt; // hit-stop slows camera + fx only
 
+      const interp = (window.Net && window.Net.sample) ? window.Net.sample(performance.now() - INTERP_DELAY) : {};
+      const input = window.Input ? window.Input.get() : { turn: 0, boost: false, fire: false };
+
       const seen = new Set();
       state.players.forEach((p, id) => {
         seen.add(id);
         let v = this.views.get(id);
-        if (!v) { v = this._makeView(id, p); this.views.set(id, v); }
+        if (!v) { v = this._makeView(id, p); this.views.set(id, v); if (id === myId) this._initPredict(p); }
 
-        if (v.wasAlive && !p.alive) {
+        const wasAlive = v.wasAlive;
+        if (wasAlive && !p.alive) {
           this._explode(v.cx, v.cz, SKINS[p.skin % SKINS.length]);
           if (id === myId) this.setShake(15);
         }
-        if (!v.wasAlive && p.alive) { v.cx = p.x; v.cz = p.y; v.cAngle = p.angle; }
+        const justSpawned = !wasAlive && p.alive;
+        if (justSpawned) { v.cx = p.x; v.cz = p.y; v.cAngle = p.angle; if (id === myId) this._initPredict(p); }
         v.wasAlive = p.alive;
         if (id === myId && p.alive && p.hp < v.hp) { this.setShake(7); dip = Math.min(1, dip + 0.7); }
         v.hp = p.hp; v.alive = p.alive; v.boosting = p.boosting;
 
-        const me = id === myId;
-        const k = Math.min(1, dt * (me ? 20 : 12));
-        v.cx += (p.x - v.cx) * k;
-        v.cz += (p.y - v.cz) * k;
-        const lead = shortest(p.angle - v.cAngle);
-        v.cAngle += lead * Math.min(1, dt * (me ? 22 : 13));
-        v.bankTarget = Math.max(-0.7, Math.min(0.7, -lead * 4));
+        if (id === myId) {
+          // Client-side prediction for instant control, eased toward authoritative state.
+          if (p.alive) {
+            this._stepPredict(dt, input);
+            const ex = p.x - predict.x, ez = p.y - predict.z;
+            if (Math.hypot(ex, ez) > 140) { predict.x = p.x; predict.z = p.y; predict.angle = p.angle; }
+            else { const rk = Math.min(1, dt * 2.5); predict.x += ex * rk; predict.z += ez * rk; predict.angle += shortest(p.angle - predict.angle) * rk; }
+            v.cx = predict.x; v.cz = predict.z; v.cAngle = predict.angle;
+            v.bankTarget = Math.max(-0.7, Math.min(0.7, -(input.turn || 0) * 0.7));
+          } else { v.cx = p.x; v.cz = p.y; v.cAngle = p.angle; v.bankTarget = 0; }
+        } else {
+          // Remote: time-based snapshot interpolation (falls back to raw state).
+          const ip = interp[id];
+          if (ip && p.alive && !justSpawned) {
+            v.bankTarget = Math.max(-0.7, Math.min(0.7, -shortest(ip.angle - v.cAngle) * 4));
+            v.cx = ip.x; v.cz = ip.y; v.cAngle = ip.angle;
+          } else { v.cx = p.x; v.cz = p.y; v.cAngle = p.angle; v.bankTarget = 0; }
+        }
         v.bank += (v.bankTarget - v.bank) * Math.min(1, dt * 9);
 
         this._placePlane(v, p);
@@ -181,13 +199,17 @@ import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
         if (!seen.has(id)) { scene.remove(v.mesh); if (v.blob) scene.remove(v.blob); this.views.delete(id); }
       });
 
+      // Bullets: extrapolate along heading each frame; reconcile to server on a patch.
       const bseen = new Set();
       state.bullets.forEach((b, key) => {
         bseen.add(key);
         let m = this.bullets.get(key);
-        if (!m) { m = this._makeBullet(); this.bullets.set(key, m); }
-        m.position.set(b.x, ALT, b.y);
-        _t.set(b.x + fX(b.angle), ALT, b.y + fZ(b.angle));
+        if (!m) { m = this._makeBullet(); m.userData = { x: b.x, z: b.y, sx: b.x, sz: b.y, angle: b.angle }; this.bullets.set(key, m); }
+        const u = m.userData;
+        if (b.x !== u.sx || b.y !== u.sz) { u.x = b.x; u.z = b.y; u.sx = b.x; u.sz = b.y; u.angle = b.angle; }
+        else { u.x += fX(u.angle) * G.BULLET_SPEED * dt; u.z += fZ(u.angle) * G.BULLET_SPEED * dt; }
+        m.position.set(u.x, ALT, u.z);
+        _t.set(u.x + fX(u.angle), ALT, u.z + fZ(u.angle));
         m.lookAt(_t);
       });
       this.bullets.forEach((m, key) => {
@@ -231,7 +253,28 @@ import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
         shadows: renderer ? renderer.shadowMap.enabled : null,
         quality: Q.current, fov: Math.round(fov),
         cam: camera ? camera.position.toArray().map((n) => Math.round(n)) : null,
+        predict: [Math.round(predict.x), Math.round(predict.z)],
       };
+    },
+
+    // ---- local-plane prediction (mirrors the server stepPlane) ----
+    _initPredict(p) { predict.x = p.x; predict.z = p.y; predict.angle = p.angle; predict.speed = G.CRUISE_SPEED; },
+
+    _deflect(angle, inward) { const diff = ((inward - angle + Math.PI) % (Math.PI * 2)) - Math.PI; return angle + diff * 0.35; },
+
+    _stepPredict(dt, input) {
+      predict.angle += (input.turn || 0) * G.TURN_RATE * dt;
+      const target = input.boost ? G.BOOST_SPEED : G.CRUISE_SPEED;
+      const before = predict.speed;
+      predict.speed += Math.sign(target - before) * G.ACCEL * dt;
+      if ((target - predict.speed) * (target - before) < 0) predict.speed = target;
+      predict.x += Math.cos(predict.angle) * predict.speed * dt;
+      predict.z += Math.sin(predict.angle) * predict.speed * dt;
+      const m = G.WALL_MARGIN + G.PLANE_RADIUS;
+      if (predict.x < m) { predict.x = m; predict.angle = this._deflect(predict.angle, 0); }
+      if (predict.x > G.ARENA_WIDTH - m) { predict.x = G.ARENA_WIDTH - m; predict.angle = this._deflect(predict.angle, Math.PI); }
+      if (predict.z < m) { predict.z = m; predict.angle = this._deflect(predict.angle, Math.PI / 2); }
+      if (predict.z > G.ARENA_HEIGHT - m) { predict.z = G.ARENA_HEIGHT - m; predict.angle = this._deflect(predict.angle, -Math.PI / 2); }
     },
 
     // ===================== build =====================
