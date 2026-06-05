@@ -42,4 +42,4 @@
 - [x] 6.1 Local headless verification (Preview `eval`/`readPixels`): scene builds, planes/shadows/bloom render, audio API loads, quality toggle works, zero console errors (4 planes, bots firing, 22 particles, sky+grass pixels confirmed)
 - [x] 6.2 Quality-tier sanity check: Low disables bloom and uses blob shadows yet still renders; Med/High enable shadow map + bloom (verified via __debug)
 - [x] 6.3 `tsc --noEmit` for the server bot changes (OK); updated README (3D, quality setting, audio credits) and kept Kenney CC0 attribution
-- [ ] 6.4 Commit → push `main` → redeploy via Coolify; verify live (game 200, audio/assets served, matchmake + WebSocket 101) and spot-check the deployed build
+- [x] 6.4 Commit → push `main` → redeploy via Coolify; verified live (game 200, audio/assets served, matchmake 200 + WebSocket 101, app running:healthy)
