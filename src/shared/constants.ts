@@ -40,3 +40,25 @@ export const BOT_NAMES = [
 
 // Plane skins (index → asset). Players cycle through these.
 export const SKIN_COUNT = 5;
+
+// Powerups
+export const PICKUP_MAX = 5;
+export const PICKUP_INTERVAL = 6;      // seconds between spawns while below max
+export const PICKUP_RADIUS = 26;
+export const POWERUP_DURATION = 10;    // seconds for timed effects
+export const SHIELD_CHARGES = 3;
+export const RAPID_FACTOR = 0.45;      // fire-cooldown multiplier while rapid
+export const SPREAD_ANGLE = 0.18;      // radians between spread bullets
+export const AFTERBURNER_FACTOR = 1.4; // speed multiplier
+export const HOMING_TURN = 2.6;        // radians/sec homing steer
+export const POWERUP_TYPES = ["spread", "rapid", "shield", "afterburner", "repair", "homing"];
+export const POWERUP_WEIGHTS: Record<string, number> = {
+  spread: 1, rapid: 1, shield: 1, afterburner: 1, repair: 0.7, homing: 0.6,
+};
+
+// Robustness / hardening
+export const DT_MAX = 0.05;          // clamp the server step so a hitch can't tunnel/blow up physics
+export const SPAWN_INVULN = 1.2;     // seconds of invulnerability after (re)spawn (drops on first fire)
+export const RECONNECT_WINDOW = 20;  // seconds the server keeps a dropped player's slot for reconnection
+export const INPUT_RATE_MAX = 60;    // max "input" messages/sec processed per client
+export const NAME_RATE_MAX = 5;      // max "setName" messages/sec processed per client

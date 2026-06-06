@@ -99,6 +99,7 @@
     kill() { playBuf("kill"); },
     go() { playBuf("ui", 0.7, 0.8); },
     uiClick() { playBuf("ui"); },
+    pickup() { playBuf("ui", 1.6, 0.9); },
     toggleMute() { store.muted = !store.muted; wr("sc_muted", store.muted ? 1 : 0); applyVolumes(); return store.muted; },
     isMuted() { return store.muted; },
     setMaster(v) { store.master = clamp(v); wr("sc_vol_master", store.master); applyVolumes(); },

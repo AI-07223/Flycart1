@@ -22,11 +22,13 @@
     settingsBtn: $("settings-btn"), settingsPanel: $("settings-panel"),
     qSeg: $("quality-seg"), volMaster: $("vol-master"), volMusic: $("vol-music"), volSfx: $("vol-sfx"),
     settingsClose: $("settings-close"), callout: $("callout"),
+    powerChip: $("power-chip"),
   };
 
   let prevPhase = "playing";
   let prevHp = 100;
   let streak = 0, lastKill = 0, lastFireSnd = 0;
+  let powerType = "", powerStart = 0;
 
   let mode = "menu"; // menu | playing | paused
   let last = 0;
@@ -141,6 +143,20 @@
       }
       els.vignette.classList.toggle("low", me.alive && me.hp > 0 && me.hp < 30);
       prevHp = me.hp;
+
+      // Active-powerup chip + countdown.
+      if (me.power) {
+        if (me.power !== powerType) { powerType = me.power; powerStart = performance.now(); }
+        const info = G.POWERUPS[me.power] || { label: me.power, icon: "★", color: 0xffffff };
+        const left = Math.max(0, G.POWERUP_DURATION - (performance.now() - powerStart) / 1000);
+        const pct = Math.max(0, Math.min(100, (left / G.POWERUP_DURATION) * 100));
+        const hex = "#" + info.color.toString(16).padStart(6, "0");
+        els.powerChip.classList.remove("hidden");
+        els.powerChip.innerHTML = `<span class="pc-label">${info.icon} ${escapeHtml(info.label)}</span><span class="pc-bar"><span class="pc-fill" style="width:${pct}%;background:${hex}"></span></span>`;
+      } else {
+        powerType = "";
+        els.powerChip.classList.add("hidden");
+      }
     }
 
     // Leaderboard: top 5 by score.
@@ -208,6 +224,14 @@
     return s >= 6 ? "GODLIKE!" : s >= 5 ? "UNSTOPPABLE!" : s >= 4 ? "RAMPAGE!" : s >= 3 ? "TRIPLE SMASH!" : "DOUBLE SMASH!";
   }
 
+  // Powerup grabbed (server "pickup" event) — feedback only for the local player.
+  function onPickup(msg) {
+    if (!window.Net || msg.by !== window.Net.sessionId) return;
+    window.SFX.pickup();
+    const info = G.POWERUPS[msg.type];
+    showCallout((info ? info.icon + " " + info.label : "POWERUP") + "!");
+  }
+
   function escapeHtml(s) {
     return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   }
@@ -219,6 +243,7 @@
     window.Assets.load();
 
     window.Net.onKill = onKill;
+    window.Net.onPickup = onPickup;
 
     // Show mobile options on touch devices.
     if (window.Input.isTouchDevice()) {

@@ -29,11 +29,21 @@ import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
   const PUFF_GEO = new THREE.SphereGeometry(1, 8, 8);
   const RING_GEO = new THREE.TorusGeometry(1, 0.16, 8, 28);
   const BLOB_GEO = new THREE.CircleGeometry(1, 20);
+  [SPARK_GEO, PUFF_GEO, RING_GEO, BLOB_GEO].forEach((g) => (g.__shared = true)); // never dispose these
 
   const _t = new THREE.Vector3();
   const fX = (a) => Math.cos(a), fZ = (a) => Math.sin(a);
   const shortest = (a) => Math.atan2(Math.sin(a), Math.cos(a));
   const rand = (a, b) => a + Math.random() * (b - a);
+  const _seen = new Set(), _bseen = new Set(), _pkseen = new Set(); // reused each frame (no per-frame Set alloc)
+
+  // Free GPU resources for an object and its children. scene.remove() alone LEAKS geometry + material.
+  function disposeObject(obj) {
+    obj.traverse((o) => {
+      if (o.geometry && !o.geometry.__shared) o.geometry.dispose();
+      if (o.material) Array.isArray(o.material) ? o.material.forEach((m) => m.dispose()) : o.material.dispose();
+    });
+  }
 
   let scene, camera, renderer, composer, bloomPass, sun;
   let canvasEl, minimap, mmctx, popupLayer;
@@ -48,6 +58,7 @@ import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
   const R = {
     views: new Map(),
     bullets: new Map(),
+    pickups: new Map(),
 
     init(canvas) {
       canvasEl = canvas;
@@ -148,7 +159,7 @@ import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
       const interp = (window.Net && window.Net.sample) ? window.Net.sample(performance.now() - INTERP_DELAY) : {};
       const input = window.Input ? window.Input.get() : { turn: 0, boost: false, fire: false };
 
-      const seen = new Set();
+      const seen = _seen; seen.clear();
       state.players.forEach((p, id) => {
         seen.add(id);
         let v = this.views.get(id);
@@ -168,7 +179,7 @@ import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
         if (id === myId) {
           // Client-side prediction for instant control, eased toward authoritative state.
           if (p.alive) {
-            this._stepPredict(dt, input);
+            this._stepPredict(dt, input, p.power);
             const ex = p.x - predict.x, ez = p.y - predict.z;
             if (Math.hypot(ex, ez) > 140) { predict.x = p.x; predict.z = p.y; predict.angle = p.angle; }
             else { const rk = Math.min(1, dt * 2.5); predict.x += ex * rk; predict.z += ez * rk; predict.angle += shortest(p.angle - predict.angle) * rk; }
@@ -187,6 +198,11 @@ import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 
         this._placePlane(v, p);
 
+        if (p.power === "shield" && p.alive) {
+          if (!v.shield) { v.shield = this._makeShield(); scene.add(v.shield); }
+          v.shield.visible = true; v.shield.position.set(v.cx, ALT, v.cz);
+        } else if (v.shield) { v.shield.visible = false; }
+
         if (p.alive) {
           const rate = p.boosting ? 0.03 : 0.13;
           if (time - v.lastPuff > rate) {
@@ -196,25 +212,43 @@ import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
         }
       });
       this.views.forEach((v, id) => {
-        if (!seen.has(id)) { scene.remove(v.mesh); if (v.blob) scene.remove(v.blob); this.views.delete(id); }
+        if (!seen.has(id)) {
+          scene.remove(v.mesh); disposeObject(v.mesh);
+          if (v.blob) { scene.remove(v.blob); disposeObject(v.blob); }
+          if (v.shield) { scene.remove(v.shield); disposeObject(v.shield); }
+          this.views.delete(id);
+        }
       });
 
-      // Bullets: extrapolate along heading each frame; reconcile to server on a patch.
-      const bseen = new Set();
+      // Bullets: straight bullets extrapolate along heading; homing bullets curve server-side, so
+      // snap those to the authoritative position each frame (no wrong straight-line ghost trail).
+      const bseen = _bseen; bseen.clear();
       state.bullets.forEach((b, key) => {
         bseen.add(key);
         let m = this.bullets.get(key);
-        if (!m) { m = this._makeBullet(); m.userData = { x: b.x, z: b.y, sx: b.x, sz: b.y, angle: b.angle }; this.bullets.set(key, m); }
+        if (!m) { m = this._makeBullet(b.homing); m.userData = { x: b.x, z: b.y, sx: b.x, sz: b.y, angle: b.angle, homing: b.homing }; this.bullets.set(key, m); }
         const u = m.userData;
-        if (b.x !== u.sx || b.y !== u.sz) { u.x = b.x; u.z = b.y; u.sx = b.x; u.sz = b.y; u.angle = b.angle; }
+        if (u.homing) { u.x = b.x; u.z = b.y; u.angle = b.angle; }
+        else if (b.x !== u.sx || b.y !== u.sz) { u.x = b.x; u.z = b.y; u.sx = b.x; u.sz = b.y; u.angle = b.angle; }
         else { u.x += fX(u.angle) * G.BULLET_SPEED * dt; u.z += fZ(u.angle) * G.BULLET_SPEED * dt; }
         m.position.set(u.x, ALT, u.z);
         _t.set(u.x + fX(u.angle), ALT, u.z + fZ(u.angle));
         m.lookAt(_t);
       });
       this.bullets.forEach((m, key) => {
-        if (!bseen.has(key)) { scene.remove(m); this.bullets.delete(key); }
+        if (!bseen.has(key)) { scene.remove(m); disposeObject(m); this.bullets.delete(key); }
       });
+
+      // Pickups (floating powerup orbs).
+      const pkseen = _pkseen; pkseen.clear();
+      state.pickups.forEach((pk, key) => {
+        pkseen.add(key);
+        let m = this.pickups.get(key);
+        if (!m) { m = this._makePickup(pk.type); this.pickups.set(key, m); }
+        m.position.set(pk.x, ALT + Math.sin(time * 2 + m.userData.ph) * 7, pk.y);
+        m.rotation.y += dt * 1.6;
+      });
+      this.pickups.forEach((m, key) => { if (!pkseen.has(key)) { scene.remove(m); disposeObject(m); this.pickups.delete(key); } });
 
       this._updateParticles(sdt);
       this._updateCamera(myId, sdt);
@@ -434,13 +468,33 @@ import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
       if (v.blob) { v.blob.visible = p.alive && Q.cfg().shadows !== "map"; v.blob.position.set(v.cx, GROUND_Y + 0.8, v.cz); }
     },
 
-    _makeBullet() {
+    _makeBullet(homing) {
+      const core = homing ? 0xd7a8ff : 0xfff1a8, tcol = homing ? 0xc07bff : 0xffae3b;
       const grp = new THREE.Group();
-      grp.add(new THREE.Mesh(new THREE.SphereGeometry(3, 8, 8), new THREE.MeshBasicMaterial({ color: 0xfff1a8 })));
-      const tracer = new THREE.Mesh(new THREE.CylinderGeometry(1.1, 0.2, 16, 6), new THREE.MeshBasicMaterial({ color: 0xffae3b, transparent: true, opacity: 0.8 }));
+      grp.add(new THREE.Mesh(new THREE.SphereGeometry(homing ? 3.6 : 3, 8, 8), new THREE.MeshBasicMaterial({ color: core })));
+      const tracer = new THREE.Mesh(new THREE.CylinderGeometry(1.1, 0.2, 16, 6), new THREE.MeshBasicMaterial({ color: tcol, transparent: true, opacity: 0.8 }));
       tracer.rotation.x = Math.PI / 2; tracer.position.z = 8; grp.add(tracer);
       scene.add(grp);
       return grp;
+    },
+
+    _makePickup(type) {
+      const info = (G.POWERUPS && G.POWERUPS[type]) || { color: 0xffffff };
+      const grp = new THREE.Group();
+      const gem = new THREE.Mesh(new THREE.OctahedronGeometry(15, 0), new THREE.MeshStandardMaterial({ color: info.color, emissive: info.color, emissiveIntensity: 0.6, flatShading: true, roughness: 0.4 }));
+      grp.add(gem);
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(20, 1.6, 8, 24), new THREE.MeshBasicMaterial({ color: info.color, transparent: true, opacity: 0.7 }));
+      ring.rotation.x = Math.PI / 2; grp.add(ring);
+      grp.userData = { ph: Math.random() * 6 };
+      scene.add(grp);
+      return grp;
+    },
+
+    _makeShield() {
+      return new THREE.Mesh(
+        new THREE.SphereGeometry(38, 16, 12),
+        new THREE.MeshBasicMaterial({ color: 0x49c0ff, transparent: true, opacity: 0.18, depthWrite: false })
+      );
     },
 
     // ---- particles ----
