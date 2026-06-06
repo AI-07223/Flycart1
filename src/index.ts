@@ -6,8 +6,10 @@ import { WebSocketTransport } from "@colyseus/ws-transport";
 import { monitor } from "@colyseus/monitor";
 import crypto from "crypto";
 import { ArenaRoom } from "./rooms/ArenaRoom";
+import * as leaderboard from "./leaderboard";
 
 const PORT = Number(process.env.PORT) || 2567;
+leaderboard.init();
 
 const app = express();
 app.use(express.json({ limit: "16kb" }));
@@ -27,6 +29,16 @@ app.use(express.static(publicDir));
 
 // Lightweight health check for the VPS / load balancer.
 app.get("/healthz", (_req, res) => res.json({ ok: true }));
+
+// Read-only global leaderboard (top-N by best round score). Writes happen only inside the
+// room at round end from authoritative state — there is intentionally no write endpoint.
+let lbCache: { t: number; data: { name: string; score: number }[] } | null = null;
+app.get("/leaderboard", (req, res) => {
+  const now = Date.now();
+  if (!lbCache || now - lbCache.t > 2000) lbCache = { t: now, data: leaderboard.top(50) }; // brief cache vs refresh spam
+  const n = Math.max(1, Math.min(50, Number(req.query.n) || 10));
+  res.json(lbCache.data.slice(0, n));
+});
 
 // Colyseus monitor dashboard — protected with HTTP Basic Auth.
 // Credentials come from env (MONITOR_USER / MONITOR_PASS). If no password is

@@ -2,6 +2,7 @@ import { Room, Client } from "colyseus";
 import { ArenaState, Player, Bullet, Pickup } from "../schema/ArenaState";
 import * as C from "../shared/constants";
 import * as S from "../shared/sphere";
+import * as leaderboard from "../leaderboard";
 
 interface Input {
   turn: number; // -1, 0, 1
@@ -136,6 +137,8 @@ export class ArenaRoom extends Room<ArenaState> {
     if (this.state.phase === "playing") {
       this.state.timeLeft = Math.max(0, this.state.timeLeft - dt);
       if (this.state.timeLeft <= 0) {
+        // Round over: record each human's round score (best-kept) before scores reset next round.
+        for (const [, p] of this.state.players) if (!p.bot && p.score > 0) leaderboard.record(p.name, p.score);
         this.state.phase = "intermission";
         this.state.timeLeft = C.ROUND_INTERMISSION;
       }

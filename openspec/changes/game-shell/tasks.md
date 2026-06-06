@@ -11,11 +11,11 @@
 
 ## 2. Phase 2a — leaderboard code (safe before the volume exists; in-memory fallback)
 
-- [ ] 2.1 `src/leaderboard.ts` (new): in-memory top-N keyed by trimmed callsign with `record(name, score)` (keep `max`) and `top(n)`; persist to `${DATA_DIR}/leaderboard.json` via atomic write (temp + `rename`), debounced; if `DATA_DIR` is unset/unwritable, run in-memory only (load best-effort on boot)
-- [ ] 2.2 `src/rooms/ArenaRoom.ts`: at the round-end (playing→intermission) transition, `record(p.name, p.score)` for each **human** player with `score > 0` (never bots)
-- [ ] 2.3 `src/index.ts`: `GET /leaderboard?n=10` returns `[{name, score}]` (clamp n; brief in-memory cache); **no** write route
-- [ ] 2.4 `main.js` + `index.html` (+ css): leaderboard panel on the menu (compact top-5 + expand to top-10); fetch on menu load; graceful empty/placeholder state on error
-- [ ] 2.5 `tsc --noEmit` clean; Preview verify: a round-end records best human scores (verify against the compiled room like `scripts/verify-*.cjs`); `GET /leaderboard` returns ordered top-N; menu renders it; endpoint unreachable → menu still works (Quick Play unaffected)
+- [x] 2.1 `src/leaderboard.ts` (new): top-N keyed by trimmed callsign, `record` (keep max) + `top(n)`; persist to `${DATA_DIR}/leaderboard.json` via atomic temp+rename, debounced; in-memory fallback when DATA_DIR unset/unwritable; loads on boot — verified 7/7 (`scripts/verify-leaderboard.cjs`: ordering, best-kept, zero/empty ignored, persists across restart, fallback)
+- [x] 2.2 `src/rooms/ArenaRoom.ts`: at round-end (playing→intermission) records each **human** player with `score>0` (never bots) — verified against the compiled room (winner recorded, zero + bot excluded)
+- [x] 2.3 `src/index.ts`: `GET /leaderboard?n=10` returns `[{name,score}]` (clamp n; 2s cache); no write route — verified 200 + array live in Preview
+- [x] 2.4 `main.js` + `index.html` (+ css): leaderboard panel on the menu; fetch on load + after each game; graceful empty/error state — verified renders "No scores yet"
+- [x] 2.5 `tsc --noEmit` clean; Preview verified: endpoint, recording, menu render, Quick Play still fires, no console errors
 - [ ] 2.6 Commit → push `main` → Coolify redeploy → verify live (leaderboard endpoint 200; menu shows entries; in-memory fallback fine until the volume is added)
 
 ## 3. Phase 2b — infrastructure (the one infra step)

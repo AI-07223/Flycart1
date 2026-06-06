@@ -283,6 +283,12 @@ button.secondary { background: #2b3550; color: #fff; box-shadow: 0 6px 0 #1a2034
 #final-board li.me { color: #fff; font-weight: 700; }
 #final-board li.win { color: var(--accent); }
 
+/* Menu leaderboard */
+#menu-leaderboard { display: flex; flex-direction: column; align-items: center; gap: 6px; margin-top: 4px; width: min(360px, 80vw); }
+#lb-list { list-style: none; margin: 0; padding: 0; width: 100%; display: flex; flex-direction: column; gap: 3px; }
+#lb-list li { display: flex; justify-content: space-between; gap: 12px; background: rgba(10,16,28,0.5); border-radius: 6px; padding: 4px 12px; color: #c4cde2; font-size: 14px; }
+#lb-list li span:last-child { color: var(--accent); font-weight: 700; }
+
 .hidden { display: none !important; }
 
 /* ---------- 3D overlays ---------- */

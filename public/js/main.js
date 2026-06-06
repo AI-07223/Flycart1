@@ -19,7 +19,7 @@
     recenter: $("recenter-btn"),
     gyroOpt: $("gyro-opt"), gyroCheck: $("gyro-check"), kbdControls: $("kbd-controls"),
     touchHint: $("touch-controls-hint"), planeSwatches: $("plane-swatches"),
-    winnerLine: $("winner-line"), yourPlace: $("your-place"),
+    winnerLine: $("winner-line"), yourPlace: $("your-place"), lbList: $("lb-list"),
     vignette: $("vignette"), rotate: $("rotate-overlay"),
     settingsBtn: $("settings-btn"), settingsPanel: $("settings-panel"),
     qSeg: $("quality-seg"), volMaster: $("vol-master"), volMusic: $("vol-music"), volSfx: $("vol-sfx"),
@@ -41,6 +41,20 @@
   const SKINS = [0xff6b6b, 0x49c0ff, 0x8be34a, 0xffd24a, 0xc07bff];
   let selectedSkin = 0;
   try { const s = parseInt(localStorage.getItem("smashcart.skin"), 10); if (Number.isInteger(s) && s >= 0 && s < SKINS.length) selectedSkin = s; } catch (e) {}
+
+  // Fetch + render the global leaderboard on the menu; degrade gracefully on error.
+  function fetchLeaderboard() {
+    if (!els.lbList) return;
+    fetch("/leaderboard?n=10")
+      .then((r) => (r.ok ? r.json() : []))
+      .then((rows) => {
+        if (!Array.isArray(rows) || !rows.length) { els.lbList.innerHTML = '<li class="muted">No scores yet — be the first!</li>'; return; }
+        els.lbList.innerHTML = rows.map((e, i) =>
+          `<li><span>${i + 1}. ${escapeHtml(e.name)}</span><span>${e.score | 0}</span></li>`
+        ).join("");
+      })
+      .catch(() => { els.lbList.innerHTML = '<li class="muted">Leaderboard unavailable</li>'; });
+  }
 
   function buildPlanePicker() {
     if (!els.planeSwatches) return;
@@ -291,6 +305,7 @@
       if (!window.Input.gyro.supported) els.gyroCheck.checked = false;
     }
     buildPlanePicker();
+    fetchLeaderboard();
     setupTouchButtons();
 
     const urlCode = roomFromUrl();
@@ -387,6 +402,7 @@
     els.quick.disabled = els.friends.disabled = false;
     els.status.textContent = "";
     els.start.classList.remove("hidden");
+    fetchLeaderboard(); // refresh standings after a game
     updateRotateOverlay();
   }
 
