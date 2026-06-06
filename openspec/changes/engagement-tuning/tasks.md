@@ -34,5 +34,5 @@
 
 - [x] 7.1 `tsc --noEmit` clean; headless Preview — Quick Play opens (no `Renderer.init` regression), settings wired, new UI present, no console errors; `verify-sphere.cjs` 20/20 + `verify-leaderboard.cjs` 7/7 still green
 - [ ] 7.2 **Fly-test (lock the numbers, USER):** steering + bank correct in landscape (keyboard/touch/gyro); speeds trackable; flatter look at same feel; minimap unobtrusive/readable-on-threat; bots-off clean; mid-match control switch. Nudge K / speeds / FOV / minimap to taste
-- [ ] 7.3 Commit → push `main` → Coolify redeploy (**patient — do not cancel mid-build**) → verify the new build is served
+- [x] 7.3 Commit (d308010) → push → Coolify redeploy (patient, ~17 min, no cancel) → verified live: game 200, render3d has VIS_K, constants 185/320, input has invertSteer, bots toggle served, leaderboard still 200
 - [ ] 7.4 Observe high-ping feel on the globe; note whether a netcode follow-up is warranted
