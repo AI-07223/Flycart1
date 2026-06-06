@@ -11,7 +11,8 @@ Today the simulation is authoritative in flat 2D (`x`, `y`, `angle`) and merely 
 - **Renderer becomes a planet.** The flat island/water/boundary becomes a textured globe (grass continents, water, atmosphere); planes sit on and bank to the surface; the chase camera follows above the surface and the horizon curves; decor (clouds/balloons/blimp) orbits the planet.
 - **Netcode ported to the sphere.** Prediction mirrors the spherical step; remote interpolation slerps positions and interpolates tangent headings; bullet extrapolation follows geodesics.
 - **HUD/minimap.** The rectangular minimap becomes a small rotating globe or an equirectangular projection; "off-screen enemy" cues account for wrap-around.
-- **Recommended staged delivery** (see design): **Stage A** — visual curvature only (keep flat sim, curve the presentation) to de-risk the look; **Stage B** — true spherical simulation. Stage A is shippable on its own; Stage B is the real "globe instead of flat".
+- **Dynamic planet size by player count.** `GLOBE_RADIUS` scales with the number of bodies in the arena (humans + bots) to hold play density constant — **radius ∝ √(players)**, clamped to a floor/ceiling, recomputed **between rounds** (during the intermission) and held steady per round. Bigger lobby → bigger world; the variation is gentle (~1.4× across 4→8) so it never lurches. Free because positions are direction unit-vectors and speeds are angular — `R` only rescales the render/placement.
+- **Stage B is the committed deliverable** (see design): true spherical simulation. Stage A (visual curvature over the still-flat sim) is an optional internal look-test only — it does not remove the boundary, so it is not the release.
 
 ## Capabilities
 

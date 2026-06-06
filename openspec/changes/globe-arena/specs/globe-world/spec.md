@@ -39,3 +39,26 @@ The minimap and any off-screen target cues SHALL represent a wrapping spherical 
 #### Scenario: Minimap on a sphere
 - **WHEN** the minimap is shown
 - **THEN** it represents positions on the globe (rotating globe or projection), and direction cues point along the great-circle bearing to their target
+
+### Requirement: Planet size scales with player count
+The planet radius SHALL be derived from the number of bodies in the arena (human players plus active bots) so that play density stays roughly constant: more bodies SHALL yield a larger world. Because surface area grows with the square of the radius, the radius SHALL scale with the square root of the body count, clamped to a configured minimum and maximum. The radius SHALL be recomputed only at round start (during the intermission) and SHALL remain fixed for the duration of a round. Changing the radius SHALL NOT alter gameplay positions, headings, or aim — only the rendered scale and surface placement change (positions are directions; speeds and hit tests are angular).
+
+#### Scenario: More players, bigger world
+
+- **WHEN** a round begins with more bodies in the arena than the previous round
+- **THEN** the planet radius is larger (scaled by the square root of the body count, within the min/max bounds), keeping roughly the same player density
+
+#### Scenario: Size is stable within a round
+
+- **WHEN** players join or leave mid-round
+- **THEN** the planet radius does not change until the next round begins, so the world never resizes during a dogfight
+
+#### Scenario: Resizing preserves gameplay state
+
+- **WHEN** the radius changes between rounds
+- **THEN** no player or projectile is teleported and aim/collision outcomes are unaffected (only the rendered scale changes), because positions are stored as directions and motion/hit tests are angular
+
+#### Scenario: Bounded by floor and ceiling
+
+- **WHEN** the body count would imply a radius below the minimum or above the maximum
+- **THEN** the radius is clamped so the world is never too cramped (few players) nor so large that fights become hard to find (many players)

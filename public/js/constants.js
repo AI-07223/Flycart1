@@ -1,10 +1,7 @@
 // Client mirror of the gameplay-relevant constants in src/shared/constants.ts.
 // Used for local input prediction and rendering. Keep in sync with the server.
+// GLOBE ARENA: positions are unit-vector directions; speeds are linear surface speeds (÷ radius → angular).
 window.GAME = {
-  ARENA_WIDTH: 2600,
-  ARENA_HEIGHT: 1800,
-  WALL_MARGIN: 40,
-
   CRUISE_SPEED: 260,
   BOOST_SPEED: 440,
   ACCEL: 900,
@@ -26,9 +23,8 @@ window.GAME = {
   TICK_RATE: 30,
   SKIN_COUNT: 5,
 
-  // Sprites point UP (north) but our angle 0 = pointing right (east).
-  // Add this when drawing a plane rotated to its heading.
-  SPRITE_ROT_OFFSET: Math.PI / 2,
+  // Dynamic planet radius (reference; the live value is synced as state.radius).
+  R_BASE: 700, R_MIN: 560, R_MAX: 820, N_BASE: 6,
 
   // Powerups (client visuals + HUD). Durations/effects are server-authoritative.
   POWERUP_DURATION: 10,
@@ -41,9 +37,11 @@ window.GAME = {
     homing:      { label: "Homing",      color: 0xc07bff, icon: "🎯" },
   },
 
-  // ----- arena map content (arena-content) — mirror of src/shared/constants.ts -----
-  // Static map geometry used for rendering + local prediction's obstacle deflect.
-  // Environment NEVER damages players; these flags only gate cover/solidity.
+  // ----- arena map content (sphere-native) — mirror of src/shared/constants.ts -----
+  // Hotspot direction + obstacle specs (angle from hotspot, azimuth, angular radius). The client
+  // builds unit-vector dirs from these via window.Sphere.dirFrom(HOTSPOT_DIR, ang, az).
+  HOTSPOT_DIR: null, // set below (needs Sphere.normalize)
+  ZONES: { centerAng: 0.34, midAng: 0.7 },
   OBSTACLE_BEHAVIOR: {
     spire: { solid: true,  blocksBullets: true },
     rock:  { solid: true,  blocksBullets: true },
@@ -51,30 +49,26 @@ window.GAME = {
     arch:  { solid: true,  blocksBullets: true },
     ring:  { solid: false, blocksBullets: false },
   },
-  HOTSPOT: { x: 2600 / 2, y: 1800 / 2 },
-  ZONES: { centerR: 280, midR: 760 },
-  HOTSPOT_BIAS: 2,
-  SPAWN_REROLL: 8,
-  OBSTACLES: [
-    { x: 1300, y: 900,  radius: 95, height: 240, kind: "tower", landmark: "volcano" },
-    { x: 1820, y: 900,  radius: 70, height: 170, kind: "spire", landmark: "lighthouse" },
-    { x: 1560, y: 1350, radius: 80, height: 95,  kind: "rock",  landmark: "shipwreck" },
-    { x: 1040, y: 1350, radius: 72, height: 165, kind: "arch" },
-    { x: 780,  y: 900,  radius: 80, height: 150, kind: "spire" },
-    { x: 1040, y: 450,  radius: 72, height: 95,  kind: "rock",  landmark: "forest" },
-    { x: 1560, y: 450,  radius: 72, height: 165, kind: "arch" },
-    { x: 1300, y: 620,  radius: 46, height: 130, kind: "spire" },
-    { x: 1300, y: 1180, radius: 46, height: 130, kind: "spire" },
-    { x: 560,  y: 560,  radius: 70, height: 120, kind: "ring" },
-    { x: 2040, y: 1240, radius: 70, height: 120, kind: "ring" },
-    { x: 560,  y: 1240, radius: 70, height: 120, kind: "ring" },
+  OB_SPECS: [
+    { ang: 0.0,  az: 0,            angRadius: 0.12, height: 240, kind: "tower", landmark: "volcano" },
+    { ang: 0.55, az: 0,            angRadius: 0.09, height: 170, kind: "spire", landmark: "lighthouse" },
+    { ang: 0.55, az: Math.PI / 3,        angRadius: 0.10, height: 95,  kind: "rock",  landmark: "shipwreck" },
+    { ang: 0.55, az: 2 * Math.PI / 3,    angRadius: 0.09, height: 165, kind: "arch" },
+    { ang: 0.55, az: Math.PI,            angRadius: 0.10, height: 150, kind: "spire" },
+    { ang: 0.55, az: 4 * Math.PI / 3,    angRadius: 0.09, height: 95,  kind: "rock",  landmark: "forest" },
+    { ang: 0.55, az: 5 * Math.PI / 3,    angRadius: 0.09, height: 165, kind: "arch" },
+    { ang: 0.28, az: 0.5 * Math.PI,      angRadius: 0.06, height: 130, kind: "spire" },
+    { ang: 0.28, az: 1.5 * Math.PI,      angRadius: 0.06, height: 130, kind: "spire" },
+    { ang: 0.95, az: 0.2 * Math.PI,      angRadius: 0.10, height: 120, kind: "ring" },
+    { ang: 0.95, az: 1.0 * Math.PI,      angRadius: 0.10, height: 120, kind: "ring" },
+    { ang: 0.95, az: 1.6 * Math.PI,      angRadius: 0.10, height: 120, kind: "ring" },
   ],
-
-  // ----- pluggable distance/collision metric (Euclidean; swap point for the globe) -----
-  dist2(ax, ay, bx, by) { const dx = bx - ax, dy = by - ay; return dx * dx + dy * dy; },
-  within(ax, ay, bx, by, r) { return this.dist2(ax, ay, bx, by) <= r * r; },
-  normalDir(fromx, fromy, tox, toy) {
-    const dx = tox - fromx, dy = toy - fromy, len = Math.hypot(dx, dy);
-    return len > 1e-6 ? { x: dx / len, y: dy / len } : { x: 1, y: 0 };
-  },
 };
+// Build the hotspot direction + obstacle dirs once Sphere is available.
+window.GAME.HOTSPOT_DIR = window.Sphere.normalize(window.Sphere.vec(0, 0.35, 1));
+window.GAME.OBSTACLES = window.GAME.OB_SPECS.map(function (s) {
+  return {
+    dir: window.Sphere.dirFrom(window.GAME.HOTSPOT_DIR, s.ang, s.az),
+    angRadius: s.angRadius, height: s.height, kind: s.kind, landmark: s.landmark,
+  };
+});

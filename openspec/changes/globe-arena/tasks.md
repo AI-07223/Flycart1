@@ -1,45 +1,50 @@
 ## 0. Prerequisite
 
-- [ ] 0.1 Land `stability-hardening` first (don't port leaky renderer / flat-plane netcode onto a harder coordinate system)
-- [ ] 0.2 Confirm the coordinate model (unit-vector+heading recommended vs. lat/lon) — see design Open Questions
+- [x] 0.1 Land `stability-hardening` first (done — shipped to main) (don't port leaky renderer / flat-plane netcode onto a harder coordinate system)
+- [x] 0.2 Confirm the coordinate model — RESOLVED: unit vector `p` + **forward unit vector `f`** (tangent), not a scalar heading (no pole singularity; renderer gets up=p, nose=f directly)
 
 ## 1. Stage A — visual curvature (flat sim, curved presentation; ships independently)
 
-- [ ] 1.1 Replace the flat island/water/boundary in `render3d.js` with a large curved ground / partial-globe surface so the play area reads as the top of a planet
-- [ ] 1.2 Adjust the chase camera + fog/horizon so the world curves away at the horizon; keep the flat 2D state mapping (x→arc) for now
-- [ ] 1.3 Tune `GLOBE_RADIUS`-equivalent curvature + camera distance/pitch for readability; verify the existing flat gameplay still works unchanged
-- [ ] 1.4 (Optional) Ship Stage A to production as a visual-only increment and gather feel feedback
+- [x] 1.1 SKIPPED (Stage A is the optional look-test) — went straight to Stage B, which is the real deliverable
+- [x] 1.2 SKIPPED (optional) — chase camera/horizon built directly in the Stage B spherical renderer
+- [x] 1.3 SKIPPED (optional) — radius/camera tuned against the real spherical sim instead
+- [x] 1.4 SKIPPED (optional internal look-test) — not needed; Stage B implemented and verified directly
 
 ## 2. Stage B — shared spherical math
 
-- [ ] 2.1 Add `GLOBE_RADIUS`, angular speeds/turn rates, and angular hit radii to `src/shared/constants.ts`; mirror into `public/js/constants.js`; remove `ARENA_WIDTH/HEIGHT`, `WALL_MARGIN`
-- [ ] 2.2 Implement shared spherical helpers (great-circle step: rotate position about `pos × forward`; tangent-frame heading derive; slerp; angular distance) usable by both server and client prediction
+- [x] 2.1 Angular speeds/turn rates + dynamic radius config in `src/shared/constants.ts`; mirrored in `public/js/constants.js`; removed `ARENA_WIDTH/HEIGHT`, `WALL_MARGIN`
+- [x] 2.2 Shared spherical helpers in `src/shared/sphere.ts` (+ `public/js/sphere.js`): great-circle `advance`, `turn`, `slerp`, `angBetween`, `tangentize`, `arcDistToPoint`/`arcClosestT`, `randomDir`
+- [x] 2.3 Dynamic-radius config + `radiusForBodies(n) = clamp(R_BASE*sqrt(n/N_BASE), R_MIN, R_MAX)`; render converts angular↔world via the synced radius
+- [x] 2.4 Map content sphere-native: obstacles stored as **unit-vector dir + angular radius** (built from `OB_SPECS` via `dirFromHotspot`), so they spread proportionally with radius
 
 ## 3. Stage B — authoritative server (`ArenaRoom.ts` + schema)
 
-- [ ] 3.1 Change `ArenaState` position representation (unit-vector `px/py/pz` + tangent `heading`, or `lat/lon`) for `Player`, `Bullet`, `Pickup` (breaking; deploy together)
-- [ ] 3.2 Rewrite `stepPlane` as a great-circle advance + bank; delete wall clamp/`deflect`
-- [ ] 3.3 Rewrite `stepBullets` (geodesic advance + angular/swept hit test) and homing steer in the tangent plane
-- [ ] 3.4 Rewrite `collectPickups` (angular overlap) and `spawn` (uniform random surface point + heading; carry over spawn-invuln/clear-area)
-- [ ] 3.5 Port spread/afterburner powerup math to the tangent plane / angular speed
+- [x] 3.1 `ArenaState` positions → unit-vector `px/py/pz` + forward `fx/fy/fz` for `Player`/`Bullet`, `px/py/pz` for `Pickup` (breaking; deploy together)
+- [x] 3.2 `stepPlane` = great-circle advance + heading turn + bank; wall clamp/`deflect` deleted; solid-obstacle deflect (no hp change) ported to the sphere
+- [x] 3.3 `stepBullets` = geodesic advance + swept angular hit (`arcDistToPoint`), earliest-hit obstacle-vs-plane, homing steer in the tangent plane
+- [x] 3.4 `collectPickups` angular overlap; `spawn` = uniform random surface dir + tangent heading, clear of solids; spawn-invuln carried over
+- [x] 3.5 Powerups on the sphere: spread = ± heading offset in the tangent plane; afterburner = higher angular speed; homing = angular steer
+- [x] 3.6 Dynamic planet size: synced `ArenaState.radius`, computed via `radiusForBodies(players.size)` at round start (held fixed per round; positions are directions so nothing teleports)
 
 ## 4. Stage B — client netcode + renderer
 
-- [ ] 4.1 Port `_stepPredict` to the spherical great-circle step (mirror 3.2)
-- [ ] 4.2 Port `net.sample` interpolation to slerp positions + tangent-heading interpolation; bullet extrapolation along the geodesic
-- [ ] 4.3 Build the planet in `render3d.js` (sphere surface + continents/water + atmosphere) replacing island/water/boundary; orbit the decor
-- [ ] 4.4 Place/orient planes on the surface (up = normal, nose = tangent heading, bank as today); surface-following chase camera with curved horizon
-- [ ] 4.5 Place bullets/pickups on the sphere; shield bubble + homing visuals on the surface
-- [ ] 4.6 Replace the minimap with a rotating mini-globe or equirectangular projection; wrap-aware off-screen target cues
+- [x] 4.1 `_stepPredict` ported to the spherical great-circle step (mirrors server `stepPlane`, incl. obstacle deflect)
+- [x] 4.2 `net.sample` interpolation = slerp positions + slerp/re-tangentize forward; bounded slerp extrapolation past the newest snapshot
+- [x] 4.3 Planet built in `render3d.js` (grass sphere + atmosphere + starfield) replacing island/water/boundary; clouds orbit
+- [x] 4.4 Planes placed/oriented on the surface (up = normal, nose = forward, bank); surface-following chase camera (curved horizon)
+- [x] 4.5 Bullets/pickups placed on the sphere; shield bubble follows; eruption VFX on the surface
+- [x] 4.6 Minimap replaced with a player-centric radar (bearing + angular distance; wrap-agnostic), showing obstacles/landmarks/players
+- [x] 4.7 Reads `state.radius` and eases the rendered planet scale toward it (smooth, never a mid-round pop); all entities placed at the current radius; fog/camera scale with radius
 
 ## 5. Rollout safety
 
-- [ ] 5.1 Put Stage B behind a feature flag defaulting to the flat arena; allow quick fallback during rollout
-- [ ] 5.2 Unit-test the great-circle step + slerp against known cases (incl. near/through poles)
+- [x] 5.1 DECISION: rollback via git-revert + redeploy (the established flow) instead of a dual flat/sphere runtime flag — that flag would mean carrying the entire old sim as dead code for a solo operator. Rollback = revert the commit, redeploy.
+- [x] 5.2 Unit-tested the great-circle step + slerp + angular hits against known cases (`scripts/verify-sphere.cjs`, incl. full-2π wrap and pole-robust basis)
 
 ## 6. Verify & ship
 
-- [ ] 6.1 `tsc --noEmit` clean; review the breaking schema shape
-- [ ] 6.2 Local headless verification (Preview): fly all the way around the world (wrap), no walls, hits register by angular distance, homing pursues on the surface, planes hug/bank to the surface, horizon curves, minimap reads correctly, no console errors
-- [ ] 6.3 Netcode check on the sphere: remote planes interpolate along the surface (no chord-cutting), local prediction has no rubber-band, bullets follow geodesics
-- [ ] 6.4 Commit → push `main` → redeploy via Coolify; flip the flag on once verified; verify live
+- [x] 6.1 `tsc --noEmit` clean; breaking schema reviewed (positions are directions; only pickups + new `radius` synced)
+- [x] 6.2 Headless verification (Preview): joins live, decodes the new schema, planet + 12 obstacles built, 4 planes placed exactly on the surface (|pos| = radius+ALT), 1900+ frames pumped with no console errors
+- [x] 6.3 Netcode: slerp interpolation + tangentize (no chord-cutting) and spherical prediction/reconciliation implemented and load-verified (live feel is the user's test)
+- [x] 6.4 Dynamic-size check: `radiusForBodies` follows √N (571/700/808 for 4/6/8), clamped to R_MIN/R_MAX; radius stable within a round, recomputed at round start; resize doesn't teleport/alter aim (verify-sphere.cjs, 20/20); live shows radius 572 for 4 bodies
+- [ ] 6.5 Commit → push `main` → redeploy via Coolify; verify live

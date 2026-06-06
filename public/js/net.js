@@ -58,7 +58,7 @@
       if (!this.room || !this.room.state) return;
       const players = {};
       this.room.state.players.forEach((p, id) => {
-        players[id] = { x: p.x, y: p.y, angle: p.angle, alive: p.alive };
+        players[id] = { p: { x: p.px, y: p.py, z: p.pz }, f: { x: p.fx, y: p.fy, z: p.fz }, alive: p.alive };
       });
       const t = performance.now();
       this.snaps.push({ t, players });
@@ -66,30 +66,33 @@
       while (this.snaps.length > 2 && this.snaps[0].t < cut) this.snaps.shift();
     },
 
-    // Interpolated remote poses at renderTime (ms): { id: {x, y, angle, alive} }.
+    // Interpolated remote poses at renderTime (ms): { id: { p:{x,y,z}, f:{x,y,z}, alive } }.
+    // Positions slerp along the surface; forward slerps then re-tangentizes (no chord-cutting).
     sample(renderTime) {
-      const s = this.snaps, out = {};
+      const s = this.snaps, out = {}, Sp = window.Sphere;
       if (!s.length) return out;
+      const clone = (o) => ({ p: { ...o.p }, f: { ...o.f }, alive: o.alive });
+      const blend = (a, b, t) => { const p = Sp.slerp(a.p, b.p, t); return { p, f: Sp.tangentize(p, Sp.slerp(a.f, b.f, t)), alive: b.alive }; };
       const latest = s[s.length - 1];
       if (renderTime >= latest.t) {
-        // Past the newest snapshot → bounded extrapolation along recent velocity (no freeze-then-snap).
-        if (s.length < 2) { for (const id in latest.players) out[id] = { ...latest.players[id] }; return out; }
+        // Past the newest snapshot → bounded slerp extrapolation (t>1) along recent motion.
+        if (s.length < 2) { for (const id in latest.players) out[id] = clone(latest.players[id]); return out; }
         const prev = s[s.length - 2], span = latest.t - prev.t;
         const k = span > 0 ? Math.min(renderTime - latest.t, MAX_EXTRAP) / span : 0;
         for (const id in latest.players) {
           const b = latest.players[id], a = prev.players[id] || b;
-          out[id] = { x: b.x + (b.x - a.x) * k, y: b.y + (b.y - a.y) * k, angle: b.angle + shortDelta(a.angle, b.angle) * k, alive: b.alive };
+          out[id] = blend(a, b, 1 + k);
         }
         return out;
       }
       let bi = 0;
       while (bi < s.length && s[bi].t < renderTime) bi++;
-      if (bi === 0) { for (const id in s[0].players) out[id] = { ...s[0].players[id] }; return out; }
+      if (bi === 0) { for (const id in s[0].players) out[id] = clone(s[0].players[id]); return out; }
       const a = s[bi - 1], b = s[bi];
       const span = b.t - a.t, t = span > 0 ? (renderTime - a.t) / span : 0;
       for (const id in b.players) {
         const pb = b.players[id], pa = a.players[id] || pb;
-        out[id] = { x: lerp(pa.x, pb.x, t), y: lerp(pa.y, pb.y, t), angle: shortAngle(pa.angle, pb.angle, t), alive: pb.alive };
+        out[id] = blend(pa, pb, t);
       }
       return out;
     },

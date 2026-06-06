@@ -1,7 +1,6 @@
-// 3D renderer (Three.js, ESM) — arcade-cute. Drop-in for the game loop.
-// Server stays 2D-authoritative (position + heading); we present it as a toy
-// island arena with rounded low-poly planes, soft/blob shadows, bloom, poofy
-// explosions, a speed-sensing chase camera, hit-stop, and quality scaling.
+// 3D renderer (Three.js, ESM) — GLOBE ARENA. The world is a toy planet; planes fly on its surface
+// and wrap around it (no walls). Server is authoritative in spherical space (unit-vector positions +
+// tangent forward); we present it as a globe with a surface-following chase camera.
 //
 // window.Renderer API: init(canvas) · sync(state,dt,myId) · draw(state,myId)
 //   · views (Map) · killPopup(id,mine) · hitStop(ms) · setShake(mag) · __debug()
@@ -14,30 +13,29 @@ import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 (function () {
   const G = window.GAME;
   const Q = window.Quality;
+  const SP = window.Sphere;
   const TAU = Math.PI * 2;
-  const cx = G.ARENA_WIDTH / 2, cz = G.ARENA_HEIGHT / 2;
 
   // ---- tuning (rendering only) ----
-  const ALT = 64, GROUND_Y = 0, PLANE_SCALE = 1.7;
-  const CAM_BACK = 130, CAM_UP = 60, CAM_LOOKAHEAD = 120, CAM_LERP = 4.2;
-  const FOV_BASE = 62, FOV_BOOST = 73;
-  const SKY = 0x9fd4ff;
+  const ALT = 16, BULLET_ALT = 13, PICKUP_ALT = 20, PLANE_SCALE = 1.7;
+  const CAM_BACK = 150, CAM_UP = 78, CAM_LOOKAHEAD = 120, CAM_LERP = 4.5;
+  const FOV_BASE = 64, FOV_BOOST = 75;
+  const SKY = 0x0b1022;
   const SKINS = [0xff6b6b, 0x49c0ff, 0x8be34a, 0xffd24a, 0xc07bff];
 
-  // shared geometries (cheap to reuse)
+  // shared geometries (cheap to reuse) — never disposed
   const SPARK_GEO = new THREE.TetrahedronGeometry(1);
   const PUFF_GEO = new THREE.SphereGeometry(1, 8, 8);
   const RING_GEO = new THREE.TorusGeometry(1, 0.16, 8, 28);
-  const BLOB_GEO = new THREE.CircleGeometry(1, 20);
-  [SPARK_GEO, PUFF_GEO, RING_GEO, BLOB_GEO].forEach((g) => (g.__shared = true)); // never dispose these
+  [SPARK_GEO, PUFF_GEO, RING_GEO].forEach((g) => (g.__shared = true));
 
-  const _t = new THREE.Vector3();
-  const fX = (a) => Math.cos(a), fZ = (a) => Math.sin(a);
-  const shortest = (a) => Math.atan2(Math.sin(a), Math.cos(a));
+  // scratch + helpers
+  const V = (o) => new THREE.Vector3(o.x, o.y, o.z);
+  const m4 = new THREE.Matrix4();
+  const _a = new THREE.Vector3(), _b = new THREE.Vector3(), _c = new THREE.Vector3();
   const rand = (a, b) => a + Math.random() * (b - a);
-  const _seen = new Set(), _bseen = new Set(), _pkseen = new Set(); // reused each frame (no per-frame Set alloc)
+  const _seen = new Set(), _bseen = new Set(), _pkseen = new Set();
 
-  // Free GPU resources for an object and its children. scene.remove() alone LEAKS geometry + material.
   function disposeObject(obj) {
     obj.traverse((o) => {
       if (o.geometry && !o.geometry.__shared) o.geometry.dispose();
@@ -49,12 +47,18 @@ import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
   let canvasEl, minimap, mmctx, popupLayer;
   let time = 0, shakeMag = 0, hitStop = 0, fov = FOV_BASE, dip = 0;
   let decorScale = 1, partScale = 1;
-  const camPos = new THREE.Vector3(cx, 1200, cz + 1400);
-  const camLook = new THREE.Vector3(cx, 0, cz);
+  let curR = G.R_BASE;          // eased render radius (toward state.radius)
+  let volcano = null, eruptAt = 0, emberAt = 0;
+  const camPos = new THREE.Vector3(0, 0, curR * 3);
+  const camLook = new THREE.Vector3(0, 0, 0);
+  const camUp = new THREE.Vector3(0, 1, 0);
   const particles = [];
-  const INTERP_DELAY = 100; // ms render delay for remote snapshot interpolation
-  const predict = { x: 0, z: 0, angle: 0, speed: 0 }; // local-plane client prediction
-  let volcano = null, eruptAt = 0, emberAt = 0; // central hotspot eruption VFX (render-only)
+  const INTERP_DELAY = 100;
+  // local-plane prediction: p (dir), f (forward tangent), speed
+  const predict = { p: { x: 0, y: 1, z: 0 }, f: { x: 1, y: 0, z: 0 }, speed: G.CRUISE_SPEED };
+
+  // world position of a surface direction at altitude `alt` (uses the eased radius)
+  const worldOf = (dir, alt) => _a.set(dir.x, dir.y, dir.z).multiplyScalar(curR + alt);
 
   const R = {
     views: new Map(),
@@ -69,48 +73,40 @@ import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
       renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: "high-performance" });
       renderer.setSize(window.innerWidth, window.innerHeight, false);
       renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, cfg.pixelRatio));
-      renderer.toneMapping = THREE.NoToneMapping; // keep arcade colors vivid
+      renderer.toneMapping = THREE.NoToneMapping;
       renderer.shadowMap.enabled = cfg.shadows === "map";
       renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
       scene = new THREE.Scene();
       scene.background = new THREE.Color(SKY);
-      scene.fog = new THREE.Fog(SKY, 1300, 3400);
+      scene.fog = new THREE.Fog(SKY, curR * 2.4, curR * 5.5);
 
-      camera = new THREE.PerspectiveCamera(FOV_BASE, window.innerWidth / window.innerHeight, 1, 9000);
+      camera = new THREE.PerspectiveCamera(FOV_BASE, window.innerWidth / window.innerHeight, 1, 40000);
       camera.position.copy(camPos);
 
-      // lights
-      scene.add(new THREE.HemisphereLight(0xcdebff, 0x4a6b3a, 1.0));
-      sun = new THREE.DirectionalLight(0xfff4da, 1.25);
-      sun.position.set(cx - 300, 760, cz - 220);
-      sun.castShadow = cfg.shadows === "map";
-      sun.shadow.mapSize.set(cfg.shadowMap || 1024, cfg.shadowMap || 1024);
-      const sc = sun.shadow.camera;
-      sc.left = -520; sc.right = 520; sc.top = 520; sc.bottom = -520; sc.near = 60; sc.far = 1800;
-      sc.updateProjectionMatrix();
+      scene.add(new THREE.HemisphereLight(0xbfe0ff, 0x404a5a, 1.0));
+      sun = new THREE.DirectionalLight(0xfff4da, 1.3);
+      sun.position.set(1, 0.7, 0.6).multiplyScalar(3000);
       scene.add(sun);
-      scene.add(sun.target);
 
-      // post-processing
       const w = window.innerWidth, h = window.innerHeight;
       composer = new EffectComposer(renderer);
       composer.setSize(w, h);
       composer.setPixelRatio(renderer.getPixelRatio());
       composer.addPass(new RenderPass(scene, camera));
-      bloomPass = new UnrealBloomPass(new THREE.Vector2(w, h), 0.62, 0.5, 0.82);
+      bloomPass = new UnrealBloomPass(new THREE.Vector2(w, h), 0.6, 0.5, 0.82);
       bloomPass.enabled = cfg.bloom;
       composer.addPass(bloomPass);
       composer.addPass(new OutputPass());
 
-      this._buildIsland();
-      this._buildBoundary();
-      this._buildDecor();
+      this._buildStars();
+      this._buildPlanet();
       this._buildObstacles();
+      this._buildDecor();
 
       minimap = document.createElement("canvas");
       minimap.id = "minimap";
-      minimap.width = 150; minimap.height = Math.round(150 * (G.ARENA_HEIGHT / G.ARENA_WIDTH));
+      minimap.width = 150; minimap.height = 150;
       (document.getElementById("game-wrap") || document.body).appendChild(minimap);
       mmctx = minimap.getContext("2d");
 
@@ -128,17 +124,8 @@ import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
       renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, cfg.pixelRatio));
       if (composer) composer.setPixelRatio(renderer.getPixelRatio());
       if (bloomPass) bloomPass.enabled = cfg.bloom;
-      const useMap = cfg.shadows === "map";
-      renderer.shadowMap.enabled = useMap;
+      renderer.shadowMap.enabled = cfg.shadows === "map";
       renderer.shadowMap.needsUpdate = true;
-      if (sun) {
-        sun.castShadow = useMap;
-        if (useMap && cfg.shadowMap) {
-          sun.shadow.mapSize.set(cfg.shadowMap, cfg.shadowMap);
-          if (sun.shadow.map) { sun.shadow.map.dispose(); sun.shadow.map = null; }
-        }
-      }
-      this.views.forEach((v) => { if (v.blob) v.blob.visible = !useMap; });
     },
 
     resize() {
@@ -156,7 +143,11 @@ import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
       Q.sample(dt);
       time += dt;
       hitStop = Math.max(0, hitStop - dt);
-      const sdt = hitStop > 0 ? dt * 0.12 : dt; // hit-stop slows camera + fx only
+      const sdt = hitStop > 0 ? dt * 0.12 : dt;
+
+      // ease the rendered planet radius toward the authoritative (per-round) value
+      const targetR = state.radius || G.R_BASE;
+      curR += (targetR - curR) * Math.min(1, dt * 1.5);
 
       const interp = (window.Net && window.Net.sample) ? window.Net.sample(performance.now() - INTERP_DELAY) : {};
       const input = window.Input ? window.Input.get() : { turn: 0, boost: false, fire: false };
@@ -167,34 +158,31 @@ import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
         let v = this.views.get(id);
         if (!v) { v = this._makeView(id, p); this.views.set(id, v); if (id === myId) this._initPredict(p); }
 
+        const sp = { x: p.px, y: p.py, z: p.pz }, sf = { x: p.fx, y: p.fy, z: p.fz };
         const wasAlive = v.wasAlive;
-        if (wasAlive && !p.alive) {
-          this._explode(v.cx, v.cz, SKINS[p.skin % SKINS.length]);
-          if (id === myId) this.setShake(15);
-        }
+        if (wasAlive && !p.alive) { this._explode(worldOf(v.p, ALT).clone(), v.p, SKINS[p.skin % SKINS.length]); if (id === myId) this.setShake(15); }
         const justSpawned = !wasAlive && p.alive;
-        if (justSpawned) { v.cx = p.x; v.cz = p.y; v.cAngle = p.angle; if (id === myId) this._initPredict(p); }
+        if (justSpawned) { v.p = sp; v.f = sf; if (id === myId) this._initPredict(p); }
         v.wasAlive = p.alive;
         if (id === myId && p.alive && p.hp < v.hp) { this.setShake(7); dip = Math.min(1, dip + 0.7); }
         v.hp = p.hp; v.alive = p.alive; v.boosting = p.boosting;
 
+        const prevF = v.f;
         if (id === myId) {
-          // Client-side prediction for instant control, eased toward authoritative state.
           if (p.alive) {
             this._stepPredict(dt, input, p.power);
-            const ex = p.x - predict.x, ez = p.y - predict.z;
-            if (Math.hypot(ex, ez) > 140) { predict.x = p.x; predict.z = p.y; predict.angle = p.angle; }
-            else { const rk = Math.min(1, dt * 2.5); predict.x += ex * rk; predict.z += ez * rk; predict.angle += shortest(p.angle - predict.angle) * rk; }
-            v.cx = predict.x; v.cz = predict.z; v.cAngle = predict.angle;
+            const err = SP.angBetween(predict.p, sp);
+            if (err > 0.2) { predict.p = sp; predict.f = sf; }
+            else { const rk = Math.min(1, dt * 2.5); predict.p = SP.slerp(predict.p, sp, rk); predict.f = SP.tangentize(predict.p, SP.slerp(predict.f, sf, rk)); }
+            v.p = predict.p; v.f = predict.f;
             v.bankTarget = Math.max(-0.7, Math.min(0.7, -(input.turn || 0) * 0.7));
-          } else { v.cx = p.x; v.cz = p.y; v.cAngle = p.angle; v.bankTarget = 0; }
+          } else { v.p = sp; v.f = sf; v.bankTarget = 0; }
         } else {
-          // Remote: time-based snapshot interpolation (falls back to raw state).
           const ip = interp[id];
           if (ip && p.alive && !justSpawned) {
-            v.bankTarget = Math.max(-0.7, Math.min(0.7, -shortest(ip.angle - v.cAngle) * 4));
-            v.cx = ip.x; v.cz = ip.y; v.cAngle = ip.angle;
-          } else { v.cx = p.x; v.cz = p.y; v.cAngle = p.angle; v.bankTarget = 0; }
+            v.p = ip.p; v.f = ip.f;
+            v.bankTarget = Math.max(-0.7, Math.min(0.7, -SP.signedAngle(v.p, prevF, ip.f) * 7));
+          } else { v.p = sp; v.f = sf; v.bankTarget = 0; }
         }
         v.bank += (v.bankTarget - v.bank) * Math.min(1, dt * 9);
 
@@ -202,53 +190,50 @@ import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 
         if (p.power === "shield" && p.alive) {
           if (!v.shield) { v.shield = this._makeShield(); scene.add(v.shield); }
-          v.shield.visible = true; v.shield.position.set(v.cx, ALT, v.cz);
+          v.shield.visible = true; v.shield.position.copy(worldOf(v.p, ALT));
         } else if (v.shield) { v.shield.visible = false; }
 
         if (p.alive) {
           const rate = p.boosting ? 0.03 : 0.13;
           if (time - v.lastPuff > rate) {
             v.lastPuff = time;
-            this._puff(v.cx - fX(v.cAngle) * 24, v.cz - fZ(v.cAngle) * 24, p.boosting);
+            const back = SP.advance(v.p, v.f, -24 / curR).p; // just behind the tail on the surface
+            this._puff(worldOf(back, ALT).clone(), p.boosting);
           }
         }
       });
       this.views.forEach((v, id) => {
         if (!seen.has(id)) {
           scene.remove(v.mesh); disposeObject(v.mesh);
-          if (v.blob) { scene.remove(v.blob); disposeObject(v.blob); }
           if (v.shield) { scene.remove(v.shield); disposeObject(v.shield); }
           this.views.delete(id);
         }
       });
 
-      // Bullets: straight bullets extrapolate along heading; homing bullets curve server-side, so
-      // snap those to the authoritative position each frame (no wrong straight-line ghost trail).
+      // bullets (server positions; slight forward extrapolation between patches)
       const bseen = _bseen; bseen.clear();
       state.bullets.forEach((b, key) => {
         bseen.add(key);
         let m = this.bullets.get(key);
-        if (!m) { m = this._makeBullet(b.homing); m.userData = { x: b.x, z: b.y, sx: b.x, sz: b.y, angle: b.angle, homing: b.homing }; this.bullets.set(key, m); }
+        const sp = { x: b.px, y: b.py, z: b.pz }, sf = { x: b.fx, y: b.fy, z: b.fz };
+        if (!m) { m = this._makeBullet(b.homing); m.userData = { p: sp, f: sf, sx: b.px, sy: b.py, sz: b.pz, homing: b.homing }; this.bullets.set(key, m); }
         const u = m.userData;
-        if (u.homing) { u.x = b.x; u.z = b.y; u.angle = b.angle; }
-        else if (b.x !== u.sx || b.y !== u.sz) { u.x = b.x; u.z = b.y; u.sx = b.x; u.sz = b.y; u.angle = b.angle; }
-        else { u.x += fX(u.angle) * G.BULLET_SPEED * dt; u.z += fZ(u.angle) * G.BULLET_SPEED * dt; }
-        m.position.set(u.x, ALT, u.z);
-        _t.set(u.x + fX(u.angle), ALT, u.z + fZ(u.angle));
-        m.lookAt(_t);
+        if (u.homing || b.px !== u.sx || b.py !== u.sy || b.pz !== u.sz) { u.p = sp; u.f = sf; u.sx = b.px; u.sy = b.py; u.sz = b.pz; }
+        else { const adv = SP.advance(u.p, u.f, (G.BULLET_SPEED / curR) * dt); u.p = adv.p; u.f = adv.f; }
+        this._orient(m, u.p, u.f, BULLET_ALT, 0);
       });
-      this.bullets.forEach((m, key) => {
-        if (!bseen.has(key)) { scene.remove(m); disposeObject(m); this.bullets.delete(key); }
-      });
+      this.bullets.forEach((m, key) => { if (!bseen.has(key)) { scene.remove(m); disposeObject(m); this.bullets.delete(key); } });
 
-      // Pickups (floating powerup orbs).
+      // pickups
       const pkseen = _pkseen; pkseen.clear();
       state.pickups.forEach((pk, key) => {
         pkseen.add(key);
         let m = this.pickups.get(key);
         if (!m) { m = this._makePickup(pk.type); this.pickups.set(key, m); }
-        m.position.set(pk.x, ALT + Math.sin(time * 2 + m.userData.ph) * 7, pk.y);
-        m.rotation.y += dt * 1.6;
+        const dir = { x: pk.px, y: pk.py, z: pk.pz };
+        m.position.copy(worldOf(dir, PICKUP_ALT + Math.sin(time * 2 + m.userData.ph) * 6));
+        m.up.copy(V(dir)); m.lookAt(_b.copy(m.position).add(V(dir))); // keep upright on the surface
+        m.rotateY(time * 1.6);
       });
       this.pickups.forEach((m, key) => { if (!pkseen.has(key)) { scene.remove(m); disposeObject(m); this.pickups.delete(key); } });
 
@@ -267,13 +252,13 @@ import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
     killPopup(id, mine) {
       const v = this.views.get(id);
       if (!v || !popupLayer) return;
-      _t.set(v.cx, ALT + 26, v.cz).project(camera);
-      if (_t.z > 1) return;
+      _c.copy(worldOf(v.p, ALT + 30)).project(camera);
+      if (_c.z > 1) return;
       const el = document.createElement("div");
       el.className = "popup3d" + (mine ? " mine" : "");
       el.textContent = mine ? "+1 SMASH!" : "+1";
-      el.style.left = (_t.x * 0.5 + 0.5) * window.innerWidth + "px";
-      el.style.top = (-_t.y * 0.5 + 0.5) * window.innerHeight + "px";
+      el.style.left = (_c.x * 0.5 + 0.5) * window.innerWidth + "px";
+      el.style.top = (-_c.y * 0.5 + 0.5) * window.innerHeight + "px";
       popupLayer.appendChild(el);
       requestAnimationFrame(() => el.classList.add("go"));
       setTimeout(() => el.remove(), 1200);
@@ -284,155 +269,93 @@ import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 
     __debug() {
       return {
-        sceneChildren: scene ? scene.children.length : -1,
+        radius: Math.round(curR),
         views: this.views.size, bullets: this.bullets.size, particles: particles.length,
         bloom: bloomPass ? bloomPass.enabled : null,
-        shadows: renderer ? renderer.shadowMap.enabled : null,
         quality: Q.current, fov: Math.round(fov),
-        cam: camera ? camera.position.toArray().map((n) => Math.round(n)) : null,
-        predict: [Math.round(predict.x), Math.round(predict.z)],
+        sceneChildren: scene ? scene.children.length : -1,
         geometries: renderer ? renderer.info.memory.geometries : -1,
         textures: renderer ? renderer.info.memory.textures : -1,
         programs: renderer && renderer.info.programs ? renderer.info.programs.length : -1,
       };
     },
 
-    // ---- local-plane prediction (mirrors the server stepPlane) ----
-    _initPredict(p) { predict.x = p.x; predict.z = p.y; predict.angle = p.angle; predict.speed = G.CRUISE_SPEED; },
-
-    _deflect(angle, inward) { const diff = ((inward - angle + Math.PI) % (Math.PI * 2)) - Math.PI; return angle + diff * 0.35; },
+    // ---- local-plane prediction (mirrors the server stepPlane on the sphere) ----
+    _initPredict(p) { predict.p = { x: p.px, y: p.py, z: p.pz }; predict.f = { x: p.fx, y: p.fy, z: p.fz }; predict.speed = G.CRUISE_SPEED; },
 
     _stepPredict(dt, input, power) {
-      predict.angle += (input.turn || 0) * G.TURN_RATE * dt;
+      predict.f = SP.turn(predict.p, predict.f, (input.turn || 0) * G.TURN_RATE * dt);
       let target = input.boost ? G.BOOST_SPEED : G.CRUISE_SPEED;
-      if (power === "afterburner") target *= (G.AFTERBURNER_FACTOR || 1); // match server so prediction doesn't rubber-band
+      if (power === "afterburner") target *= (G.AFTERBURNER_FACTOR || 1);
       const before = predict.speed;
       predict.speed += Math.sign(target - before) * G.ACCEL * dt;
       if ((target - predict.speed) * (target - before) < 0) predict.speed = target;
-      predict.x += Math.cos(predict.angle) * predict.speed * dt;
-      predict.z += Math.sin(predict.angle) * predict.speed * dt;
-      const m = G.WALL_MARGIN + G.PLANE_RADIUS;
-      if (predict.x < m) { predict.x = m; predict.angle = this._deflect(predict.angle, 0); }
-      if (predict.x > G.ARENA_WIDTH - m) { predict.x = G.ARENA_WIDTH - m; predict.angle = this._deflect(predict.angle, Math.PI); }
-      if (predict.z < m) { predict.z = m; predict.angle = this._deflect(predict.angle, Math.PI / 2); }
-      if (predict.z > G.ARENA_HEIGHT - m) { predict.z = G.ARENA_HEIGHT - m; predict.angle = this._deflect(predict.angle, -Math.PI / 2); }
-      // Mirror the server's solid-obstacle deflect so the local plane doesn't rubber-band near cover.
-      // (predict.z is the 2D y; obstacle o.y is that same axis.) Never affects hp — render/feel only.
-      const O = G.OBSTACLES || [], BEH = G.OBSTACLE_BEHAVIOR || {};
-      for (let i = 0; i < O.length; i++) {
-        const o = O[i]; if (!BEH[o.kind] || !BEH[o.kind].solid) continue;
-        const rr = o.radius + G.PLANE_RADIUS;
-        if (G.within(predict.x, predict.z, o.x, o.y, rr)) {
-          const n = G.normalDir(o.x, o.y, predict.x, predict.z);
-          predict.x = o.x + n.x * rr; predict.z = o.y + n.y * rr;
-          predict.angle = this._deflect(predict.angle, Math.atan2(n.y, n.x));
+      const adv = SP.advance(predict.p, predict.f, (predict.speed / curR) * dt);
+      predict.p = adv.p; predict.f = adv.f;
+      // solid-obstacle deflect (mirror server) — render/feel only, never hp
+      const planeAng = G.PLANE_RADIUS / curR;
+      for (let i = 0; i < G.OBSTACLES.length; i++) {
+        const o = G.OBSTACLES[i]; if (!G.OBSTACLE_BEHAVIOR[o.kind].solid) continue;
+        const sep = SP.angBetween(predict.p, o.dir), rr = o.angRadius + planeAng;
+        if (sep < rr) {
+          predict.p = sep > 1e-4 ? SP.slerp(o.dir, predict.p, rr / sep) : SP.advance(o.dir, SP.anyTangent(o.dir), rr).p;
+          const outward = SP.tangentize(predict.p, SP.sub(predict.p, o.dir));
+          predict.f = SP.turn(predict.p, predict.f, SP.signedAngle(predict.p, predict.f, outward) * 0.35);
         }
       }
     },
 
     // ===================== build =====================
-    _buildIsland() {
-      // water (large, below) — gentle stylized blue
-      const water = new THREE.Mesh(
-        new THREE.PlaneGeometry(G.ARENA_WIDTH * 3, G.ARENA_HEIGHT * 3),
-        new THREE.MeshStandardMaterial({ color: 0x3aa6e0, roughness: 0.3, metalness: 0.1 })
-      );
-      water.rotation.x = -Math.PI / 2;
-      water.position.set(cx, GROUND_Y - 6, cz);
-      water.receiveShadow = false;
-      scene.add(water);
-      this._water = water;
-
-      // grass island (the play field)
-      const c = document.createElement("canvas"); c.width = c.height = 256;
-      const g = c.getContext("2d");
-      g.fillStyle = "#5bbf4a"; g.fillRect(0, 0, 256, 256);
-      g.fillStyle = "rgba(255,255,255,0.06)";
-      for (let i = 0; i < 40; i++) g.fillRect(Math.random() * 256, Math.random() * 256, 3, 3);
-      g.strokeStyle = "rgba(20,90,30,0.18)"; g.lineWidth = 2;
-      for (let i = 0; i <= 256; i += 64) { g.beginPath(); g.moveTo(i, 0); g.lineTo(i, 256); g.stroke(); g.beginPath(); g.moveTo(0, i); g.lineTo(256, i); g.stroke(); }
-      const tex = new THREE.CanvasTexture(c);
-      tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-      tex.repeat.set(G.ARENA_WIDTH / 300, G.ARENA_HEIGHT / 300);
-      tex.anisotropy = 4;
-      const ground = new THREE.Mesh(
-        new THREE.PlaneGeometry(G.ARENA_WIDTH + 80, G.ARENA_HEIGHT + 80),
-        new THREE.MeshStandardMaterial({ map: tex, roughness: 0.95, metalness: 0 })
-      );
-      ground.rotation.x = -Math.PI / 2;
-      ground.position.set(cx, GROUND_Y, cz);
-      ground.receiveShadow = true;
-      scene.add(ground);
+    _buildStars() {
+      const n = 600, pos = new Float32Array(n * 3);
+      for (let i = 0; i < n; i++) { const d = SP.randomDir ? null : null; const x = rand(-1, 1), y = rand(-1, 1), z = rand(-1, 1); const l = Math.hypot(x, y, z) || 1; const r = 16000; pos[i*3]=x/l*r; pos[i*3+1]=y/l*r; pos[i*3+2]=z/l*r; }
+      const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+      const stars = new THREE.Points(g, new THREE.PointsMaterial({ color: 0xbcd2ff, size: 60, sizeAttenuation: true }));
+      scene.add(stars); this._stars = stars;
     },
 
-    _buildBoundary() {
-      const mat = new THREE.MeshBasicMaterial({ color: 0x6fe0ff, transparent: true, opacity: 0.10, side: THREE.DoubleSide, depthWrite: false });
-      const h = ALT * 2.2;
-      const walls = [
-        [G.ARENA_WIDTH, 0, cx, h / 2, 0], [G.ARENA_WIDTH, 0, cx, h / 2, G.ARENA_HEIGHT],
-        [G.ARENA_HEIGHT, Math.PI / 2, 0, h / 2, cz], [G.ARENA_HEIGHT, Math.PI / 2, G.ARENA_WIDTH, h / 2, cz],
-      ];
-      for (const [len, ry, x, y, z] of walls) {
-        const m = new THREE.Mesh(new THREE.PlaneGeometry(len, h), mat);
-        m.position.set(x, y, z); m.rotation.y = ry; scene.add(m);
-      }
-      const rim = new THREE.LineSegments(
-        new THREE.EdgesGeometry(new THREE.BoxGeometry(G.ARENA_WIDTH, h, G.ARENA_HEIGHT)),
-        new THREE.LineBasicMaterial({ color: 0x9becff, transparent: true, opacity: 0.55 })
+    _buildPlanet() {
+      // grass texture (canvas) wrapped over the sphere
+      const c = document.createElement("canvas"); c.width = 512; c.height = 256;
+      const g = c.getContext("2d");
+      g.fillStyle = "#5bbf4a"; g.fillRect(0, 0, 512, 256);
+      g.fillStyle = "rgba(40,120,55,0.55)";
+      for (let i = 0; i < 60; i++) { const x = Math.random()*512, y = Math.random()*256, r = rand(14, 46); g.beginPath(); g.ellipse(x, y, r, r*0.7, 0, 0, TAU); g.fill(); }
+      g.fillStyle = "rgba(255,255,255,0.05)";
+      for (let i = 0; i < 200; i++) g.fillRect(Math.random()*512, Math.random()*256, 2, 2);
+      const tex = new THREE.CanvasTexture(c); tex.anisotropy = 4;
+      const planet = new THREE.Mesh(
+        new THREE.SphereGeometry(1, 64, 48),
+        new THREE.MeshStandardMaterial({ map: tex, roughness: 0.95, metalness: 0 })
       );
-      rim.position.set(cx, h / 2, cz); scene.add(rim);
+      planet.receiveShadow = true; scene.add(planet); this._planet = planet;
+
+      const atmo = new THREE.Mesh(
+        new THREE.SphereGeometry(1.05, 32, 24),
+        new THREE.MeshBasicMaterial({ color: 0x8fd0ff, transparent: true, opacity: 0.16, side: THREE.BackSide, depthWrite: false })
+      );
+      scene.add(atmo); this._atmo = atmo;
     },
 
     _buildDecor() {
-      // clouds
-      const cloudMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, metalness: 0, transparent: true, opacity: 0.92 });
-      const nClouds = Math.round(16 * decorScale);
-      for (let i = 0; i < nClouds; i++) {
+      // a few clouds orbiting above the surface
+      const cloudMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, transparent: true, opacity: 0.9 });
+      const n = Math.round(14 * decorScale);
+      this._clouds = [];
+      for (let i = 0; i < n; i++) {
         const grp = new THREE.Group();
         const lobes = 3 + (i % 3);
-        for (let j = 0; j < lobes; j++) {
-          const s = rand(45, 95);
-          const m = new THREE.Mesh(PUFF_GEO, cloudMat);
-          m.scale.set(s * 1.4, s, s);
-          m.position.set((j - lobes / 2) * 70, rand(-10, 14), rand(-30, 30));
-          grp.add(m);
-        }
-        grp.position.set(rand(-400, G.ARENA_WIDTH + 400), rand(420, 760), rand(-400, G.ARENA_HEIGHT + 400));
-        scene.add(grp);
-      }
-      // hot-air balloons
-      const nB = Math.round(5 * decorScale);
-      for (let i = 0; i < nB; i++) {
-        const grp = new THREE.Group();
-        const col = SKINS[i % SKINS.length];
-        const balloon = new THREE.Mesh(new THREE.SphereGeometry(34, 14, 12), new THREE.MeshStandardMaterial({ color: col, roughness: 0.6, flatShading: true }));
-        balloon.scale.set(1, 1.2, 1);
-        const basket = new THREE.Mesh(new THREE.BoxGeometry(14, 12, 14), new THREE.MeshStandardMaterial({ color: 0x8a5a2b, roughness: 0.9 }));
-        basket.position.y = -46;
-        grp.add(balloon); grp.add(basket);
-        grp.position.set(rand(100, G.ARENA_WIDTH - 100), rand(220, 380), rand(100, G.ARENA_HEIGHT - 100));
-        scene.add(grp);
-      }
-      // a blimp
-      if (decorScale > 0.5) {
-        const blimp = new THREE.Group();
-        const body = new THREE.Mesh(new THREE.SphereGeometry(40, 16, 12), new THREE.MeshStandardMaterial({ color: 0xff8c42, roughness: 0.5, flatShading: true }));
-        body.scale.set(2.6, 1, 1);
-        const fin = new THREE.Mesh(new THREE.BoxGeometry(22, 18, 3), new THREE.MeshStandardMaterial({ color: 0xffd24a, roughness: 0.6 }));
-        fin.position.set(95, 0, 0);
-        blimp.add(body); blimp.add(fin);
-        blimp.position.set(cx, 560, cz - 600);
-        scene.add(blimp); this._blimp = blimp;
+        for (let j = 0; j < lobes; j++) { const s = rand(28, 60); const m = new THREE.Mesh(PUFF_GEO, cloudMat); m.scale.set(s*1.4, s, s); m.position.set((j-lobes/2)*46, rand(-8, 10), rand(-20, 20)); grp.add(m); }
+        const dir = SP.randomDir(); grp.userData = { dir, alt: rand(120, 220) };
+        scene.add(grp); this._clouds.push(grp);
       }
     },
 
-    // ---- arena map content (obstacles / landmarks / hotspot) ----
-    // Built once from the shared G.OBSTACLES data, at the SAME coords the server collides against.
-    // Static for the session; disposed via _disposeMap (no per-frame churn → no leak).
+    // ---- arena map content on the sphere (obstacles / landmarks / hotspot) ----
     _buildObstacles() {
       const list = G.OBSTACLES || [];
       this._mapGroup = new THREE.Group();
-      if (!list.length) { scene.add(this._mapGroup); return; } // gate on non-empty list
+      if (!list.length) { scene.add(this._mapGroup); return; }
       const ROCK = 0x8d857a, ROCK_D = 0x6f675d, STONE = 0x9a958c;
       for (const o of list) {
         let mesh;
@@ -444,148 +367,100 @@ import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
         else if (o.kind === "arch") mesh = this._obArch(o, STONE);
         else if (o.kind === "ring") mesh = this._obRing(o);
         else mesh = this._obRock(o, ROCK);
-        if (mesh) { mesh.position.x = o.x; mesh.position.z = o.y; this._mapGroup.add(mesh); }
+        if (mesh) { mesh.userData.dir = o.dir; this._mapGroup.add(mesh); }
       }
       scene.add(this._mapGroup);
     },
 
+    // place a static surface object: base on the surface, local +Y = outward normal
+    _seat(group, dir, baseAlt) {
+      group.userData.dir = dir; group.userData.alt = baseAlt || 0;
+    },
     _obSpire(o, col, dark) {
-      const g = new THREE.Group(), h = o.height, r = o.radius;
-      const cone = new THREE.Mesh(new THREE.ConeGeometry(r * 0.95, h, 7), new THREE.MeshStandardMaterial({ color: col, flatShading: true, roughness: 1 }));
+      const g = new THREE.Group(), h = o.height, r = h * 0.45;
+      const cone = new THREE.Mesh(new THREE.ConeGeometry(r, h, 7), new THREE.MeshStandardMaterial({ color: col, flatShading: true, roughness: 1 }));
       cone.position.y = h / 2; cone.castShadow = true; g.add(cone);
       const cap = new THREE.Mesh(new THREE.ConeGeometry(r * 0.5, h * 0.3, 7), new THREE.MeshStandardMaterial({ color: dark, flatShading: true, roughness: 1 }));
-      cap.position.y = h * 0.92; g.add(cap);
-      return g;
+      cap.position.y = h * 0.92; g.add(cap); return g;
     },
-
     _obRock(o, col) {
-      const g = new THREE.Group(), r = o.radius, h = o.height;
-      const rock = new THREE.Mesh(new THREE.IcosahedronGeometry(r * 0.95, 0), new THREE.MeshStandardMaterial({ color: col, flatShading: true, roughness: 1 }));
-      rock.scale.y = Math.max(0.4, h / (r * 1.6)); rock.position.y = h * 0.42; rock.castShadow = true; g.add(rock);
-      return g;
+      const g = new THREE.Group(), h = o.height;
+      const rock = new THREE.Mesh(new THREE.IcosahedronGeometry(h * 0.6, 0), new THREE.MeshStandardMaterial({ color: col, flatShading: true, roughness: 1 }));
+      rock.scale.y = 0.7; rock.position.y = h * 0.42; rock.castShadow = true; g.add(rock); return g;
     },
-
     _obArch(o, col) {
-      const g = new THREE.Group(), r = o.radius;
-      const torus = new THREE.Mesh(new THREE.TorusGeometry(r * 0.92, r * 0.17, 8, 18), new THREE.MeshStandardMaterial({ color: col, flatShading: true, roughness: 1 }));
-      torus.position.y = r * 0.95; torus.rotation.y = Math.atan2(cz - o.y, cx - o.x); torus.castShadow = true; g.add(torus);
-      return g;
+      const g = new THREE.Group(), h = o.height;
+      const torus = new THREE.Mesh(new THREE.TorusGeometry(h * 0.5, h * 0.1, 8, 18), new THREE.MeshStandardMaterial({ color: col, flatShading: true, roughness: 1 }));
+      torus.position.y = h * 0.5; torus.castShadow = true; g.add(torus); return g;
     },
-
     _obRing(o) {
-      const g = new THREE.Group(), r = o.radius, col = 0x6fe0ff;
-      const ring = new THREE.Mesh(new THREE.TorusGeometry(r * 0.95, r * 0.1, 8, 24), new THREE.MeshStandardMaterial({ color: col, emissive: col, emissiveIntensity: 0.85, roughness: 0.4, transparent: true, opacity: 0.85 }));
-      ring.position.y = ALT; ring.rotation.y = Math.atan2(cz - o.y, cx - o.x); g.add(ring);
-      g.userData.ring = true; // gentle spin in _updateMap (cosmetic)
-      return g;
+      const g = new THREE.Group(), h = o.height, col = 0x6fe0ff;
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(h * 0.55, h * 0.06, 8, 24), new THREE.MeshStandardMaterial({ color: col, emissive: col, emissiveIntensity: 0.85, roughness: 0.4, transparent: true, opacity: 0.85 }));
+      ring.position.y = h * 0.7; g.add(ring); g.userData.ring = true; return g;
     },
-
     _lmVolcano(o) {
-      const g = new THREE.Group(), r = o.radius, h = o.height;
-      const cone = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.5, r, h, 14), new THREE.MeshStandardMaterial({ color: 0x4b3f3a, flatShading: true, roughness: 1 }));
+      const g = new THREE.Group(), h = o.height, r = h * 0.5;
+      const cone = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.5, r, h, 16), new THREE.MeshStandardMaterial({ color: 0x4b3f3a, flatShading: true, roughness: 1 }));
       cone.position.y = h / 2; cone.castShadow = true; g.add(cone);
       const crater = new THREE.Mesh(new THREE.CircleGeometry(r * 0.42, 16), new THREE.MeshBasicMaterial({ color: 0xff7b2e }));
       crater.rotation.x = -Math.PI / 2; crater.position.y = h + 0.5; g.add(crater);
-      const glow = new THREE.PointLight(0xff6a2a, 0.85, r * 7, 2); glow.position.y = h + 10; g.add(glow);
-      volcano = { x: o.x, y: o.y, top: h + 6 }; // eruption source (world x, world z=o.y, top height)
+      const glow = new THREE.PointLight(0xff6a2a, 0.9, h * 6, 2); glow.position.y = h + 10; g.add(glow);
+      g.userData.volcanoTop = h + 6;
       return g;
     },
-
     _lmLighthouse(o) {
-      const g = new THREE.Group(), r = o.radius, h = o.height;
-      const tower = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.45, r * 0.7, h, 12), new THREE.MeshStandardMaterial({ color: 0xf4f4f4, flatShading: true, roughness: 0.85 }));
+      const g = new THREE.Group(), h = o.height, r = h * 0.28;
+      const tower = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.6, r, h, 12), new THREE.MeshStandardMaterial({ color: 0xf4f4f4, flatShading: true, roughness: 0.85 }));
       tower.position.y = h / 2; tower.castShadow = true; g.add(tower);
-      for (let i = 0; i < 2; i++) {
-        const band = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.5, r * 0.6, h * 0.12, 12), new THREE.MeshStandardMaterial({ color: 0xe2452f, roughness: 0.85 }));
-        band.position.y = h * (0.35 + i * 0.32); g.add(band);
-      }
-      const lantern = new THREE.Mesh(new THREE.SphereGeometry(r * 0.32, 10, 8), new THREE.MeshBasicMaterial({ color: 0xfff2a8 }));
-      lantern.position.y = h + r * 0.1; g.add(lantern); // emissive look via bloom (no extra dynamic light)
+      for (let i = 0; i < 2; i++) { const band = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.66, r * 0.72, h * 0.12, 12), new THREE.MeshStandardMaterial({ color: 0xe2452f, roughness: 0.85 })); band.position.y = h * (0.35 + i * 0.32); g.add(band); }
+      const lantern = new THREE.Mesh(new THREE.SphereGeometry(r * 0.5, 10, 8), new THREE.MeshBasicMaterial({ color: 0xfff2a8 })); lantern.position.y = h + r * 0.2; g.add(lantern);
       return g;
     },
-
     _lmShipwreck(o) {
-      const g = new THREE.Group(), r = o.radius, h = Math.max(o.height, 60);
-      const hull = new THREE.Mesh(new THREE.BoxGeometry(r * 1.6, h * 0.7, r * 0.8), new THREE.MeshStandardMaterial({ color: 0x6b4a2b, flatShading: true, roughness: 1 }));
-      hull.position.y = h * 0.35; hull.rotation.z = 0.22; hull.castShadow = true; g.add(hull);
-      const mast = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.06, r * 0.06, h * 1.4, 6), new THREE.MeshStandardMaterial({ color: 0x4a3420, roughness: 1 }));
-      mast.position.set(r * 0.1, h * 0.8, 0); mast.rotation.z = 0.18; g.add(mast);
-      const sail = new THREE.Mesh(new THREE.PlaneGeometry(r * 0.7, h * 0.6), new THREE.MeshStandardMaterial({ color: 0xe8e0cf, roughness: 1, side: THREE.DoubleSide }));
-      sail.position.set(r * 0.2, h * 0.9, 0); g.add(sail);
+      const g = new THREE.Group(), h = Math.max(o.height, 70);
+      const hull = new THREE.Mesh(new THREE.BoxGeometry(h * 1.1, h * 0.5, h * 0.55), new THREE.MeshStandardMaterial({ color: 0x6b4a2b, flatShading: true, roughness: 1 }));
+      hull.position.y = h * 0.3; hull.rotation.z = 0.2; hull.castShadow = true; g.add(hull);
+      const mast = new THREE.Mesh(new THREE.CylinderGeometry(h * 0.04, h * 0.04, h * 1.1, 6), new THREE.MeshStandardMaterial({ color: 0x4a3420, roughness: 1 })); mast.position.set(h*0.08, h*0.7, 0); mast.rotation.z = 0.16; g.add(mast);
       return g;
     },
-
     _lmForest(o) {
-      const g = new THREE.Group(), r = o.radius;
+      const g = new THREE.Group(), h = o.height;
       const trunkMat = new THREE.MeshStandardMaterial({ color: 0x6b4a2b, roughness: 1 });
       const leafMat = new THREE.MeshStandardMaterial({ color: 0x3f9d4a, flatShading: true, roughness: 1 });
-      const n = 6;
-      for (let i = 0; i < n; i++) {
-        const a = (i / n) * TAU, rr = rand(r * 0.2, r * 0.8), tx = Math.cos(a) * rr, tz = Math.sin(a) * rr, th = rand(o.height * 0.7, o.height * 1.2);
-        const trunk = new THREE.Mesh(new THREE.CylinderGeometry(th * 0.06, th * 0.08, th * 0.5, 6), trunkMat);
-        trunk.position.set(tx, th * 0.25, tz); g.add(trunk);
-        const leaf = new THREE.Mesh(new THREE.ConeGeometry(th * 0.32, th * 0.7, 7), leafMat);
-        leaf.position.set(tx, th * 0.7, tz); leaf.castShadow = true; g.add(leaf);
-      }
+      for (let i = 0; i < 6; i++) { const a = (i/6)*TAU, rr = rand(h*0.2, h*0.7), tx = Math.cos(a)*rr, tz = Math.sin(a)*rr, th = rand(h*0.7, h*1.1); const tr = new THREE.Mesh(new THREE.CylinderGeometry(th*0.06, th*0.08, th*0.5, 6), trunkMat); tr.position.set(tx, th*0.25, tz); g.add(tr); const lf = new THREE.Mesh(new THREE.ConeGeometry(th*0.32, th*0.7, 7), leafMat); lf.position.set(tx, th*0.7, tz); lf.castShadow = true; g.add(lf); }
       return g;
     },
 
-    // Hotspot eruption + ring spin — purely visual, emits/reads NO game state (never damages).
     _updateMap(dt) {
-      if (this._mapGroup) {
-        for (const c of this._mapGroup.children) if (c.userData && c.userData.ring && c.children[0]) c.children[0].rotation.z += dt * 0.6;
-      }
+      // seat all static surface meshes on the (possibly resized) planet, oriented to the normal
+      if (this._mapGroup) for (const m of this._mapGroup.children) this._orient(m, m.userData.dir, null, 0, m.userData.ring ? 0 : 0);
+      if (this._clouds) for (const c of this._clouds) { c.position.copy(worldOf(c.userData.dir, c.userData.alt)); c.up.copy(V(c.userData.dir)); c.lookAt(_b.copy(c.position).add(V(c.userData.dir))); }
+      // volcano eruption (purely visual; emits/reads no state)
+      if (!volcano && this._mapGroup) for (const m of this._mapGroup.children) if (m.userData.volcanoTop != null) volcano = { dir: m.userData.dir, top: m.userData.volcanoTop };
       if (!volcano) return;
-      if (time > emberAt) { // continuous drifting embers
+      const top = worldOf(volcano.dir, volcano.top);
+      const nrm = V(volcano.dir);
+      if (time > emberAt) {
         emberAt = time + 0.18;
         const n = Math.max(1, Math.round(partScale));
-        for (let i = 0; i < n; i++) {
-          const a = rand(0, TAU), sp = rand(8, 26);
-          this._spawn(SPARK_GEO, 0xff9a3c, volcano.x + rand(-12, 12), volcano.top, volcano.y + rand(-12, 12), {
-            vel: new THREE.Vector3(Math.cos(a) * sp, rand(40, 80), Math.sin(a) * sp),
-            life: rand(0.7, 1.3), gravity: 90, spin: 5, from: rand(1.5, 3), to: 0.4, alpha: 0.9, add: true,
-          });
-        }
+        for (let i = 0; i < n; i++) this._spawnAt(SPARK_GEO, 0xff9a3c, top, nrm, { spread: 14, up: rand(40, 80), life: rand(0.7, 1.3), grav: 90, from: rand(1.5, 3), to: 0.4, alpha: 0.9, add: true });
       }
-      if (time > eruptAt) { // periodic eruption burst
+      if (time > eruptAt) {
         eruptAt = time + rand(3.5, 6);
         const n = Math.round(16 * partScale);
-        for (let i = 0; i < n; i++) {
-          const a = rand(0, TAU), sp = rand(40, 120);
-          this._spawn(SPARK_GEO, i % 2 ? 0xffd27a : 0xff5a2a, volcano.x, volcano.top, volcano.y, {
-            vel: new THREE.Vector3(Math.cos(a) * sp, rand(120, 240), Math.sin(a) * sp),
-            life: rand(0.8, 1.5), gravity: 220, spin: 8, from: rand(2.5, 5), to: 0.5, alpha: 1, add: true,
-          });
-        }
-        const smoke = Math.round(5 * partScale);
-        for (let i = 0; i < smoke; i++) {
-          this._spawn(PUFF_GEO, 0x6b5a52, volcano.x + rand(-10, 10), volcano.top, volcano.y + rand(-10, 10), {
-            vel: new THREE.Vector3(rand(-12, 12), rand(40, 80), rand(-12, 12)),
-            life: rand(1, 1.8), gravity: -8, from: rand(4, 8), to: rand(20, 32), alpha: 0.35,
-          });
-        }
+        for (let i = 0; i < n; i++) this._spawnAt(SPARK_GEO, i % 2 ? 0xffd27a : 0xff5a2a, top, nrm, { spread: 30, up: rand(120, 240), life: rand(0.8, 1.5), grav: 220, from: rand(2.5, 5), to: 0.5, alpha: 1, add: true });
+        const sm = Math.round(5 * partScale);
+        for (let i = 0; i < sm; i++) this._spawnAt(PUFF_GEO, 0x6b5a52, top, nrm, { spread: 16, up: rand(40, 90), life: rand(1, 1.8), grav: -8, from: rand(4, 8), to: rand(20, 32), alpha: 0.35 });
       }
     },
 
-    _disposeMap() {
-      if (this._mapGroup) { scene.remove(this._mapGroup); disposeObject(this._mapGroup); this._mapGroup = null; }
-      volcano = null;
-    },
+    _disposeMap() { if (this._mapGroup) { scene.remove(this._mapGroup); disposeObject(this._mapGroup); this._mapGroup = null; } volcano = null; },
 
     // ===================== entities =====================
     _makeView(id, p) {
       const mesh = this._makePlane(p.skin);
       scene.add(mesh);
-      const blob = new THREE.Mesh(BLOB_GEO, new THREE.MeshBasicMaterial({ color: 0x12331c, transparent: true, opacity: 0.28, depthWrite: false }));
-      blob.rotation.x = -Math.PI / 2;
-      blob.scale.setScalar(26 * PLANE_SCALE * 0.6);
-      blob.visible = Q.cfg().shadows !== "map";
-      scene.add(blob);
-      return {
-        mesh, blob, cx: p.x, cz: p.y, cAngle: p.angle, bank: 0, bankTarget: 0,
-        hp: p.hp, alive: p.alive, wasAlive: p.alive, boosting: false,
-        phase: (id.charCodeAt(0) || 1) % 7, lastPuff: 0,
-      };
+      return { mesh, p: { x: p.px, y: p.py, z: p.pz }, f: { x: p.fx, y: p.fy, z: p.fz }, bank: 0, bankTarget: 0, hp: p.hp, alive: p.alive, wasAlive: p.alive, boosting: false, phase: (id.charCodeAt(0) || 1) % 7, lastPuff: 0 };
     },
 
     _makePlane(skin) {
@@ -594,43 +469,38 @@ import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
       const body = new THREE.MeshStandardMaterial({ color, flatShading: true, roughness: 0.6, metalness: 0.05 });
       const dark = new THREE.MeshStandardMaterial({ color: 0x2b2f3a, flatShading: true, roughness: 0.6 });
       const glass = new THREE.MeshStandardMaterial({ color: 0x123a5a, flatShading: true, roughness: 0.25, metalness: 0.1 });
-
-      const fus = new THREE.Mesh(new THREE.CapsuleGeometry(4.2, 20, 4, 10), body);
-      fus.rotation.x = Math.PI / 2; fus.castShadow = true; g.add(fus);
-
-      const nose = new THREE.Mesh(new THREE.SphereGeometry(4.2, 12, 10), dark);
-      nose.scale.set(1, 1, 1.5); nose.position.z = -13; nose.castShadow = true; g.add(nose);
-
-      const wing = new THREE.Mesh(new THREE.CapsuleGeometry(2.1, 40, 4, 8), body);
-      wing.rotation.z = Math.PI / 2; wing.scale.set(1, 1, 2.1); wing.position.z = 2; wing.castShadow = true; g.add(wing);
-
-      const tail = new THREE.Mesh(new THREE.CapsuleGeometry(1.3, 16, 4, 6), body);
-      tail.rotation.z = Math.PI / 2; tail.scale.set(1, 1, 1.7); tail.position.z = 15; tail.castShadow = true; g.add(tail);
-
-      const fin = new THREE.Mesh(new THREE.CapsuleGeometry(1.1, 8, 4, 6), body);
-      fin.position.set(0, 4, 15); fin.castShadow = true; g.add(fin);
-
-      const canopy = new THREE.Mesh(new THREE.SphereGeometry(3, 12, 10), glass);
-      canopy.scale.set(1, 0.7, 1.5); canopy.position.set(0, 3.3, -1); g.add(canopy);
-
-      const prop = new THREE.Mesh(new THREE.CapsuleGeometry(0.8, 18, 3, 6), dark);
-      prop.rotation.z = Math.PI / 2; prop.position.z = -22; g.add(prop);
-      g._prop = prop;
-
+      const fus = new THREE.Mesh(new THREE.CapsuleGeometry(4.2, 20, 4, 10), body); fus.rotation.x = Math.PI / 2; fus.castShadow = true; g.add(fus);
+      const nose = new THREE.Mesh(new THREE.SphereGeometry(4.2, 12, 10), dark); nose.scale.set(1, 1, 1.5); nose.position.z = -13; g.add(nose);
+      const wing = new THREE.Mesh(new THREE.CapsuleGeometry(2.1, 40, 4, 8), body); wing.rotation.z = Math.PI / 2; wing.scale.set(1, 1, 2.1); wing.position.z = 2; wing.castShadow = true; g.add(wing);
+      const tail = new THREE.Mesh(new THREE.CapsuleGeometry(1.3, 16, 4, 6), body); tail.rotation.z = Math.PI / 2; tail.scale.set(1, 1, 1.7); tail.position.z = 15; g.add(tail);
+      const fin = new THREE.Mesh(new THREE.CapsuleGeometry(1.1, 8, 4, 6), body); fin.position.set(0, 4, 15); g.add(fin);
+      const canopy = new THREE.Mesh(new THREE.SphereGeometry(3, 12, 10), glass); canopy.scale.set(1, 0.7, 1.5); canopy.position.set(0, 3.3, -1); g.add(canopy);
+      const prop = new THREE.Mesh(new THREE.CapsuleGeometry(0.8, 18, 3, 6), dark); prop.rotation.z = Math.PI / 2; prop.position.z = -22; g.add(prop); g._prop = prop;
       g.scale.setScalar(PLANE_SCALE);
       return g;
+    },
+
+    // Orient `obj` on the surface: position = dir·(R+alt); local +Y = normal (dir); if `fwd` given,
+    // local -Z (nose) = fwd; apply `bank` roll about the nose. If fwd null, keep an arbitrary heading.
+    _orient(obj, dir, fwd, alt, bank) {
+      obj.position.copy(worldOf(dir, alt));
+      const up = _a.set(dir.x, dir.y, dir.z);
+      const f = fwd ? _b.set(fwd.x, fwd.y, fwd.z) : _b.copy(up).cross(_c.set(0, 1, 0)).normalize();
+      if (f.lengthSq() < 1e-6) f.set(1, 0, 0);
+      const back = _c.copy(f).multiplyScalar(-1);            // local +Z → -forward
+      const right = new THREE.Vector3().crossVectors(up, back).normalize();
+      back.crossVectors(right, up).normalize();              // re-orthogonalize
+      m4.makeBasis(right, up, back);
+      obj.quaternion.setFromRotationMatrix(m4);
+      if (bank) obj.rotateZ(bank);
     },
 
     _placePlane(v, p) {
       const g = v.mesh;
       g.visible = p.alive;
-      const bob = Math.sin(time * 2 + v.phase) * 1.7;
-      g.position.set(v.cx, ALT + bob, v.cz);
-      _t.set(v.cx + fX(v.cAngle), ALT + bob, v.cz + fZ(v.cAngle));
-      g.lookAt(_t);
-      g.rotateZ(v.bank);
+      const bob = Math.sin(time * 2 + v.phase) * 1.5;
+      this._orient(g, v.p, v.f, ALT + bob, v.bank);
       if (g._prop) g._prop.rotation.z = time * 42;
-      if (v.blob) { v.blob.visible = p.alive && Q.cfg().shadows !== "map"; v.blob.position.set(v.cx, GROUND_Y + 0.8, v.cz); }
     },
 
     _makeBullet(homing) {
@@ -639,65 +509,48 @@ import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
       grp.add(new THREE.Mesh(new THREE.SphereGeometry(homing ? 3.6 : 3, 8, 8), new THREE.MeshBasicMaterial({ color: core })));
       const tracer = new THREE.Mesh(new THREE.CylinderGeometry(1.1, 0.2, 16, 6), new THREE.MeshBasicMaterial({ color: tcol, transparent: true, opacity: 0.8 }));
       tracer.rotation.x = Math.PI / 2; tracer.position.z = 8; grp.add(tracer);
-      scene.add(grp);
-      return grp;
+      scene.add(grp); return grp;
     },
 
     _makePickup(type) {
       const info = (G.POWERUPS && G.POWERUPS[type]) || { color: 0xffffff };
       const grp = new THREE.Group();
-      const gem = new THREE.Mesh(new THREE.OctahedronGeometry(15, 0), new THREE.MeshStandardMaterial({ color: info.color, emissive: info.color, emissiveIntensity: 0.6, flatShading: true, roughness: 0.4 }));
-      grp.add(gem);
+      grp.add(new THREE.Mesh(new THREE.OctahedronGeometry(15, 0), new THREE.MeshStandardMaterial({ color: info.color, emissive: info.color, emissiveIntensity: 0.6, flatShading: true, roughness: 0.4 })));
       const ring = new THREE.Mesh(new THREE.TorusGeometry(20, 1.6, 8, 24), new THREE.MeshBasicMaterial({ color: info.color, transparent: true, opacity: 0.7 }));
       ring.rotation.x = Math.PI / 2; grp.add(ring);
       grp.userData = { ph: Math.random() * 6 };
-      scene.add(grp);
-      return grp;
+      scene.add(grp); return grp;
     },
 
     _makeShield() {
-      return new THREE.Mesh(
-        new THREE.SphereGeometry(38, 16, 12),
-        new THREE.MeshBasicMaterial({ color: 0x49c0ff, transparent: true, opacity: 0.18, depthWrite: false })
-      );
+      return new THREE.Mesh(new THREE.SphereGeometry(38, 16, 12), new THREE.MeshBasicMaterial({ color: 0x49c0ff, transparent: true, opacity: 0.18, depthWrite: false }));
     },
 
     // ---- particles ----
     _spawn(geo, color, x, y, z, o) {
       const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color, transparent: true, opacity: o.alpha ?? 1, depthWrite: false, blending: o.add ? THREE.AdditiveBlending : THREE.NormalBlending }));
       m.position.set(x, y, z); m.scale.setScalar(o.from ?? 1);
-      if (o.flat) m.rotation.x = -Math.PI / 2;
       scene.add(m);
-      particles.push({ mesh: m, vel: o.vel, life: o.life, maxLife: o.life, gravity: o.gravity ?? 0, spin: o.spin ?? 0, alpha: o.alpha ?? 1, from: o.from ?? 1, to: o.to ?? o.from ?? 1 });
+      particles.push({ mesh: m, vel: o.vel, life: o.life, maxLife: o.life, gravity: o.gravity ?? 0, grav3: o.grav3 || null, spin: o.spin ?? 0, alpha: o.alpha ?? 1, from: o.from ?? 1, to: o.to ?? o.from ?? 1 });
     },
 
-    _explode(x, z, color) {
-      this._spawn(RING_GEO, 0xffffff, x, ALT, z, { vel: new THREE.Vector3(), life: 0.5, from: 4, to: 64, alpha: 0.9, add: true, flat: true });
-      this._spawn(PUFF_GEO, 0xffe6a8, x, ALT, z, { vel: new THREE.Vector3(0, 6, 0), life: 0.26, from: 6, to: 36, alpha: 0.95, add: true });
+    // spawn at a world point, velocity = up·(normal) + random spread, gravity pulls along -normal
+    _spawnAt(geo, color, pos, normal, o) {
+      const vel = new THREE.Vector3(rand(-o.spread, o.spread), rand(-o.spread, o.spread), rand(-o.spread, o.spread)).addScaledVector(normal, o.up);
+      this._spawn(geo, color, pos.x, pos.y, pos.z, { vel, life: o.life, gravity: 0, grav3: normal.clone().multiplyScalar(-(o.grav || 0)), spin: o.spin ?? 6, from: o.from, to: o.to, alpha: o.alpha, add: o.add });
+    },
+
+    _explode(pos, normal, color) {
+      const nrm = V(normal);
+      this._spawnAt(PUFF_GEO, 0xffe6a8, pos, nrm, { spread: 8, up: 8, life: 0.26, grav: 0, from: 6, to: 36, alpha: 0.95, add: true });
       const n = Math.round(16 * partScale);
-      for (let i = 0; i < n; i++) {
-        const a = (i / n) * TAU + rand(-0.3, 0.3), sp = rand(90, 230);
-        this._spawn(SPARK_GEO, i % 2 ? 0xffd27a : color, x, ALT, z, {
-          vel: new THREE.Vector3(Math.cos(a) * sp, rand(60, 200), Math.sin(a) * sp),
-          life: rand(0.5, 0.85), gravity: 240, spin: 9, from: rand(3, 6), to: 0.5, alpha: 1, add: true,
-        });
-      }
+      for (let i = 0; i < n; i++) this._spawnAt(SPARK_GEO, i % 2 ? 0xffd27a : color, pos, nrm, { spread: 180, up: rand(40, 160), life: rand(0.5, 0.85), grav: 240, from: rand(3, 6), to: 0.5, alpha: 1, add: true });
       const m = Math.round(7 * partScale);
-      for (let i = 0; i < m; i++) {
-        const a = rand(0, TAU), sp = rand(20, 70);
-        this._spawn(PUFF_GEO, 0x9aa6b2, x, ALT, z, {
-          vel: new THREE.Vector3(Math.cos(a) * sp, rand(20, 60), Math.sin(a) * sp),
-          life: rand(0.5, 0.9), gravity: -12, from: rand(3, 6), to: rand(14, 20), alpha: 0.4,
-        });
-      }
+      for (let i = 0; i < m; i++) this._spawnAt(PUFF_GEO, 0x9aa6b2, pos, nrm, { spread: 50, up: rand(20, 60), life: rand(0.5, 0.9), grav: -12, from: rand(3, 6), to: rand(14, 20), alpha: 0.4 });
     },
 
-    _puff(x, z, boosting) {
-      this._spawn(PUFF_GEO, boosting ? 0xff9a3c : 0x9aa6b2, x, ALT, z, {
-        vel: new THREE.Vector3(0, boosting ? 6 : 12, 0),
-        life: boosting ? 0.35 : 0.6, from: boosting ? 5 : 3, to: boosting ? 13 : 16,
-        alpha: boosting ? 0.75 : 0.32, gravity: -10, add: !!boosting,
-      });
+    _puff(pos, boosting) {
+      this._spawn(PUFF_GEO, boosting ? 0xff9a3c : 0x9aa6b2, pos.x, pos.y, pos.z, { vel: new THREE.Vector3(0, 0, 0), life: boosting ? 0.35 : 0.6, from: boosting ? 5 : 3, to: boosting ? 13 : 16, alpha: boosting ? 0.75 : 0.32, add: !!boosting });
     },
 
     _updateParticles(dt) {
@@ -705,7 +558,7 @@ import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
         const p = particles[i];
         p.life -= dt;
         if (p.life <= 0) { scene.remove(p.mesh); p.mesh.material.dispose(); particles.splice(i, 1); continue; }
-        p.vel.y -= p.gravity * dt;
+        if (p.grav3) p.vel.addScaledVector(p.grav3, dt); else p.vel.y -= p.gravity * dt;
         p.mesh.position.addScaledVector(p.vel, dt);
         const k = p.life / p.maxLife;
         p.mesh.scale.setScalar(p.to + (p.from - p.to) * k);
@@ -716,28 +569,27 @@ import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 
     _updateCamera(myId, dt) {
       const me = this.views.get(myId);
-      let dx, dy, dz, lx, ly, lz, wantFov = FOV_BASE;
-      if (me) {
-        const ax = fX(me.cAngle), az = fZ(me.cAngle);
-        dx = me.cx - ax * CAM_BACK; dy = ALT + CAM_UP; dz = me.cz - az * CAM_BACK;
-        lx = me.cx + ax * CAM_LOOKAHEAD; ly = ALT; lz = me.cz + az * CAM_LOOKAHEAD;
-        if (me.boosting && me.alive) wantFov = FOV_BOOST;
-        // crisp local shadows: follow the player
-        if (sun && renderer.shadowMap.enabled) {
-          sun.position.set(me.cx - 300, 760, me.cz - 220);
-          sun.target.position.set(me.cx, 0, me.cz); sun.target.updateMatrixWorld();
-        }
-      } else { dx = cx; dy = 1300; dz = cz + 1500; lx = cx; ly = 0; lz = cz; }
-
-      const k = Math.min(1, dt * CAM_LERP);
-      camPos.x += (dx - camPos.x) * k; camPos.y += (dy - camPos.y) * k; camPos.z += (dz - camPos.z) * k;
-      camLook.x += (lx - camLook.x) * k; camLook.y += (ly - camLook.y) * k; camLook.z += (lz - camLook.z) * k;
-
+      let wantFov = FOV_BASE;
+      if (me && me.alive) {
+        const P = V(me.p), F = V(me.f);
+        const planeW = P.clone().multiplyScalar(curR + ALT);
+        // behind along -forward, up along the surface normal
+        _a.copy(planeW).addScaledVector(F, -CAM_BACK).addScaledVector(P, CAM_UP);
+        _b.copy(planeW).addScaledVector(F, CAM_LOOKAHEAD);
+        const k = Math.min(1, dt * CAM_LERP);
+        camPos.lerp(_a, k); camLook.lerp(_b, k); camUp.lerp(P, Math.min(1, dt * 3)).normalize();
+        if (me.boosting) wantFov = FOV_BOOST;
+      } else {
+        // idle orbit around the planet
+        const a = time * 0.08;
+        _a.set(Math.cos(a) * curR * 2.4, curR * 1.2, Math.sin(a) * curR * 2.4);
+        camPos.lerp(_a, Math.min(1, dt * 1.5)); camLook.lerp(_b.set(0, 0, 0), Math.min(1, dt * 1.5)); camUp.lerp(_c.set(0, 1, 0), Math.min(1, dt * 1.5)).normalize();
+      }
       fov += (wantFov - fov) * Math.min(1, dt * 6);
       camera.fov = fov; camera.updateProjectionMatrix();
-
+      camera.up.copy(camUp);
       camera.position.copy(camPos);
-      camera.position.y -= dip * 10; // dip down on hit
+      camera.position.addScaledVector(camUp, -dip * 10);
       if (shakeMag > 0.05) {
         camera.position.x += (Math.random() - 0.5) * shakeMag;
         camera.position.y += (Math.random() - 0.5) * shakeMag;
@@ -745,49 +597,40 @@ import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
         shakeMag *= Math.pow(0.0001, dt);
       } else shakeMag = 0;
       camera.lookAt(camLook);
-
-      if (this._blimp) this._blimp.position.x = cx + Math.sin(time * 0.05) * 700;
-      if (this._water) this._water.material.color.setHSL(0.55, 0.7, 0.5 + Math.sin(time * 0.6) * 0.03);
+      if (this._planet) { this._planet.scale.setScalar(curR); }
+      if (this._atmo) { this._atmo.scale.setScalar(curR * 1.05); }
+      if (scene.fog) { scene.fog.near = curR * 2.2; scene.fog.far = curR * 5.5; }
     },
 
+    // player-centric radar: bearing relative to my heading (forward = up), radius = angular distance
     _drawMinimap(state, myId) {
       if (!mmctx) return;
-      const w = minimap.width, h = minimap.height;
+      const w = minimap.width, h = minimap.height, cx = w / 2, cy = h / 2, rad = w / 2 - 6;
       mmctx.clearRect(0, 0, w, h);
-      mmctx.fillStyle = "rgba(10,24,14,0.6)"; mmctx.fillRect(0, 0, w, h);
-      mmctx.strokeStyle = "rgba(150,236,180,0.5)"; mmctx.strokeRect(0.5, 0.5, w - 1, h - 1);
-      const sx = w / G.ARENA_WIDTH, sy = h / G.ARENA_HEIGHT;
-
-      // zones (faint) — hot centre vs cover ring, for orientation
-      if (G.HOTSPOT && G.ZONES) {
-        const hx = G.HOTSPOT.x * sx, hy = G.HOTSPOT.y * sy;
-        mmctx.strokeStyle = "rgba(255,180,90,0.18)"; mmctx.lineWidth = 1;
-        mmctx.beginPath(); mmctx.arc(hx, hy, G.ZONES.midR * sx, 0, TAU); mmctx.stroke();
-        mmctx.fillStyle = "rgba(255,120,60,0.10)";
-        mmctx.beginPath(); mmctx.arc(hx, hy, G.ZONES.centerR * sx, 0, TAU); mmctx.fill();
-      }
-
-      // obstacles + landmarks: solid = filled stone, landmark = brighter, ring = cyan outline
-      (G.OBSTACLES || []).forEach((o) => {
-        const ox = o.x * sx, oy = o.y * sy, orad = Math.max(1.5, o.radius * sx);
+      mmctx.fillStyle = "rgba(10,18,34,0.62)"; mmctx.beginPath(); mmctx.arc(cx, cy, rad + 4, 0, TAU); mmctx.fill();
+      mmctx.strokeStyle = "rgba(150,200,236,0.5)"; mmctx.beginPath(); mmctx.arc(cx, cy, rad + 4, 0, TAU); mmctx.stroke();
+      const me = state.players.get(myId);
+      let myP = me ? SP.vec(me.px, me.py, me.pz) : SP.vec(0, 0, 1);
+      let myF = me ? SP.tangentize(myP, SP.vec(me.fx, me.fy, me.fz)) : SP.vec(1, 0, 0);
+      const plot = (dir, fn) => {
+        const ang = SP.angBetween(myP, dir); if (ang < 1e-3) { fn(cx, cy); return; }
+        const bearing = SP.signedAngle(myP, myF, SP.tangentize(myP, SP.sub(dir, myP)));
+        const rr = Math.min(1, ang / Math.PI) * rad;
+        fn(cx + Math.sin(bearing) * rr, cy - Math.cos(bearing) * rr);
+      };
+      // obstacles + hotspot
+      (G.OBSTACLES || []).forEach((o) => plot(o.dir, (x, y) => {
         const beh = (G.OBSTACLE_BEHAVIOR || {})[o.kind] || {};
-        if (o.landmark === "volcano" || o.kind === "tower") {
-          mmctx.fillStyle = "#ff7b2e"; mmctx.beginPath(); mmctx.arc(ox, oy, orad, 0, TAU); mmctx.fill();
-        } else if (beh.solid) {
-          mmctx.fillStyle = o.landmark ? "rgba(222,212,150,0.9)" : "rgba(160,150,140,0.8)";
-          mmctx.beginPath(); mmctx.arc(ox, oy, orad, 0, TAU); mmctx.fill();
-        } else {
-          mmctx.strokeStyle = "rgba(111,224,255,0.85)"; mmctx.lineWidth = 1;
-          mmctx.beginPath(); mmctx.arc(ox, oy, orad, 0, TAU); mmctx.stroke();
-        }
-      });
-
+        if (o.landmark === "volcano" || o.kind === "tower") { mmctx.fillStyle = "#ff7b2e"; mmctx.beginPath(); mmctx.arc(x, y, 3, 0, TAU); mmctx.fill(); }
+        else if (beh.solid) { mmctx.fillStyle = o.landmark ? "rgba(222,212,150,0.9)" : "rgba(160,150,140,0.8)"; mmctx.beginPath(); mmctx.arc(x, y, 2.4, 0, TAU); mmctx.fill(); }
+        else { mmctx.strokeStyle = "rgba(111,224,255,0.85)"; mmctx.beginPath(); mmctx.arc(x, y, 2.4, 0, TAU); mmctx.stroke(); }
+      }));
       state.players.forEach((p, id) => {
         if (!p.alive) return;
-        const me = id === myId;
-        mmctx.fillStyle = me ? "#fff" : (p.bot ? "#ff8a8a" : "#7fd0ff");
-        mmctx.beginPath(); mmctx.arc(p.x * sx, p.y * sy, me ? 3 : 2, 0, TAU); mmctx.fill();
+        plot(SP.vec(p.px, p.py, p.pz), (x, y) => { const m = id === myId; mmctx.fillStyle = m ? "#fff" : (p.bot ? "#ff8a8a" : "#7fd0ff"); mmctx.beginPath(); mmctx.arc(x, y, m ? 3 : 2, 0, TAU); mmctx.fill(); });
       });
+      // own heading marker (always up/centre)
+      mmctx.fillStyle = "#fff"; mmctx.beginPath(); mmctx.moveTo(cx, cy - 5); mmctx.lineTo(cx - 3, cy + 3); mmctx.lineTo(cx + 3, cy + 3); mmctx.closePath(); mmctx.fill();
     },
   };
 

@@ -5,10 +5,11 @@ The authoritative sim is flat 2D (`x`, `y` in world units, `angle` heading), pre
 ## Goals / Non-Goals
 
 **Goals:**
-- A spherical play surface: great-circle flight, no walls, wrap-around dogfights.
+- A spherical play surface: great-circle flight, no walls, wrap-around dogfights. **Stage B (true spherical sim) is the committed deliverable** — the unbounded *feel* requires real wrap-around, not just a curved backdrop.
 - Server stays authoritative; prediction/interpolation/extrapolation work on the sphere.
-- Preserve the arcade-cute feel and the existing powerup set.
-- A de-risked path to ship (staged).
+- **Planet size scales with player count to hold play density constant** — a bigger lobby gets a bigger world, recomputed between rounds, so encounter cadence feels right whether 4 or 8 planes.
+- Preserve the arcade-cute feel and the existing powerup set; compose with `arena-content`'s cover/hotspot map (metric → angular).
+- A de-risked path to ship (Stage A as an optional internal look-test on the way to Stage B).
 
 **Non-Goals:**
 - Multiple planets / 3D free-flight off the surface (planes stay on the surface, like a top-down game wrapped onto a sphere).
@@ -35,10 +36,15 @@ The authoritative sim is flat 2D (`x`, `y` in world units, `angle` heading), pre
 
 9. **HUD/minimap.** Minimap → a small rotating 3D globe (cheap, reuses the planet material) or an equirectangular 2D projection; off-screen cues point along the great-circle bearing to the target. *Why:* a rectangular minimap is meaningless on a wrapping world.
 
-10. **Staged delivery (recommended).**
-    - **Stage A — visual curvature only.** Keep the flat 2D sim; bend the *presentation* so the play area reads as the top of a large sphere (curved ground, horizon falloff). No netcode/collision change. Low risk, ships independently, validates the look and camera.
-    - **Stage B — true spherical sim.** Swap the authoritative model + netcode + collision to the sphere (decisions 1–9). This is "globe instead of flat".
-    *Why:* Stage A buys the visual win cheaply and lets us tune the camera/feel before committing to the math-heavy Stage B. Each stage is shippable.
+10. **Stage B is the deliverable; Stage A is an optional look-test.**
+    - **Stage B — true spherical sim (the deliverable).** Swap the authoritative model + netcode + collision to the sphere (decisions 1–9, 11). This is "globe instead of flat" and is the only stage that actually removes the boundary — the unbounded feel needs real wrap-around, because a curved backdrop over a still-bounded sim would let players hit invisible walls and break the illusion.
+    - **Stage A — visual curvature (optional internal checkpoint).** Keep the flat 2D sim; bend the *presentation* so the play area reads as the top of a sphere, to validate camera/horizon/feel before the math-heavy Stage B. Not required to ship to production; it's a de-risking step, not a separate release.
+    *Why:* the goal ("infinite / not bounded") is only met by Stage B, so we commit to it; Stage A stays available purely to tune the look cheaply first if useful.
+
+11. **Dynamic planet size by player count (constant play density).** `GLOBE_RADIUS` is not fixed — it is computed from the number of bodies in the arena (humans + active bots, always within `[MIN_PLAYERS, MAX_CLIENTS]` = `[4, 8]`). To hold density constant, surface area (`4πr²`) scales with `N`, so **radius scales with √N**: `R = clamp(R_BASE * sqrt(N / N_BASE), R_MIN, R_MAX)`, with `N_BASE ≈ 6`. Recompute **only at round start during the intermission**, and hold `R` fixed for the whole round (never mid-round).
+    *Why this is correct and cheap:* state stores **direction unit vectors** (radius-independent) and **angular** speeds / turn-rates / hit-radii, so `R` is only a placement+render scalar. Changing `R` rescales the world **without moving anyone in gameplay terms** — no teleport, aim preserved, collisions unchanged (they're angular). The renderer can ease the planet scale across the 8 s intermission for a smooth inflate/deflate. `arena-content`'s cover/landmarks are stored as **directions + angular sizes**, so they spread proportionally as `R` grows — a spire's "fly-around time" stays constant; optionally scale obstacle *count* with `N` at larger sizes (refinement, not required).
+    *Why √N, total bodies, per-round:* √N (not ×N) keeps the variation gentle and tasteful ("not too much, not too little" — ~1.4× across 4→8); counting total bodies (not humans only) matches density to what's actually flying, since bots fill to the floor; per-round resize keeps it non-jarring. `R_MIN`/`R_MAX` are the "not too little / not too much" guardrails.
+    *Alternatives considered:* fixed radius (empty at 4, cramped at 8) — rejected; continuous mid-match easing (always "right" but constant breathing + camera/collision churn) — rejected for jank; size by humans only (bots then over-pack a too-small world) — rejected in favour of total bodies. Formula is future-proof: raising `MAX_CLIENTS` later widens the range automatically.
 
 ## Risks / Trade-offs
 
@@ -55,8 +61,8 @@ Land after `stability-hardening`. Ship **Stage A** (visual curvature) first as a
 
 ## Open Questions
 
-- **Confirm the coordinate model:** unit-vector+heading (recommended, robust) vs. lat/lon (leanest wire)?
-- `GLOBE_RADIUS` and the resulting feel — how "small" should the planet be (how fast does the horizon wrap)? Tune in Stage A.
-- Minimap form: rotating mini-globe vs. equirectangular projection?
-- Do we keep an invisible "play band" (avoid poles) or allow true full-sphere flight including over the poles?
-- Should Stage A ship to production on its own, or only as an internal checkpoint before Stage B?
+- **Coordinate model — resolved:** unit-vector + tangent heading (robust, no pole singularities, and radius-independent so dynamic sizing is free). lat/lon remains a viable lean-wire fallback but is not the plan.
+- **Stage A shipping — resolved:** Stage A is an optional internal look-test only; **Stage B is the committed deliverable** (decision 10).
+- **Play band — resolved:** allow true full-sphere flight (no artificial band); uniform `acos(2u−1)` spawns avoid pole clustering; unit-tests cover motion through the poles.
+- **Sizing tuning (open, by feel):** `R_BASE`, `R_MIN`, `R_MAX`, and `N_BASE` for the √N curve — dial in Stage A's camera test so the floor isn't cramped at 4 and the ceiling still wraps quickly at 8. Whether to also scale obstacle *count* with `N` is a later refinement.
+- **Minimap form (open):** rotating mini-globe vs. equirectangular projection — pick by what reads best/cheapest during the renderer task.
