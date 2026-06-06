@@ -54,6 +54,7 @@ import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
   const particles = [];
   const INTERP_DELAY = 100; // ms render delay for remote snapshot interpolation
   const predict = { x: 0, z: 0, angle: 0, speed: 0 }; // local-plane client prediction
+  let volcano = null, eruptAt = 0, emberAt = 0; // central hotspot eruption VFX (render-only)
 
   const R = {
     views: new Map(),
@@ -105,6 +106,7 @@ import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
       this._buildIsland();
       this._buildBoundary();
       this._buildDecor();
+      this._buildObstacles();
 
       minimap = document.createElement("canvas");
       minimap.id = "minimap";
@@ -250,6 +252,7 @@ import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
       });
       this.pickups.forEach((m, key) => { if (!pkseen.has(key)) { scene.remove(m); disposeObject(m); this.pickups.delete(key); } });
 
+      this._updateMap(sdt);
       this._updateParticles(sdt);
       this._updateCamera(myId, sdt);
       dip = Math.max(0, dip - dt * 3);
@@ -313,6 +316,18 @@ import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
       if (predict.x > G.ARENA_WIDTH - m) { predict.x = G.ARENA_WIDTH - m; predict.angle = this._deflect(predict.angle, Math.PI); }
       if (predict.z < m) { predict.z = m; predict.angle = this._deflect(predict.angle, Math.PI / 2); }
       if (predict.z > G.ARENA_HEIGHT - m) { predict.z = G.ARENA_HEIGHT - m; predict.angle = this._deflect(predict.angle, -Math.PI / 2); }
+      // Mirror the server's solid-obstacle deflect so the local plane doesn't rubber-band near cover.
+      // (predict.z is the 2D y; obstacle o.y is that same axis.) Never affects hp — render/feel only.
+      const O = G.OBSTACLES || [], BEH = G.OBSTACLE_BEHAVIOR || {};
+      for (let i = 0; i < O.length; i++) {
+        const o = O[i]; if (!BEH[o.kind] || !BEH[o.kind].solid) continue;
+        const rr = o.radius + G.PLANE_RADIUS;
+        if (G.within(predict.x, predict.z, o.x, o.y, rr)) {
+          const n = G.normalDir(o.x, o.y, predict.x, predict.z);
+          predict.x = o.x + n.x * rr; predict.z = o.y + n.y * rr;
+          predict.angle = this._deflect(predict.angle, Math.atan2(n.y, n.x));
+        }
+      }
     },
 
     // ===================== build =====================
@@ -409,6 +424,152 @@ import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
         blimp.position.set(cx, 560, cz - 600);
         scene.add(blimp); this._blimp = blimp;
       }
+    },
+
+    // ---- arena map content (obstacles / landmarks / hotspot) ----
+    // Built once from the shared G.OBSTACLES data, at the SAME coords the server collides against.
+    // Static for the session; disposed via _disposeMap (no per-frame churn → no leak).
+    _buildObstacles() {
+      const list = G.OBSTACLES || [];
+      this._mapGroup = new THREE.Group();
+      if (!list.length) { scene.add(this._mapGroup); return; } // gate on non-empty list
+      const ROCK = 0x8d857a, ROCK_D = 0x6f675d, STONE = 0x9a958c;
+      for (const o of list) {
+        let mesh;
+        if (o.landmark === "volcano" || o.kind === "tower") mesh = this._lmVolcano(o);
+        else if (o.landmark === "lighthouse") mesh = this._lmLighthouse(o);
+        else if (o.landmark === "shipwreck") mesh = this._lmShipwreck(o);
+        else if (o.landmark === "forest") mesh = this._lmForest(o);
+        else if (o.kind === "spire") mesh = this._obSpire(o, ROCK, ROCK_D);
+        else if (o.kind === "arch") mesh = this._obArch(o, STONE);
+        else if (o.kind === "ring") mesh = this._obRing(o);
+        else mesh = this._obRock(o, ROCK);
+        if (mesh) { mesh.position.x = o.x; mesh.position.z = o.y; this._mapGroup.add(mesh); }
+      }
+      scene.add(this._mapGroup);
+    },
+
+    _obSpire(o, col, dark) {
+      const g = new THREE.Group(), h = o.height, r = o.radius;
+      const cone = new THREE.Mesh(new THREE.ConeGeometry(r * 0.95, h, 7), new THREE.MeshStandardMaterial({ color: col, flatShading: true, roughness: 1 }));
+      cone.position.y = h / 2; cone.castShadow = true; g.add(cone);
+      const cap = new THREE.Mesh(new THREE.ConeGeometry(r * 0.5, h * 0.3, 7), new THREE.MeshStandardMaterial({ color: dark, flatShading: true, roughness: 1 }));
+      cap.position.y = h * 0.92; g.add(cap);
+      return g;
+    },
+
+    _obRock(o, col) {
+      const g = new THREE.Group(), r = o.radius, h = o.height;
+      const rock = new THREE.Mesh(new THREE.IcosahedronGeometry(r * 0.95, 0), new THREE.MeshStandardMaterial({ color: col, flatShading: true, roughness: 1 }));
+      rock.scale.y = Math.max(0.4, h / (r * 1.6)); rock.position.y = h * 0.42; rock.castShadow = true; g.add(rock);
+      return g;
+    },
+
+    _obArch(o, col) {
+      const g = new THREE.Group(), r = o.radius;
+      const torus = new THREE.Mesh(new THREE.TorusGeometry(r * 0.92, r * 0.17, 8, 18), new THREE.MeshStandardMaterial({ color: col, flatShading: true, roughness: 1 }));
+      torus.position.y = r * 0.95; torus.rotation.y = Math.atan2(cz - o.y, cx - o.x); torus.castShadow = true; g.add(torus);
+      return g;
+    },
+
+    _obRing(o) {
+      const g = new THREE.Group(), r = o.radius, col = 0x6fe0ff;
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(r * 0.95, r * 0.1, 8, 24), new THREE.MeshStandardMaterial({ color: col, emissive: col, emissiveIntensity: 0.85, roughness: 0.4, transparent: true, opacity: 0.85 }));
+      ring.position.y = ALT; ring.rotation.y = Math.atan2(cz - o.y, cx - o.x); g.add(ring);
+      g.userData.ring = true; // gentle spin in _updateMap (cosmetic)
+      return g;
+    },
+
+    _lmVolcano(o) {
+      const g = new THREE.Group(), r = o.radius, h = o.height;
+      const cone = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.5, r, h, 14), new THREE.MeshStandardMaterial({ color: 0x4b3f3a, flatShading: true, roughness: 1 }));
+      cone.position.y = h / 2; cone.castShadow = true; g.add(cone);
+      const crater = new THREE.Mesh(new THREE.CircleGeometry(r * 0.42, 16), new THREE.MeshBasicMaterial({ color: 0xff7b2e }));
+      crater.rotation.x = -Math.PI / 2; crater.position.y = h + 0.5; g.add(crater);
+      const glow = new THREE.PointLight(0xff6a2a, 0.85, r * 7, 2); glow.position.y = h + 10; g.add(glow);
+      volcano = { x: o.x, y: o.y, top: h + 6 }; // eruption source (world x, world z=o.y, top height)
+      return g;
+    },
+
+    _lmLighthouse(o) {
+      const g = new THREE.Group(), r = o.radius, h = o.height;
+      const tower = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.45, r * 0.7, h, 12), new THREE.MeshStandardMaterial({ color: 0xf4f4f4, flatShading: true, roughness: 0.85 }));
+      tower.position.y = h / 2; tower.castShadow = true; g.add(tower);
+      for (let i = 0; i < 2; i++) {
+        const band = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.5, r * 0.6, h * 0.12, 12), new THREE.MeshStandardMaterial({ color: 0xe2452f, roughness: 0.85 }));
+        band.position.y = h * (0.35 + i * 0.32); g.add(band);
+      }
+      const lantern = new THREE.Mesh(new THREE.SphereGeometry(r * 0.32, 10, 8), new THREE.MeshBasicMaterial({ color: 0xfff2a8 }));
+      lantern.position.y = h + r * 0.1; g.add(lantern); // emissive look via bloom (no extra dynamic light)
+      return g;
+    },
+
+    _lmShipwreck(o) {
+      const g = new THREE.Group(), r = o.radius, h = Math.max(o.height, 60);
+      const hull = new THREE.Mesh(new THREE.BoxGeometry(r * 1.6, h * 0.7, r * 0.8), new THREE.MeshStandardMaterial({ color: 0x6b4a2b, flatShading: true, roughness: 1 }));
+      hull.position.y = h * 0.35; hull.rotation.z = 0.22; hull.castShadow = true; g.add(hull);
+      const mast = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.06, r * 0.06, h * 1.4, 6), new THREE.MeshStandardMaterial({ color: 0x4a3420, roughness: 1 }));
+      mast.position.set(r * 0.1, h * 0.8, 0); mast.rotation.z = 0.18; g.add(mast);
+      const sail = new THREE.Mesh(new THREE.PlaneGeometry(r * 0.7, h * 0.6), new THREE.MeshStandardMaterial({ color: 0xe8e0cf, roughness: 1, side: THREE.DoubleSide }));
+      sail.position.set(r * 0.2, h * 0.9, 0); g.add(sail);
+      return g;
+    },
+
+    _lmForest(o) {
+      const g = new THREE.Group(), r = o.radius;
+      const trunkMat = new THREE.MeshStandardMaterial({ color: 0x6b4a2b, roughness: 1 });
+      const leafMat = new THREE.MeshStandardMaterial({ color: 0x3f9d4a, flatShading: true, roughness: 1 });
+      const n = 6;
+      for (let i = 0; i < n; i++) {
+        const a = (i / n) * TAU, rr = rand(r * 0.2, r * 0.8), tx = Math.cos(a) * rr, tz = Math.sin(a) * rr, th = rand(o.height * 0.7, o.height * 1.2);
+        const trunk = new THREE.Mesh(new THREE.CylinderGeometry(th * 0.06, th * 0.08, th * 0.5, 6), trunkMat);
+        trunk.position.set(tx, th * 0.25, tz); g.add(trunk);
+        const leaf = new THREE.Mesh(new THREE.ConeGeometry(th * 0.32, th * 0.7, 7), leafMat);
+        leaf.position.set(tx, th * 0.7, tz); leaf.castShadow = true; g.add(leaf);
+      }
+      return g;
+    },
+
+    // Hotspot eruption + ring spin — purely visual, emits/reads NO game state (never damages).
+    _updateMap(dt) {
+      if (this._mapGroup) {
+        for (const c of this._mapGroup.children) if (c.userData && c.userData.ring && c.children[0]) c.children[0].rotation.z += dt * 0.6;
+      }
+      if (!volcano) return;
+      if (time > emberAt) { // continuous drifting embers
+        emberAt = time + 0.18;
+        const n = Math.max(1, Math.round(partScale));
+        for (let i = 0; i < n; i++) {
+          const a = rand(0, TAU), sp = rand(8, 26);
+          this._spawn(SPARK_GEO, 0xff9a3c, volcano.x + rand(-12, 12), volcano.top, volcano.y + rand(-12, 12), {
+            vel: new THREE.Vector3(Math.cos(a) * sp, rand(40, 80), Math.sin(a) * sp),
+            life: rand(0.7, 1.3), gravity: 90, spin: 5, from: rand(1.5, 3), to: 0.4, alpha: 0.9, add: true,
+          });
+        }
+      }
+      if (time > eruptAt) { // periodic eruption burst
+        eruptAt = time + rand(3.5, 6);
+        const n = Math.round(16 * partScale);
+        for (let i = 0; i < n; i++) {
+          const a = rand(0, TAU), sp = rand(40, 120);
+          this._spawn(SPARK_GEO, i % 2 ? 0xffd27a : 0xff5a2a, volcano.x, volcano.top, volcano.y, {
+            vel: new THREE.Vector3(Math.cos(a) * sp, rand(120, 240), Math.sin(a) * sp),
+            life: rand(0.8, 1.5), gravity: 220, spin: 8, from: rand(2.5, 5), to: 0.5, alpha: 1, add: true,
+          });
+        }
+        const smoke = Math.round(5 * partScale);
+        for (let i = 0; i < smoke; i++) {
+          this._spawn(PUFF_GEO, 0x6b5a52, volcano.x + rand(-10, 10), volcano.top, volcano.y + rand(-10, 10), {
+            vel: new THREE.Vector3(rand(-12, 12), rand(40, 80), rand(-12, 12)),
+            life: rand(1, 1.8), gravity: -8, from: rand(4, 8), to: rand(20, 32), alpha: 0.35,
+          });
+        }
+      }
+    },
+
+    _disposeMap() {
+      if (this._mapGroup) { scene.remove(this._mapGroup); disposeObject(this._mapGroup); this._mapGroup = null; }
+      volcano = null;
     },
 
     // ===================== entities =====================
@@ -596,6 +757,31 @@ import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
       mmctx.fillStyle = "rgba(10,24,14,0.6)"; mmctx.fillRect(0, 0, w, h);
       mmctx.strokeStyle = "rgba(150,236,180,0.5)"; mmctx.strokeRect(0.5, 0.5, w - 1, h - 1);
       const sx = w / G.ARENA_WIDTH, sy = h / G.ARENA_HEIGHT;
+
+      // zones (faint) — hot centre vs cover ring, for orientation
+      if (G.HOTSPOT && G.ZONES) {
+        const hx = G.HOTSPOT.x * sx, hy = G.HOTSPOT.y * sy;
+        mmctx.strokeStyle = "rgba(255,180,90,0.18)"; mmctx.lineWidth = 1;
+        mmctx.beginPath(); mmctx.arc(hx, hy, G.ZONES.midR * sx, 0, TAU); mmctx.stroke();
+        mmctx.fillStyle = "rgba(255,120,60,0.10)";
+        mmctx.beginPath(); mmctx.arc(hx, hy, G.ZONES.centerR * sx, 0, TAU); mmctx.fill();
+      }
+
+      // obstacles + landmarks: solid = filled stone, landmark = brighter, ring = cyan outline
+      (G.OBSTACLES || []).forEach((o) => {
+        const ox = o.x * sx, oy = o.y * sy, orad = Math.max(1.5, o.radius * sx);
+        const beh = (G.OBSTACLE_BEHAVIOR || {})[o.kind] || {};
+        if (o.landmark === "volcano" || o.kind === "tower") {
+          mmctx.fillStyle = "#ff7b2e"; mmctx.beginPath(); mmctx.arc(ox, oy, orad, 0, TAU); mmctx.fill();
+        } else if (beh.solid) {
+          mmctx.fillStyle = o.landmark ? "rgba(222,212,150,0.9)" : "rgba(160,150,140,0.8)";
+          mmctx.beginPath(); mmctx.arc(ox, oy, orad, 0, TAU); mmctx.fill();
+        } else {
+          mmctx.strokeStyle = "rgba(111,224,255,0.85)"; mmctx.lineWidth = 1;
+          mmctx.beginPath(); mmctx.arc(ox, oy, orad, 0, TAU); mmctx.stroke();
+        }
+      });
+
       state.players.forEach((p, id) => {
         if (!p.alive) return;
         const me = id === myId;
