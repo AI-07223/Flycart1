@@ -88,6 +88,10 @@
         <div id="plane-swatches"></div>
       </div>
 
+      <label id="bots-opt" class="switch">
+        <input type="checkbox" id="bots-check" checked /> 🤖 Play with bots
+      </label>
+
       <div class="btn-row">
         <button id="quickplay-btn">QUICK PLAY</button>
         <button id="friends-btn" class="secondary">PLAY WITH FRIENDS</button>
@@ -145,6 +149,15 @@
           <button data-q="low">Low</button><button data-q="med">Med</button><button data-q="high">High</button>
         </div>
       </div>
+      <div class="set-row" id="steer-row"><label>Steering</label>
+        <div class="seg" id="steer-seg">
+          <button data-steer="arrows">Arrows</button><button data-steer="tilt">Tilt</button>
+        </div>
+      </div>
+      <div class="set-row"><label>Invert</label>
+        <label class="switch sm"><input type="checkbox" id="invert-check" /> Reverse L/R</label>
+      </div>
+      <div class="set-row" id="sens-row"><label>Sensitivity</label><input type="range" id="sens-range" min="50" max="200" /></div>
       <div class="set-row"><label>Master</label><input type="range" id="vol-master" min="0" max="100" /></div>
       <div class="set-row"><label>Music</label><input type="range" id="vol-music" min="0" max="100" /></div>
       <div class="set-row"><label>SFX</label><input type="range" id="vol-sfx" min="0" max="100" /></div>

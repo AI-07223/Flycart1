@@ -51,11 +51,13 @@ export class ArenaRoom extends Room<ArenaState> {
   private invulnUntil = new Map<string, number>();
   private msgTimes = new Map<string, number[]>();
   private sized = false; // has the first round's radius been computed once bots filled?
+  private botsEnabled = true; // false in the no-bots matchmaking bucket (code "NOBOTS")
 
   onCreate(options: { code?: string } = {}) {
     this.state = new ArenaState();
     this.state.timeLeft = C.ROUND_SECONDS;
     this.state.radius = C.radiusForBodies(C.MIN_PLAYERS);
+    this.botsEnabled = (options.code || "PUBLIC") !== "NOBOTS";
     this.setMetadata({ code: options.code || "PUBLIC" });
 
     this.onMessage("input", (client, data: Partial<Input>) => {
@@ -107,7 +109,7 @@ export class ArenaRoom extends Room<ArenaState> {
     const R = this.state.radius;
     this.maintainBots();
     // First-round sizing: once bots have filled to the floor, set the real radius once.
-    if (!this.sized && this.state.players.size >= C.MIN_PLAYERS) { this.resizePlanet(); this.sized = true; }
+    if (!this.sized && (this.state.players.size >= C.MIN_PLAYERS || !this.botsEnabled)) { this.resizePlanet(); this.sized = true; }
     this.maintainPickups(R);
     this.updateTimer(dt);
 
@@ -161,7 +163,8 @@ export class ArenaRoom extends Room<ArenaState> {
     const input = this.inputs.get(id) ?? ZERO_INPUT;
     let pos = getP(p), fwd = getF(p);
 
-    // turn (rotate heading about the surface normal)
+    // turn (rotate heading about the surface normal). Sign is correct for bots (which set
+    // input.turn = sign(bearing error)); human input handedness is fixed at the source in input.js.
     fwd = S.turn(pos, fwd, input.turn * C.TURN_RATE * dt);
     p.boosting = input.boost;
 
@@ -465,6 +468,10 @@ export class ArenaRoom extends Room<ArenaState> {
   // ---------- bots ----------
 
   private maintainBots() {
+    if (!this.botsEnabled) { // no-bots bucket: drop any bots, never fill
+      if (this.bots.size) for (const id of [...this.bots.keys()]) this.removePlayer(id);
+      return;
+    }
     const total = this.state.players.size;
     if (total < C.MIN_PLAYERS) {
       this.addBot();

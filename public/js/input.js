@@ -16,6 +16,11 @@
     // Gyro state.
     gyro: { enabled: false, supported: false, turn: 0, base: null, sens: 1.0 },
 
+    // Steering handedness. Base mapping is negated so a right input turns right (a +rotation
+    // about the surface normal is CCW-from-camera = left). invertSteer flips it back for players
+    // who prefer inverted (set from in-game control settings).
+    invertSteer: false,
+
     get() {
       const kLeft = keys["ArrowLeft"] || keys["a"] || keys["A"];
       const kRight = keys["ArrowRight"] || keys["d"] || keys["D"];
@@ -28,7 +33,8 @@
       // Gyro tilt (analog) — takes over when active and no key/arrow override.
       if (this.gyro.enabled && turn === 0) turn = this.gyro.turn;
 
-      this.turn = Math.max(-1, Math.min(1, turn));
+      const sign = this.invertSteer ? 1 : -1; // base -1 = correct handedness (right→right)
+      this.turn = Math.max(-1, Math.min(1, sign * turn));
       this.boost = !!(keys["ArrowUp"] || keys["w"] || keys["W"] || keys["Shift"] || this.touch.boost);
       this.fire = !!(keys[" "] || keys["Spacebar"] || this.touch.fire);
       return this;

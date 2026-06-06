@@ -12,8 +12,8 @@ export const TICK_RATE = 30; // server simulation ticks per second
 export const TICK_MS = 1000 / TICK_RATE;
 
 // Plane movement
-export const CRUISE_SPEED = 260; // linear surface speed (world units/sec)
-export const BOOST_SPEED = 440;
+export const CRUISE_SPEED = 185; // linear surface speed (world units/sec) — tuned into the ~30°/s human trackable band
+export const BOOST_SPEED = 320;  // brief burst; closing stays readable
 export const ACCEL = 900;        // how fast speed eases toward its target (u/s²)
 export const TURN_RATE = 3.2;    // radians/sec heading turn (radius-independent)
 

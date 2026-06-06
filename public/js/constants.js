@@ -2,8 +2,8 @@
 // Used for local input prediction and rendering. Keep in sync with the server.
 // GLOBE ARENA: positions are unit-vector directions; speeds are linear surface speeds (÷ radius → angular).
 window.GAME = {
-  CRUISE_SPEED: 260,
-  BOOST_SPEED: 440,
+  CRUISE_SPEED: 185,
+  BOOST_SPEED: 320,
   ACCEL: 900,
   TURN_RATE: 3.2,
 

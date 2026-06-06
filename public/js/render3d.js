@@ -18,8 +18,9 @@ import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 
   // ---- tuning (rendering only) ----
   const ALT = 16, BULLET_ALT = 13, PICKUP_ALT = 20, PLANE_SCALE = 1.7;
-  const CAM_BACK = 150, CAM_UP = 78, CAM_LOOKAHEAD = 120, CAM_LERP = 4.5;
-  const FOV_BASE = 64, FOV_BOOST = 75;
+  const VIS_K = 1.5; // VISUAL planet-radius multiplier — flatter horizon + see further; GAMEPLAY radius is unchanged
+  const CAM_BACK = 165, CAM_UP = 96, CAM_LOOKAHEAD = 130, CAM_LERP = 4.5;
+  const FOV_BASE = 72, FOV_BOOST = 80;
   const SKY = 0x0b1022;
   const SKINS = [0xff6b6b, 0x49c0ff, 0x8be34a, 0xffd24a, 0xc07bff];
 
@@ -47,7 +48,8 @@ import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
   let canvasEl, minimap, mmctx, popupLayer;
   let time = 0, shakeMag = 0, hitStop = 0, fov = FOV_BASE, dip = 0;
   let decorScale = 1, partScale = 1;
-  let curR = G.R_BASE;          // eased render radius (toward state.radius)
+  let curR = G.R_BASE;          // GAMEPLAY radius (eased toward state.radius) — used by prediction/extrapolation (must match server)
+  let visR = G.R_BASE * VIS_K;  // VISUAL radius — ALL rendering/placement keys off this (flatter look, same gameplay)
   let volcano = null, eruptAt = 0, emberAt = 0;
   const camPos = new THREE.Vector3(0, 0, curR * 3);
   const camLook = new THREE.Vector3(0, 0, 0);
@@ -57,8 +59,9 @@ import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
   // local-plane prediction: p (dir), f (forward tangent), speed
   const predict = { p: { x: 0, y: 1, z: 0 }, f: { x: 1, y: 0, z: 0 }, speed: G.CRUISE_SPEED };
 
-  // world position of a surface direction at altitude `alt` (uses the eased radius)
-  const worldOf = (dir, alt) => _a.set(dir.x, dir.y, dir.z).multiplyScalar(curR + alt);
+  // world position of a surface direction at altitude `alt` (uses the VISUAL radius, so the
+  // planet renders bigger/flatter while gameplay stays on curR)
+  const worldOf = (dir, alt) => _a.set(dir.x, dir.y, dir.z).multiplyScalar(visR + alt);
 
   const R = {
     views: new Map(),
@@ -106,7 +109,7 @@ import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 
       minimap = document.createElement("canvas");
       minimap.id = "minimap";
-      minimap.width = 150; minimap.height = 150;
+      minimap.width = 120; minimap.height = 120;
       (document.getElementById("game-wrap") || document.body).appendChild(minimap);
       mmctx = minimap.getContext("2d");
 
@@ -148,6 +151,7 @@ import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
       // ease the rendered planet radius toward the authoritative (per-round) value
       const targetR = state.radius || G.R_BASE;
       curR += (targetR - curR) * Math.min(1, dt * 1.5);
+      visR = curR * VIS_K;
 
       const interp = (window.Net && window.Net.sample) ? window.Net.sample(performance.now() - INTERP_DELAY) : {};
       const input = window.Input ? window.Input.get() : { turn: 0, boost: false, fire: false };
@@ -197,7 +201,7 @@ import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
           const rate = p.boosting ? 0.03 : 0.13;
           if (time - v.lastPuff > rate) {
             v.lastPuff = time;
-            const back = SP.advance(v.p, v.f, -24 / curR).p; // just behind the tail on the surface
+            const back = SP.advance(v.p, v.f, -24 / visR).p; // just behind the tail (visual offset)
             this._puff(worldOf(back, ALT).clone(), p.boosting);
           }
         }
@@ -572,7 +576,7 @@ import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
       let wantFov = FOV_BASE;
       if (me && me.alive) {
         const P = V(me.p), F = V(me.f);
-        const planeW = P.clone().multiplyScalar(curR + ALT);
+        const planeW = P.clone().multiplyScalar(visR + ALT);
         // behind along -forward, up along the surface normal
         _a.copy(planeW).addScaledVector(F, -CAM_BACK).addScaledVector(P, CAM_UP);
         _b.copy(planeW).addScaledVector(F, CAM_LOOKAHEAD);
@@ -582,7 +586,7 @@ import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
       } else {
         // idle orbit around the planet
         const a = time * 0.08;
-        _a.set(Math.cos(a) * curR * 2.4, curR * 1.2, Math.sin(a) * curR * 2.4);
+        _a.set(Math.cos(a) * visR * 2.4, visR * 1.2, Math.sin(a) * visR * 2.4);
         camPos.lerp(_a, Math.min(1, dt * 1.5)); camLook.lerp(_b.set(0, 0, 0), Math.min(1, dt * 1.5)); camUp.lerp(_c.set(0, 1, 0), Math.min(1, dt * 1.5)).normalize();
       }
       fov += (wantFov - fov) * Math.min(1, dt * 6);
@@ -597,9 +601,9 @@ import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
         shakeMag *= Math.pow(0.0001, dt);
       } else shakeMag = 0;
       camera.lookAt(camLook);
-      if (this._planet) { this._planet.scale.setScalar(curR); }
-      if (this._atmo) { this._atmo.scale.setScalar(curR * 1.05); }
-      if (scene.fog) { scene.fog.near = curR * 2.2; scene.fog.far = curR * 5.5; }
+      if (this._planet) { this._planet.scale.setScalar(visR); }
+      if (this._atmo) { this._atmo.scale.setScalar(visR * 1.05); }
+      if (scene.fog) { scene.fog.near = visR * 2.2; scene.fog.far = visR * 5.5; }
     },
 
     // player-centric radar: bearing relative to my heading (forward = up), radius = angular distance
@@ -625,10 +629,14 @@ import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
         else if (beh.solid) { mmctx.fillStyle = o.landmark ? "rgba(222,212,150,0.9)" : "rgba(160,150,140,0.8)"; mmctx.beginPath(); mmctx.arc(x, y, 2.4, 0, TAU); mmctx.fill(); }
         else { mmctx.strokeStyle = "rgba(111,224,255,0.85)"; mmctx.beginPath(); mmctx.arc(x, y, 2.4, 0, TAU); mmctx.stroke(); }
       }));
+      let threat = false;
       state.players.forEach((p, id) => {
         if (!p.alive) return;
-        plot(SP.vec(p.px, p.py, p.pz), (x, y) => { const m = id === myId; mmctx.fillStyle = m ? "#fff" : (p.bot ? "#ff8a8a" : "#7fd0ff"); mmctx.beginPath(); mmctx.arc(x, y, m ? 3 : 2, 0, TAU); mmctx.fill(); });
+        const dir = SP.vec(p.px, p.py, p.pz);
+        if (id !== myId && SP.angBetween(myP, dir) < 0.6) threat = true; // enemy within engagement range
+        plot(dir, (x, y) => { const m = id === myId; mmctx.fillStyle = m ? "#fff" : (p.bot ? "#ff8a8a" : "#7fd0ff"); mmctx.beginPath(); mmctx.arc(x, y, m ? 3 : 2, 0, TAU); mmctx.fill(); });
       });
+      minimap.style.opacity = threat ? "0.95" : "0.5"; // calm when clear, alert when a threat is near
       // own heading marker (always up/centre)
       mmctx.fillStyle = "#fff"; mmctx.beginPath(); mmctx.moveTo(cx, cy - 5); mmctx.lineTo(cx - 3, cy + 3); mmctx.lineTo(cx + 3, cy + 3); mmctx.closePath(); mmctx.fill();
     },

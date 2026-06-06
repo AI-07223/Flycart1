@@ -20,6 +20,9 @@
     gyroOpt: $("gyro-opt"), gyroCheck: $("gyro-check"), kbdControls: $("kbd-controls"),
     touchHint: $("touch-controls-hint"), planeSwatches: $("plane-swatches"),
     winnerLine: $("winner-line"), yourPlace: $("your-place"), lbList: $("lb-list"),
+    botsOpt: $("bots-opt"), botsCheck: $("bots-check"),
+    steerRow: $("steer-row"), steerSeg: $("steer-seg"), invertCheck: $("invert-check"),
+    sensRow: $("sens-row"), sensRange: $("sens-range"),
     vignette: $("vignette"), rotate: $("rotate-overlay"),
     settingsBtn: $("settings-btn"), settingsPanel: $("settings-panel"),
     qSeg: $("quality-seg"), volMaster: $("vol-master"), volMusic: $("vol-music"), volSfx: $("vol-sfx"),
@@ -41,6 +44,12 @@
   const SKINS = [0xff6b6b, 0x49c0ff, 0x8be34a, 0xffd24a, 0xc07bff];
   let selectedSkin = 0;
   try { const s = parseInt(localStorage.getItem("smashcart.skin"), 10); if (Number.isInteger(s) && s >= 0 && s < SKINS.length) selectedSkin = s; } catch (e) {}
+
+  // Persisted options: bots on/off, steering mode (arrows|tilt).
+  let botsEnabled = true;
+  try { botsEnabled = localStorage.getItem("smashcart.bots") !== "0"; } catch (e) {}
+  let steerMode = "arrows";
+  try { const m = localStorage.getItem("smashcart.steer"); if (m === "tilt" || m === "arrows") steerMode = m; } catch (e) {}
 
   // Fetch + render the global leaderboard on the menu; degrade gracefully on error.
   function fetchLeaderboard() {
@@ -88,6 +97,7 @@
   }
 
   async function startGame(code) {
+    if (code === "PUBLIC" && !botsEnabled) code = "NOBOTS"; // bots-off Quick Play → separate no-bots bucket
     window.SFX.unlock();
     enterImmersive(); // fullscreen + landscape lock (must run inside the click gesture)
     const name = (els.name.value || "Pilot").slice(0, 14);
@@ -105,14 +115,15 @@
     els.hud.classList.remove("hidden");
     els.health.classList.remove("hidden");
 
-    // Mobile: activate touch controls and (optionally) gyro steering.
+    // Mobile: activate touch controls and (optionally) gyro steering per the chosen steer mode.
     if (window.Input.isTouchDevice()) {
       els.touch.classList.remove("hidden");
       let gyroOn = false;
-      if (els.gyroCheck.checked) gyroOn = await window.Input.enableGyro();
+      if (steerMode === "tilt") gyroOn = await window.Input.enableGyro();
       if (gyroOn) {
         els.recenter.classList.remove("hidden"); // tilt steers; show recenter
       } else {
+        steerMode = "arrows";
         els.steerPad.classList.remove("hidden"); // fall back to arrows
       }
     }
@@ -331,6 +342,7 @@
     els.mute.addEventListener("click", () => toggleMute());
     els.resume.addEventListener("click", () => togglePause());
     setupSettings();
+    setupControls();
 
     window.Input.onPause = () => { if (mode !== "menu") togglePause(); };
     window.Input.onMute = () => toggleMute();
@@ -458,6 +470,84 @@
     els.volMaster.addEventListener("input", () => window.SFX.setMaster(els.volMaster.value / 100));
     els.volMusic.addEventListener("input", () => window.SFX.setMusic(els.volMusic.value / 100));
     els.volSfx.addEventListener("input", () => window.SFX.setSfx(els.volSfx.value / 100));
+  }
+
+  // Bots toggle + in-game control settings (steering mode / invert / sensitivity), all persisted.
+  function setupControls() {
+    if (!window.Input.gyro.supported && steerMode === "tilt") steerMode = "arrows";
+
+    if (els.botsCheck) {
+      els.botsCheck.checked = botsEnabled;
+      els.botsCheck.addEventListener("change", () => {
+        botsEnabled = els.botsCheck.checked;
+        try { localStorage.setItem("smashcart.bots", botsEnabled ? "1" : "0"); } catch (e) {}
+        window.SFX.uiClick();
+      });
+    }
+
+    // Invert steering — applies to every input source, takes effect immediately.
+    try { window.Input.invertSteer = localStorage.getItem("smashcart.invert") === "1"; } catch (e) {}
+    if (els.invertCheck) {
+      els.invertCheck.checked = window.Input.invertSteer;
+      els.invertCheck.addEventListener("change", () => {
+        window.Input.invertSteer = els.invertCheck.checked;
+        try { localStorage.setItem("smashcart.invert", window.Input.invertSteer ? "1" : "0"); } catch (e) {}
+        window.SFX.uiClick();
+      });
+    }
+
+    // Sensitivity (gyro/turn) — live.
+    let sens = 100;
+    try { const s = parseInt(localStorage.getItem("smashcart.sens"), 10); if (s >= 50 && s <= 200) sens = s; } catch (e) {}
+    window.Input.setGyroSensitivity(sens / 100);
+    if (els.sensRange) {
+      els.sensRange.value = sens;
+      els.sensRange.addEventListener("input", () => {
+        window.Input.setGyroSensitivity(els.sensRange.value / 100);
+        try { localStorage.setItem("smashcart.sens", String(els.sensRange.value)); } catch (e) {}
+      });
+    }
+
+    // Steering-mode segmented control (touch) + keep the menu gyro checkbox in sync.
+    if (els.steerSeg) {
+      els.steerSeg.querySelectorAll("button").forEach((b) => {
+        b.classList.toggle("active", b.dataset.steer === steerMode);
+        b.addEventListener("click", () => { window.SFX.uiClick(); applySteerMode(b.dataset.steer); });
+      });
+    }
+    if (els.gyroCheck) {
+      els.gyroCheck.checked = steerMode === "tilt";
+      els.gyroCheck.addEventListener("change", () => applySteerMode(els.gyroCheck.checked ? "tilt" : "arrows"));
+    }
+
+    // On non-touch devices hide the touch-only rows; invert still applies to keyboard.
+    if (!window.Input.isTouchDevice()) {
+      if (els.steerRow) els.steerRow.classList.add("hidden");
+      if (els.sensRow) els.sensRow.classList.add("hidden");
+    }
+  }
+
+  // Set steering mode; if changed mid-match on a touch device, switch gyro/arrows live.
+  async function applySteerMode(m) {
+    steerMode = (m === "tilt") ? "tilt" : "arrows";
+    try { localStorage.setItem("smashcart.steer", steerMode); } catch (e) {}
+    const reflect = () => {
+      if (els.steerSeg) els.steerSeg.querySelectorAll("button").forEach((b) => b.classList.toggle("active", b.dataset.steer === steerMode));
+      if (els.gyroCheck) els.gyroCheck.checked = steerMode === "tilt";
+    };
+    reflect();
+    if (mode === "playing" && window.Input.isTouchDevice()) {
+      if (steerMode === "tilt") {
+        const ok = await window.Input.enableGyro();
+        if (ok) { els.recenter.classList.remove("hidden"); els.steerPad.classList.add("hidden"); }
+        else { steerMode = "arrows"; reflect(); }
+      }
+      if (steerMode === "arrows") {
+        window.Input.disableGyro();
+        els.recenter.classList.add("hidden");
+        els.steerPad.classList.remove("hidden");
+      }
+    }
   }
 
   function refreshQuality() {
