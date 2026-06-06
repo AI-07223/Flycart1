@@ -308,7 +308,7 @@ import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
     // ===================== build =====================
     _buildStars() {
       const n = 600, pos = new Float32Array(n * 3);
-      for (let i = 0; i < n; i++) { const d = SP.randomDir ? null : null; const x = rand(-1, 1), y = rand(-1, 1), z = rand(-1, 1); const l = Math.hypot(x, y, z) || 1; const r = 16000; pos[i*3]=x/l*r; pos[i*3+1]=y/l*r; pos[i*3+2]=z/l*r; }
+      for (let i = 0; i < n; i++) { const d = SP.randomDir(); const r = 16000; pos[i*3]=d.x*r; pos[i*3+1]=d.y*r; pos[i*3+2]=d.z*r; }
       const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.BufferAttribute(pos, 3));
       const stars = new THREE.Points(g, new THREE.PointsMaterial({ color: 0xbcd2ff, size: 60, sizeAttenuation: true }));
       scene.add(stars); this._stars = stars;

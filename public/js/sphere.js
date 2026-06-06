@@ -38,6 +38,13 @@
     return normalize({ x: a.x * wa + b.x * wb, y: a.y * wa + b.y * wb, z: a.z * wa + b.z * wb });
   }
   const signedAngle = (normal, from, to) => Math.atan2(dot(cross(from, to), normal), dot(from, to));
+  // uniform random point on the unit sphere (acos(2u-1) latitude → no pole clustering)
+  function randomDir(rng) {
+    rng = rng || Math.random;
+    const u = rng(), w = rng();
+    const z = 2 * u - 1, r = Math.sqrt(Math.max(0, 1 - z * z)), phi = 2 * Math.PI * w;
+    return { x: r * Math.cos(phi), y: z, z: r * Math.sin(phi) };
+  }
   // build a unit direction at angular distance `ang` from a base dir along azimuth `az`
   function dirFrom(base, ang, az) {
     const up = Math.abs(base.y) < 0.9 ? vec(0, 1, 0) : vec(1, 0, 0);
@@ -48,5 +55,5 @@
     return normalize(rotateAxis(base, axis, ang));
   }
 
-  window.Sphere = { vec, add, sub, scale, dot, cross, len, normalize, rotateAxis, anyTangent, tangentize, advance, turn, angBetween, slerp, signedAngle, dirFrom };
+  window.Sphere = { vec, add, sub, scale, dot, cross, len, normalize, rotateAxis, anyTangent, tangentize, advance, turn, angBetween, slerp, signedAngle, dirFrom, randomDir };
 })();
