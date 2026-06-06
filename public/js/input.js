@@ -11,7 +11,8 @@
     onMute: null,
 
     // Touch button state (set by main.js from on-screen controls).
-    touch: { left: false, right: false, boost: false, fire: false },
+    touch: { left: false, right: false, boost: false, fire: false, stick: 0 },
+    stickActive: false, // true when steering mode = virtual thumbstick
 
     // Gyro state.
     gyro: { enabled: false, supported: false, turn: 0, base: null, sens: 1.0 },
@@ -32,6 +33,8 @@
 
       // Gyro tilt (analog) — takes over when active and no key/arrow override.
       if (this.gyro.enabled && turn === 0) turn = this.gyro.turn;
+      // Virtual thumbstick (analog) — when that steering mode is active.
+      if (this.stickActive && turn === 0) turn = this.touch.stick;
 
       const sign = this.invertSteer ? 1 : -1; // base -1 = correct handedness (right→right)
       this.turn = Math.max(-1, Math.min(1, sign * turn));

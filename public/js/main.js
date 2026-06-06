@@ -2,6 +2,8 @@
 (function () {
   const $ = (id) => document.getElementById(id);
   const G = window.GAME;
+  // Haptic helper — short vibration where supported (no-op on iOS Safari etc.).
+  const buzz = (ms) => { try { if (navigator.vibrate) navigator.vibrate(ms); } catch (e) {} };
 
   const els = {
     canvas: $("game"),
@@ -16,7 +18,7 @@
     killfeed: $("killfeed"),
     touch: $("touch-controls"), steerPad: $("steer-pad"),
     left: $("left-btn"), right: $("right-btn"), boost: $("boost-btn"), fire: $("fire-btn"),
-    recenter: $("recenter-btn"),
+    recenter: $("recenter-btn"), stick: $("thumbstick"),
     gyroOpt: $("gyro-opt"), gyroCheck: $("gyro-check"), kbdControls: $("kbd-controls"),
     touchHint: $("touch-controls-hint"), planeSwatches: $("plane-swatches"),
     winnerLine: $("winner-line"), yourPlace: $("your-place"), lbList: $("lb-list"),
@@ -115,16 +117,19 @@
     els.hud.classList.remove("hidden");
     els.health.classList.remove("hidden");
 
-    // Mobile: activate touch controls and (optionally) gyro steering per the chosen steer mode.
+    // Mobile: activate touch controls + the chosen steering mode (arrows / stick / tilt).
     if (window.Input.isTouchDevice()) {
       els.touch.classList.remove("hidden");
-      let gyroOn = false;
-      if (steerMode === "tilt") gyroOn = await window.Input.enableGyro();
-      if (gyroOn) {
-        els.recenter.classList.remove("hidden"); // tilt steers; show recenter
+      els.steerPad.classList.add("hidden"); els.stick.classList.add("hidden"); els.recenter.classList.add("hidden");
+      window.Input.stickActive = (steerMode === "stick");
+      if (steerMode === "tilt") {
+        const ok = await window.Input.enableGyro();
+        if (ok) els.recenter.classList.remove("hidden");
+        else { steerMode = "arrows"; window.Input.stickActive = false; els.steerPad.classList.remove("hidden"); }
+      } else if (steerMode === "stick") {
+        els.stick.classList.remove("hidden");
       } else {
-        steerMode = "arrows";
-        els.steerPad.classList.remove("hidden"); // fall back to arrows
+        els.steerPad.classList.remove("hidden");
       }
     }
 
@@ -170,6 +175,13 @@
       const fireCd = (G.FIRE_COOLDOWN || 0.22) * (me && me.power === "rapid" ? (G.RAPID_FACTOR || 0.45) : 1);
       if (me && me.alive && inp.fire && ts / 1000 - lastFireSnd > fireCd) {
         window.SFX.fire(); lastFireSnd = ts / 1000;
+        if (els.fire) { els.fire.classList.remove("recoil"); void els.fire.offsetWidth; els.fire.classList.add("recoil"); } // per-shot recoil
+      }
+      // State-reactive controls: boost glows while held, fire dims during cooldown + glows on offensive powerup.
+      if (els.boost) els.boost.classList.toggle("active", !!(me && me.boosting));
+      if (els.fire) {
+        els.fire.classList.toggle("cooling", !!(me && me.alive && inp.fire && ts / 1000 - lastFireSnd < fireCd));
+        els.fire.classList.toggle("powered", !!(me && me.power && me.power !== "shield" && me.power !== "repair"));
       }
     } else if (room && room.state) {
       // Paused: still draw the frozen scene.
@@ -371,8 +383,9 @@
   }
 
   function setupTouchButtons() {
+    // Tactile feedback driven from the REAL pressed-state (pointer events), not CSS :active.
     const hold = (el, on) => {
-      const set = (v) => (e) => { e.preventDefault(); on(v); };
+      const set = (v) => (e) => { e.preventDefault(); on(v); el.classList.toggle("pressed", v); if (v) buzz(8); };
       el.addEventListener("pointerdown", set(true));
       el.addEventListener("pointerup", set(false));
       el.addEventListener("pointercancel", set(false));
@@ -387,6 +400,26 @@
       window.Input.recalibrateGyro();
       window.SFX.uiClick();
     });
+
+    // Virtual thumbstick: drag X → analog turn (centre dead-zone, recenters on release).
+    if (els.stick) {
+      const knob = els.stick.querySelector(".knob");
+      let active = false, cx = 0, half = 1;
+      const apply = (clientX) => {
+        let dx = Math.max(-1, Math.min(1, (clientX - cx) / half));
+        window.Input.touch.stick = Math.abs(dx) < 0.12 ? 0 : dx; // dead-zone
+        if (knob) knob.style.transform = `translateX(${dx * half * 0.55}px)`;
+      };
+      els.stick.addEventListener("pointerdown", (e) => {
+        e.preventDefault(); active = true; els.stick.classList.add("pressed"); buzz(8);
+        const r = els.stick.getBoundingClientRect(); cx = r.left + r.width / 2; half = r.width / 2;
+        apply(e.clientX);
+      });
+      window.addEventListener("pointermove", (e) => { if (active) apply(e.clientX); });
+      const end = () => { if (!active) return; active = false; window.Input.touch.stick = 0; if (knob) knob.style.transform = "translateX(0)"; els.stick.classList.remove("pressed"); };
+      window.addEventListener("pointerup", end);
+      window.addEventListener("pointercancel", end);
+    }
   }
 
   function togglePause() {
@@ -410,7 +443,8 @@
     try { window.Net.leave(); } catch (e) {}
     if (window.SFX.stopLoops) window.SFX.stopLoops();
     mode = "menu"; engineStarted = false; powerType = ""; prevPhase = "playing"; prevHp = 100; streak = 0; lastFireSnd = 0;
-    ["hud", "health", "touch", "steerPad", "recenter", "share", "inter", "pause", "powerChip", "connLost"].forEach((k) => els[k] && els[k].classList.add("hidden"));
+    window.Input.stickActive = false;
+    ["hud", "health", "touch", "steerPad", "stick", "recenter", "share", "inter", "pause", "powerChip", "connLost"].forEach((k) => els[k] && els[k].classList.add("hidden"));
     els.quick.disabled = els.friends.disabled = false;
     els.status.textContent = "";
     els.start.classList.remove("hidden");
@@ -529,24 +563,23 @@
 
   // Set steering mode; if changed mid-match on a touch device, switch gyro/arrows live.
   async function applySteerMode(m) {
-    steerMode = (m === "tilt") ? "tilt" : "arrows";
+    steerMode = (m === "tilt" || m === "stick") ? m : "arrows";
     try { localStorage.setItem("smashcart.steer", steerMode); } catch (e) {}
     const reflect = () => {
       if (els.steerSeg) els.steerSeg.querySelectorAll("button").forEach((b) => b.classList.toggle("active", b.dataset.steer === steerMode));
       if (els.gyroCheck) els.gyroCheck.checked = steerMode === "tilt";
     };
     reflect();
+    window.Input.stickActive = (steerMode === "stick");
     if (mode === "playing" && window.Input.isTouchDevice()) {
+      els.steerPad.classList.add("hidden"); els.stick.classList.add("hidden"); els.recenter.classList.add("hidden");
       if (steerMode === "tilt") {
         const ok = await window.Input.enableGyro();
-        if (ok) { els.recenter.classList.remove("hidden"); els.steerPad.classList.add("hidden"); }
-        else { steerMode = "arrows"; reflect(); }
-      }
-      if (steerMode === "arrows") {
-        window.Input.disableGyro();
-        els.recenter.classList.add("hidden");
-        els.steerPad.classList.remove("hidden");
-      }
+        if (ok) els.recenter.classList.remove("hidden");
+        else { steerMode = "arrows"; window.Input.stickActive = false; reflect(); }
+      } else { window.Input.disableGyro(); }
+      if (steerMode === "stick") els.stick.classList.remove("hidden");
+      if (steerMode === "arrows") els.steerPad.classList.remove("hidden");
     }
   }
 
