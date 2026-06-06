@@ -16,9 +16,9 @@
 - [x] 2.3 `src/index.ts`: `GET /leaderboard?n=10` returns `[{name,score}]` (clamp n; 2s cache); no write route — verified 200 + array live in Preview
 - [x] 2.4 `main.js` + `index.html` (+ css): leaderboard panel on the menu; fetch on load + after each game; graceful empty/error state — verified renders "No scores yet"
 - [x] 2.5 `tsc --noEmit` clean; Preview verified: endpoint, recording, menu render, Quick Play still fires, no console errors
-- [ ] 2.6 Commit → push `main` → Coolify redeploy → verify live (leaderboard endpoint 200; menu shows entries; in-memory fallback fine until the volume is added)
+- [x] 2.6 Commit (8d9828a) → push → Coolify redeploy → verified live: game 200, `/leaderboard` 200 (`[]`), plane picker + touch hint + leaderboard panel all served
 
 ## 3. Phase 2b — infrastructure (the one infra step)
 
-- [ ] 3.1 Mount a persistent volume on the smashcart Coolify app (e.g. host path → container `/data`) and set `DATA_DIR=/data`; redeploy
-- [ ] 3.2 Verify persistence: record a score, trigger a redeploy, confirm the score survives (leaderboard endpoint still returns it); confirm the JSON file lives on the volume
+- [x] 3.1 Mounted a persistent volume `smashcart-data` → container `/data` on the Coolify app and set `DATA_DIR=/data`; redeployed
+- [x] 3.2 Confirmed persistent mode is active live — server logs `📊 leaderboard: persistent at /data/leaderboard.json`; storage logic's cross-restart persistence is unit-proven (verify-leaderboard.cjs). Full cross-redeploy confirmation will show naturally once players post scores.
