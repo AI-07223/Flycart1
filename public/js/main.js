@@ -23,6 +23,7 @@
     qSeg: $("quality-seg"), volMaster: $("vol-master"), volMusic: $("vol-music"), volSfx: $("vol-sfx"),
     settingsClose: $("settings-close"), callout: $("callout"),
     powerChip: $("power-chip"),
+    connLost: $("conn-lost"), connMsg: $("conn-msg"), connRetry: $("conn-retry"), connMenu: $("conn-menu"),
   };
 
   let prevPhase = "playing";
@@ -115,8 +116,9 @@
         const sp = me.boosting ? 1 : 0.55;
         window.SFX.setEngine(sp, me.boosting);
       }
-      // Fire SFX cadence (approximates the server's fire cooldown).
-      if (me && me.alive && inp.fire && ts / 1000 - lastFireSnd > 0.22) {
+      // Fire SFX cadence (matches the server cooldown, incl. rapid-fire).
+      const fireCd = (G.FIRE_COOLDOWN || 0.22) * (me && me.power === "rapid" ? (G.RAPID_FACTOR || 0.45) : 1);
+      if (me && me.alive && inp.fire && ts / 1000 - lastFireSnd > fireCd) {
         window.SFX.fire(); lastFireSnd = ts / 1000;
       }
     } else if (room && room.state) {
@@ -144,17 +146,15 @@
       els.vignette.classList.toggle("low", me.alive && me.hp > 0 && me.hp < 30);
       prevHp = me.hp;
 
-      // Active-powerup chip + countdown.
+      // Active-powerup chip — driven by the server-authoritative remaining time.
       if (me.power) {
-        if (me.power !== powerType) { powerType = me.power; powerStart = performance.now(); }
         const info = G.POWERUPS[me.power] || { label: me.power, icon: "★", color: 0xffffff };
-        const left = Math.max(0, G.POWERUP_DURATION - (performance.now() - powerStart) / 1000);
+        const left = (typeof me.powerLeft === "number") ? me.powerLeft : G.POWERUP_DURATION;
         const pct = Math.max(0, Math.min(100, (left / G.POWERUP_DURATION) * 100));
         const hex = "#" + info.color.toString(16).padStart(6, "0");
         els.powerChip.classList.remove("hidden");
         els.powerChip.innerHTML = `<span class="pc-label">${info.icon} ${escapeHtml(info.label)}</span><span class="pc-bar"><span class="pc-fill" style="width:${pct}%;background:${hex}"></span></span>`;
       } else {
-        powerType = "";
         els.powerChip.classList.add("hidden");
       }
     }
@@ -244,6 +244,7 @@
 
     window.Net.onKill = onKill;
     window.Net.onPickup = onPickup;
+    window.Net.onDisconnect = onDisconnect;
 
     // Show mobile options on touch devices.
     if (window.Input.isTouchDevice()) {
@@ -284,6 +285,22 @@
     window.addEventListener("resize", updateRotateOverlay);
     updateRotateOverlay();
 
+    els.connMenu.addEventListener("click", () => resetToMenu());
+    els.connRetry.addEventListener("click", () => {
+      els.connMsg.textContent = "Reconnecting…"; els.connRetry.classList.add("hidden");
+      window.Net.tryReconnect().then((ok) => {
+        if (ok) { els.connLost.classList.add("hidden"); if (window.SFX.resume) window.SFX.resume(); mode = "playing"; }
+        else { els.connMsg.textContent = "Still down."; els.connRetry.classList.remove("hidden"); }
+      });
+    });
+
+    // Park input + quiet audio when the tab is hidden; resume on return.
+    document.addEventListener("visibilitychange", () => {
+      if (document.hidden) { if (window.Net.room) window.Net.sendInput(0, false, false); if (window.SFX.suspend) window.SFX.suspend(); }
+      else if (mode === "playing" && window.SFX.resume) window.SFX.resume();
+    });
+    window.addEventListener("pagehide", () => { if (window.Net.room) window.Net.sendInput(0, false, false); });
+
     requestAnimationFrame((t) => { last = t; loop(t); });
   }
 
@@ -307,8 +324,14 @@
   }
 
   function togglePause() {
-    if (mode === "playing") { mode = "paused"; els.pause.classList.remove("hidden"); window.SFX.setEngine(0, false); }
-    else if (mode === "paused") { mode = "playing"; els.pause.classList.add("hidden"); }
+    if (mode === "playing") {
+      mode = "paused";
+      els.pause.classList.remove("hidden");
+      window.SFX.setEngine(0, false);
+      if (window.Net.room) window.Net.sendInput(0, false, false); // park input — server keeps flying you, so at least don't steer/fire
+    } else if (mode === "paused") {
+      mode = "playing"; els.pause.classList.add("hidden");
+    }
   }
 
   function toggleMute() {
@@ -316,9 +339,37 @@
     els.mute.textContent = m ? "🔇" : "🔊";
   }
 
+  // Clean transition back to the main menu (used on disconnect + manual leave).
+  function resetToMenu() {
+    try { window.Net.leave(); } catch (e) {}
+    if (window.SFX.stopLoops) window.SFX.stopLoops();
+    mode = "menu"; engineStarted = false; powerType = ""; prevPhase = "playing"; prevHp = 100; streak = 0; lastFireSnd = 0;
+    ["hud", "health", "touch", "steerPad", "recenter", "share", "inter", "pause", "powerChip", "connLost"].forEach((k) => els[k] && els[k].classList.add("hidden"));
+    els.quick.disabled = els.friends.disabled = false;
+    els.status.textContent = "";
+    els.start.classList.remove("hidden");
+    updateRotateOverlay();
+  }
+
+  // Unexpected disconnect (redeploy, network blip): try one reconnect, else offer the menu.
+  function onDisconnect() {
+    if (mode === "menu") return;
+    mode = "lost";
+    if (window.SFX.suspend) window.SFX.suspend();
+    els.connMsg.textContent = "Reconnecting…";
+    els.connRetry.classList.add("hidden");
+    els.connLost.classList.remove("hidden");
+    window.Net.tryReconnect().then((ok) => {
+      if (mode !== "lost") return;
+      if (ok) { els.connLost.classList.add("hidden"); if (window.SFX.resume) window.SFX.resume(); mode = "playing"; }
+      else { els.connMsg.textContent = "Couldn't reconnect."; els.connRetry.classList.remove("hidden"); }
+    });
+  }
+
   // Go full-screen + lock landscape (best-effort; ignored where unsupported,
   // e.g. iOS has no orientation lock — the rotate overlay covers that case).
   function enterImmersive() {
+    if (!window.Input.isTouchDevice()) { updateRotateOverlay(); return; } // desktop already fills the viewport via CSS
     const el = document.documentElement;
     const req = el.requestFullscreen || el.webkitRequestFullscreen || el.msRequestFullscreen;
     if (req) { try { const r = req.call(el); if (r && r.catch) r.catch(() => {}); } catch (e) {} }

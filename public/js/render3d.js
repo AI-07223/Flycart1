@@ -288,6 +288,9 @@ import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
         quality: Q.current, fov: Math.round(fov),
         cam: camera ? camera.position.toArray().map((n) => Math.round(n)) : null,
         predict: [Math.round(predict.x), Math.round(predict.z)],
+        geometries: renderer ? renderer.info.memory.geometries : -1,
+        textures: renderer ? renderer.info.memory.textures : -1,
+        programs: renderer && renderer.info.programs ? renderer.info.programs.length : -1,
       };
     },
 
@@ -296,9 +299,10 @@ import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 
     _deflect(angle, inward) { const diff = ((inward - angle + Math.PI) % (Math.PI * 2)) - Math.PI; return angle + diff * 0.35; },
 
-    _stepPredict(dt, input) {
+    _stepPredict(dt, input, power) {
       predict.angle += (input.turn || 0) * G.TURN_RATE * dt;
-      const target = input.boost ? G.BOOST_SPEED : G.CRUISE_SPEED;
+      let target = input.boost ? G.BOOST_SPEED : G.CRUISE_SPEED;
+      if (power === "afterburner") target *= (G.AFTERBURNER_FACTOR || 1); // match server so prediction doesn't rubber-band
       const before = predict.speed;
       predict.speed += Math.sign(target - before) * G.ACCEL * dt;
       if ((target - predict.speed) * (target - before) < 0) predict.speed = target;

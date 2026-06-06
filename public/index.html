@@ -98,7 +98,18 @@
     <!-- Pause -->
     <div id="pause-screen" class="overlay hidden">
       <h2>PAUSED</h2>
+      <p class="muted">Heads up — your plane is still airborne out there.</p>
       <button id="resume-btn">RESUME</button>
+    </div>
+
+    <!-- Connection lost / reconnect -->
+    <div id="conn-lost" class="overlay hidden">
+      <h2>CONNECTION LOST</h2>
+      <p id="conn-msg" class="muted">Reconnecting…</p>
+      <div class="btn-row">
+        <button id="conn-retry" class="hidden">RECONNECT</button>
+        <button id="conn-menu" class="secondary">MAIN MENU</button>
+      </div>
     </div>
 
     <!-- Settings (audio + graphics) -->

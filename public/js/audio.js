@@ -86,6 +86,13 @@
 
   window.SFX = {
     unlock() { ensureCtx(); if (ctx && ctx.state === "suspended") ctx.resume(); load(); },
+    suspend() { if (ctx && ctx.state === "running") { try { ctx.suspend(); } catch (e) {} } },
+    resume() { if (ctx && ctx.state === "suspended") { try { ctx.resume(); } catch (e) {} } },
+    stopLoops() {
+      try { musicSrc && musicSrc.stop(); } catch (e) {}
+      try { engineSrc && engineSrc.stop(); } catch (e) {}
+      musicSrc = null; engineSrc = null; want.music = false; want.engine = false;
+    },
     startMusic() { want.music = true; if (loaded) startMusicNow(); },
     startEngine() { want.engine = true; if (loaded) startEngineNow(); },
     setEngine(speed, boosting) {
