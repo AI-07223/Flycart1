@@ -2,8 +2,10 @@
 // and a snapshot ring buffer used for client-side interpolation of remote planes.
 (function () {
   const BUFFER_MS = 1500;
+  const MAX_EXTRAP = 80; // ms of bounded remote extrapolation past the newest snapshot
   const lerp = (a, b, t) => a + (b - a) * t;
-  const shortAngle = (a, b, t) => { let d = ((b - a + Math.PI) % (Math.PI * 2)) - Math.PI; return a + d * t; };
+  const shortDelta = (a, b) => ((b - a + Math.PI) % (Math.PI * 2)) - Math.PI;
+  const shortAngle = (a, b, t) => a + shortDelta(a, b) * t;
 
   const Net = {
     client: null,
@@ -13,6 +15,9 @@
     snaps: [],
     onKill: null,
     onPickup: null,
+    onDisconnect: null,   // (info) => {} — fired on an UNEXPECTED room leave/error
+    reconnectToken: null,
+    _leaving: false,
 
     endpoint() {
       const proto = location.protocol === "https:" ? "wss" : "ws";
@@ -22,13 +27,30 @@
     // code: "PUBLIC" for Quick Play, or a share code for a private room.
     async connect(name, code) {
       this.client = new Colyseus.Client(this.endpoint());
-      this.room = await this.client.joinOrCreate("arena", { name, code });
-      this.sessionId = this.room.sessionId;
+      const room = await this.client.joinOrCreate("arena", { name, code });
+      this._wire(room);
+      return room;
+    },
+
+    // Attach handlers to a (freshly joined or reconnected) room.
+    _wire(room) {
+      this.room = room;
+      this.sessionId = room.sessionId;
+      this.reconnectToken = room.reconnectionToken;
       this.snaps = [];
-      this.room.onMessage("kill", (msg) => { if (this.onKill) this.onKill(msg); });
-      this.room.onMessage("pickup", (msg) => { if (this.onPickup) this.onPickup(msg); });
-      this.room.onStateChange(() => this._snap());
-      return this.room;
+      this._leaving = false;
+      room.onMessage("kill", (msg) => { if (this.onKill) this.onKill(msg); });
+      room.onMessage("pickup", (msg) => { if (this.onPickup) this.onPickup(msg); });
+      room.onStateChange(() => this._snap());
+      room.onError((code, message) => { if (!this._leaving && this.onDisconnect) this.onDisconnect({ type: "error", code, message }); });
+      room.onLeave((code) => { if (!this._leaving && this.onDisconnect) this.onDisconnect({ type: "leave", code }); });
+    },
+
+    // Best-effort reconnect within the server's allowReconnection window.
+    async tryReconnect() {
+      if (!this.client || !this.reconnectToken) return false;
+      try { this._wire(await this.client.reconnect(this.reconnectToken)); return true; }
+      catch (e) { return false; }
     },
 
     // Record a positional snapshot per server patch (timestamped on the client clock).
@@ -49,8 +71,15 @@
       const s = this.snaps, out = {};
       if (!s.length) return out;
       const latest = s[s.length - 1];
-      if (s.length === 1 || renderTime >= latest.t) {
-        for (const id in latest.players) out[id] = { ...latest.players[id] };
+      if (renderTime >= latest.t) {
+        // Past the newest snapshot → bounded extrapolation along recent velocity (no freeze-then-snap).
+        if (s.length < 2) { for (const id in latest.players) out[id] = { ...latest.players[id] }; return out; }
+        const prev = s[s.length - 2], span = latest.t - prev.t;
+        const k = span > 0 ? Math.min(renderTime - latest.t, MAX_EXTRAP) / span : 0;
+        for (const id in latest.players) {
+          const b = latest.players[id], a = prev.players[id] || b;
+          out[id] = { x: b.x + (b.x - a.x) * k, y: b.y + (b.y - a.y) * k, angle: b.angle + shortDelta(a.angle, b.angle) * k, alive: b.alive };
+        }
         return out;
       }
       let bi = 0;
@@ -79,6 +108,7 @@
     },
 
     leave() {
+      this._leaving = true;
       if (this.room) { try { this.room.leave(); } catch (e) {} this.room = null; }
       this.snaps = [];
     },

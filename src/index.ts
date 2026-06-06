@@ -10,7 +10,16 @@ import { ArenaRoom } from "./rooms/ArenaRoom";
 const PORT = Number(process.env.PORT) || 2567;
 
 const app = express();
-app.use(express.json());
+app.use(express.json({ limit: "16kb" }));
+
+// Lightweight security headers (defense-in-depth; no extra dependency).
+// X-Frame-Options blocks foreign embeds/clickjacking; nosniff + no-referrer are cheap hardening.
+app.use((_req, res, next) => {
+  res.setHeader("X-Frame-Options", "DENY");
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("Referrer-Policy", "no-referrer");
+  next();
+});
 
 // Serve the static client.
 const publicDir = path.join(__dirname, "..", "public");
