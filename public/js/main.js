@@ -18,6 +18,8 @@
     left: $("left-btn"), right: $("right-btn"), boost: $("boost-btn"), fire: $("fire-btn"),
     recenter: $("recenter-btn"),
     gyroOpt: $("gyro-opt"), gyroCheck: $("gyro-check"), kbdControls: $("kbd-controls"),
+    touchHint: $("touch-controls-hint"), planeSwatches: $("plane-swatches"),
+    winnerLine: $("winner-line"), yourPlace: $("your-place"),
     vignette: $("vignette"), rotate: $("rotate-overlay"),
     settingsBtn: $("settings-btn"), settingsPanel: $("settings-panel"),
     qSeg: $("quality-seg"), volMaster: $("vol-master"), volMusic: $("vol-music"), volSfx: $("vol-sfx"),
@@ -34,6 +36,29 @@
   let mode = "menu"; // menu | playing | paused
   let last = 0;
   let engineStarted = false;
+
+  // Plane skins (mirror render3d's SKINS) + the player's persisted choice.
+  const SKINS = [0xff6b6b, 0x49c0ff, 0x8be34a, 0xffd24a, 0xc07bff];
+  let selectedSkin = 0;
+  try { const s = parseInt(localStorage.getItem("smashcart.skin"), 10); if (Number.isInteger(s) && s >= 0 && s < SKINS.length) selectedSkin = s; } catch (e) {}
+
+  function buildPlanePicker() {
+    if (!els.planeSwatches) return;
+    els.planeSwatches.innerHTML = "";
+    SKINS.forEach((c, i) => {
+      const b = document.createElement("button");
+      b.className = "plane-swatch" + (i === selectedSkin ? " selected" : "");
+      b.style.background = "#" + c.toString(16).padStart(6, "0");
+      b.title = "Plane " + (i + 1);
+      b.addEventListener("click", () => {
+        selectedSkin = i;
+        try { localStorage.setItem("smashcart.skin", String(i)); } catch (e) {}
+        els.planeSwatches.querySelectorAll(".plane-swatch").forEach((el, j) => el.classList.toggle("selected", j === i));
+        window.SFX.uiClick();
+      });
+      els.planeSwatches.appendChild(b);
+    });
+  }
 
   function genCode() {
     const c = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -55,7 +80,7 @@
     els.status.textContent = "Connecting…";
     els.quick.disabled = els.friends.disabled = true;
     try {
-      await window.Net.connect(name, code);
+      await window.Net.connect(name, code, selectedSkin);
     } catch (e) {
       els.status.textContent = "Could not connect: " + (e && e.message ? e.message : e);
       els.quick.disabled = els.friends.disabled = false;
@@ -174,13 +199,19 @@
       prevPhase = state.phase;
     }
 
-    // Intermission scoreboard.
+    // Intermission scoreboard / round-over results.
     if (state.phase === "intermission") {
       els.inter.classList.remove("hidden");
       els.interTime.textContent = Math.ceil(state.timeLeft);
+      const winner = list[0];
+      if (els.winnerLine) els.winnerLine.textContent = winner ? (winner.id === myId ? "🏆 You win!" : "🏆 " + winner.name + " wins!") : "";
       els.finalBoard.innerHTML = list.slice(0, 6).map((p, i) =>
-        `<li class="${p.id === myId ? "me" : ""}"><span>${i + 1}. ${escapeHtml(p.name)}${p.bot ? " 🤖" : ""}</span><span>${p.score}</span></li>`
+        `<li class="${p.id === myId ? "me" : ""}${i === 0 ? " win" : ""}"><span>${i + 1}. ${escapeHtml(p.name)}${p.bot ? " 🤖" : ""}</span><span>${p.score}</span></li>`
       ).join("");
+      if (els.yourPlace) {
+        const myIdx = list.findIndex((p) => p.id === myId);
+        els.yourPlace.textContent = myIdx >= 0 ? `You placed ${ordinal(myIdx + 1)} of ${list.length}` : "";
+      }
     } else {
       els.inter.classList.add("hidden");
     }
@@ -236,6 +267,11 @@
     return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   }
 
+  function ordinal(n) {
+    const s = ["th", "st", "nd", "rd"], v = n % 100;
+    return n + (s[(v - 20) % 10] || s[v] || s[0]);
+  }
+
   // ---------- wiring ----------
   function init() {
     window.Renderer.init(els.canvas);
@@ -246,12 +282,15 @@
     window.Net.onPickup = onPickup;
     window.Net.onDisconnect = onDisconnect;
 
-    // Show mobile options on touch devices.
+    // Show mobile options on touch devices and pick the right How-to-Play block
+    // (touch instructions on touch, keyboard on desktop — never blank).
     if (window.Input.isTouchDevice()) {
       els.gyroOpt.classList.remove("hidden");
       els.kbdControls.classList.add("hidden");
+      if (els.touchHint) els.touchHint.classList.remove("hidden");
       if (!window.Input.gyro.supported) els.gyroCheck.checked = false;
     }
+    buildPlanePicker();
     setupTouchButtons();
 
     const urlCode = roomFromUrl();

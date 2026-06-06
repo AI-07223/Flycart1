@@ -70,7 +70,9 @@
     <!-- Round intermission scoreboard -->
     <div id="intermission" class="overlay hidden">
       <h2>ROUND OVER</h2>
+      <p id="winner-line" class="winner"></p>
       <ol id="final-board"></ol>
+      <p id="your-place" class="muted"></p>
       <p class="muted">Next round in <span id="inter-time">--</span>s</p>
     </div>
 
@@ -79,15 +81,31 @@
       <h1>SMASH<span>CART</span></h1>
       <p class="tagline">Online 3D plane combat. Take to the skies, chase 'em down, smash everyone out of the air.</p>
       <input id="name-input" maxlength="14" placeholder="Call sign" />
+
+      <!-- Plane picker (5 skins; populated by main.js, persisted in localStorage) -->
+      <div id="plane-picker">
+        <span class="picker-label">Choose your plane</span>
+        <div id="plane-swatches"></div>
+      </div>
+
       <div class="btn-row">
         <button id="quickplay-btn">QUICK PLAY</button>
         <button id="friends-btn" class="secondary">PLAY WITH FRIENDS</button>
       </div>
+
+      <!-- How to play — desktop (keyboard) -->
       <div class="controls" id="kbd-controls">
         <span><kbd>A</kbd><kbd>D</kbd> / <kbd>◀</kbd><kbd>▶</kbd> Steer</span>
         <span><kbd>W</kbd>/<kbd>Shift</kbd> Boost</span>
         <span><kbd>Space</kbd> Fire</span>
         <span><kbd>P</kbd> Pause · <kbd>M</kbd> Mute</span>
+      </div>
+      <!-- How to play — touch (shown on touch devices) -->
+      <div class="controls hidden" id="touch-controls-hint">
+        <span>👈 👉 Tap to steer</span>
+        <span>🚀 Tap BOOST</span>
+        <span>🔥 Tap FIRE</span>
+        <span>📱 Or tilt to steer</span>
       </div>
       <label id="gyro-opt" class="switch hidden">
         <input type="checkbox" id="gyro-check" checked /> 📱 Tilt to steer (gyro)

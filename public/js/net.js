@@ -25,9 +25,9 @@
     },
 
     // code: "PUBLIC" for Quick Play, or a share code for a private room.
-    async connect(name, code) {
+    async connect(name, code, skin) {
       this.client = new Colyseus.Client(this.endpoint());
-      const room = await this.client.joinOrCreate("arena", { name, code });
+      const room = await this.client.joinOrCreate("arena", { name, code, skin });
       this._wire(room);
       return room;
     },

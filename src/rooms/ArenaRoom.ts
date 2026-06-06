@@ -76,10 +76,12 @@ export class ArenaRoom extends Room<ArenaState> {
     this.setSimulationInterval((dt) => this.update(Math.min(dt / 1000, C.DT_MAX)));
   }
 
-  onJoin(client: Client, options: { name?: string } = {}) {
+  onJoin(client: Client, options: { name?: string; skin?: number } = {}) {
     const p = new Player();
     p.name = (options.name || "Pilot").trim().slice(0, 14) || "Pilot";
-    p.skin = Math.floor(Math.random() * C.SKIN_COUNT);
+    const s = options.skin;
+    p.skin = (typeof s === "number" && Number.isInteger(s) && s >= 0 && s < C.SKIN_COUNT)
+      ? s : Math.floor(Math.random() * C.SKIN_COUNT); // validate; random fallback
     p.bot = false;
     this.spawn(client.sessionId, p);
     this.state.players.set(client.sessionId, p);
