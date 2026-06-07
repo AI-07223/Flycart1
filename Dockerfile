@@ -2,10 +2,15 @@
 FROM node:22-alpine AS build
 WORKDIR /app
 COPY package*.json ./
-# Single resilient install. The host's npm registry connection resets under load,
-# so retry aggressively; --omit not set here because the build needs devDeps (tsc).
-RUN npm ci --no-audit --no-fund \
-  --fetch-retries=5 --fetch-retry-mintimeout=20000 --fetch-retry-maxtimeout=180000 --fetch-timeout=600000
+# Resilient install. The host's npm registry connection is flaky and intermittently fails the
+# WHOLE step (exit 152) beyond npm's own retries, so wrap it in a shell retry loop: up to 5 whole
+# attempts with backoff, which reliably catches a working network window. devDeps kept (tsc needs them).
+RUN for i in 1 2 3 4 5; do \
+      echo "npm ci attempt $i/5..."; \
+      npm ci --no-audit --no-fund --fetch-retries=5 --fetch-retry-mintimeout=20000 --fetch-retry-maxtimeout=180000 --fetch-timeout=600000 && break; \
+      if [ "$i" = "5" ]; then echo "npm ci failed after 5 attempts"; exit 1; fi; \
+      echo "retrying in 20s..."; sleep 20; \
+    done
 COPY tsconfig.json ./
 COPY src ./src
 RUN npm run build
