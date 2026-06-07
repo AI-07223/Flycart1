@@ -34,4 +34,4 @@
 
 - [x] 7.1 Build clean; headless Preview — Quick Play opens (4 players, no `Renderer.init` regression), new UI present (3 steer modes, thumbstick), minimap repositioned, press toggles `.pressed`+input, no console errors
 - [ ] 7.2 **Fly-test (real phone, USER):** thumb reach; press feedback + haptics; fire recoil/cooldown + boost glow read correctly; thumbstick analog feel; nothing occludes the dogfight; landscape + safe-area OK
-- [ ] 7.3 Commit → push `main` → Coolify redeploy (**patient — do not cancel mid-build**) → verify the new build is served
+- [x] 7.3 Commit (0351bc1) → push → Coolify redeploy (~6 min, patient) → verified live: game 200, thumbstick + 3 steer modes served, UI tokens + `.tbtn.pressed` in css, minimap top-center, leaderboard still 200
