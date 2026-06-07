@@ -100,6 +100,7 @@
 
   async function startGame(code) {
     if (code === "PUBLIC" && !botsEnabled) code = "NOBOTS"; // bots-off Quick Play → separate no-bots bucket
+    if (window.Renderer.startTakeoff) window.Renderer.startTakeoff(); // cinematic dive into the match
     window.SFX.unlock();
     enterImmersive(); // fullscreen + landscape lock (must run inside the click gesture)
     const name = (els.name.value || "Pilot").slice(0, 14);
@@ -184,8 +185,8 @@
         els.fire.classList.toggle("powered", !!(me && me.power && me.power !== "shield" && me.power !== "repair"));
       }
     } else if (mode === "menu") {
-      // Living menu: render the orbiting home-base scene behind the overlay.
-      window.Renderer.drawMenu(dt);
+      // Living menu: render the orbiting home-base scene (your chosen plane) behind the overlay.
+      window.Renderer.drawMenu(dt, selectedSkin);
     } else if (room && room.state) {
       // Paused: still draw the frozen scene.
       window.Renderer.draw(room.state, window.Net.sessionId);

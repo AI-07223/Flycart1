@@ -19,7 +19,7 @@
 - [ ] 2.1 Build home-base structures (reuse/extend landmark builders): runway + idle plane, Hangar, Scoreboard Tower, Control Tower, Comms Pad
 - [ ] 2.2 Hangar plane-select: plane on a turntable; tap a swatch → restyle live (drives the existing skin choice)
 - [ ] 2.3 Raycaster: tap/click a structure → focus it + open its section (touch + desktop)
-- [ ] 2.4 TAKEOFF transition: QUICK PLAY dives the camera from the orbit to the runway as the plane lifts, handing off to the in-game chase camera on connect
+- [x] 2.4 TAKEOFF transition: `startTakeoff()` dives the menu camera in behind the (chosen-skin) demo plane on QUICK PLAY; the game chase cam continues from the shared `camPos` → seamless handoff. Demo plane now uses the player's selected skin.
 - [ ] 2.5 Verify + fly-test; commit → deploy (patient) → verify live
 
 ## 3. Phase 3 — showpiece polish

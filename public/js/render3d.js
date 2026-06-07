@@ -256,11 +256,11 @@ import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 
     // Menu mode: render the LIVING home-base scene (orbiting planet + a demo plane) behind the menu.
     // Presentation only — never touches connection/flow.
-    drawMenu(dt) {
+    drawMenu(dt, skin) {
       if (!renderer) return;
       dt = Math.min(dt || 0.016, 0.05);
       time += dt;
-      this._ensureDemo();
+      this._ensureDemo(skin); // your chosen plane flies the menu
       const d = this._demo;
       if (d) {
         const adv = SP.advance(d.p, d.f, (G.CRUISE_SPEED / curR) * dt * 0.8);
@@ -271,20 +271,36 @@ import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
       }
       this._updateMap(dt);
       this._updateParticles(dt);
-      this._updateCamera(null, dt); // null = no local player → cinematic idle orbit
+      if (this._takeoff > 0 && d) {
+        // QUICK PLAY: dive the camera in behind the plane; the game chase cam then continues from
+        // camPos (shared) → seamless handoff, no screen cut.
+        this._takeoff += dt;
+        const k = Math.min(1, dt * 3);
+        _a.copy(worldOf(d.p, ALT)).addScaledVector(V(d.f), -150).addScaledVector(V(d.p), 70);
+        camPos.lerp(_a, k); camLook.lerp(worldOf(d.p, ALT), k);
+        fov += (FOV_BOOST - fov) * k; camera.fov = fov; camera.updateProjectionMatrix();
+        camera.up.copy(V(d.p)); camera.position.copy(camPos); camera.lookAt(camLook);
+      } else {
+        this._updateCamera(null, dt); // cinematic idle orbit
+      }
       composer.render();
     },
 
-    _ensureDemo() {
-      if (this._demo) return;
-      const mesh = this._makePlane(Math.floor(Math.random() * SKINS.length));
+    startTakeoff() { this._takeoff = 0.001; }, // begins the dive; cleared when gameplay sync() takes over
+
+    _ensureDemo(skin) {
+      const want = (typeof skin === "number" && skin >= 0 && skin < SKINS.length) ? skin : 0;
+      if (this._demo && this._demo.skin === want) return;
+      if (this._demo) this._clearDemo();
+      const mesh = this._makePlane(want);
       scene.add(mesh);
       const p = SP.randomDir();
-      this._demo = { mesh, p, f: SP.turn(p, SP.anyTangent(p), Math.random() * Math.PI * 2), lastPuff: 0 };
+      this._demo = { mesh, skin: want, p, f: SP.turn(p, SP.anyTangent(p), Math.random() * Math.PI * 2), lastPuff: 0 };
     },
 
     _clearDemo() {
       if (this._demo) { scene.remove(this._demo.mesh); disposeObject(this._demo.mesh); this._demo = null; }
+      this._takeoff = 0;
     },
 
     killPopup(id, mine) {
