@@ -143,6 +143,7 @@ import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
     // ---------- per-frame ----------
     sync(state, dt, myId) {
       dt = Math.min(dt, 0.05);
+      if (this._demo) this._clearDemo(); // leaving the menu — drop the demo plane
       Q.sample(dt);
       time += dt;
       hitStop = Math.max(0, hitStop - dt);
@@ -251,6 +252,39 @@ import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
       if (!renderer) return;
       composer.render();
       this._drawMinimap(state, myId);
+    },
+
+    // Menu mode: render the LIVING home-base scene (orbiting planet + a demo plane) behind the menu.
+    // Presentation only — never touches connection/flow.
+    drawMenu(dt) {
+      if (!renderer) return;
+      dt = Math.min(dt || 0.016, 0.05);
+      time += dt;
+      this._ensureDemo();
+      const d = this._demo;
+      if (d) {
+        const adv = SP.advance(d.p, d.f, (G.CRUISE_SPEED / curR) * dt * 0.8);
+        d.p = adv.p; d.f = adv.f;
+        this._orient(d.mesh, d.p, d.f, ALT, Math.sin(time * 0.6) * 0.25);
+        if (d.mesh._prop) d.mesh._prop.rotation.z = time * 42;
+        if (time - (d.lastPuff || 0) > 0.14) { d.lastPuff = time; const back = SP.advance(d.p, d.f, -24 / visR).p; this._puff(worldOf(back, ALT).clone(), false); }
+      }
+      this._updateMap(dt);
+      this._updateParticles(dt);
+      this._updateCamera(null, dt); // null = no local player → cinematic idle orbit
+      composer.render();
+    },
+
+    _ensureDemo() {
+      if (this._demo) return;
+      const mesh = this._makePlane(Math.floor(Math.random() * SKINS.length));
+      scene.add(mesh);
+      const p = SP.randomDir();
+      this._demo = { mesh, p, f: SP.turn(p, SP.anyTangent(p), Math.random() * Math.PI * 2), lastPuff: 0 };
+    },
+
+    _clearDemo() {
+      if (this._demo) { scene.remove(this._demo.mesh); disposeObject(this._demo.mesh); this._demo = null; }
     },
 
     killPopup(id, mine) {

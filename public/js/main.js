@@ -183,6 +183,9 @@
         els.fire.classList.toggle("cooling", !!(me && me.alive && inp.fire && ts / 1000 - lastFireSnd < fireCd));
         els.fire.classList.toggle("powered", !!(me && me.power && me.power !== "shield" && me.power !== "repair"));
       }
+    } else if (mode === "menu") {
+      // Living menu: render the orbiting home-base scene behind the overlay.
+      window.Renderer.drawMenu(dt);
     } else if (room && room.state) {
       // Paused: still draw the frozen scene.
       window.Renderer.draw(room.state, window.Net.sessionId);

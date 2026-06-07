@@ -145,6 +145,8 @@ canvas {
   background: radial-gradient(circle at center, rgba(18, 34, 52, 0.86), rgba(6, 10, 16, 0.95));
   backdrop-filter: blur(2px);
 }
+/* Living menu: let the orbiting home-base planet show behind the main menu */
+#start-screen { background: radial-gradient(circle at 50% 42%, rgba(10, 20, 34, 0.40), rgba(6, 10, 16, 0.72)); }
 .overlay h1 { font-size: clamp(42px, 9vw, 80px); letter-spacing: 4px; text-shadow: 0 5px 0 rgba(0,0,0,.35); }
 .overlay h1 span { color: var(--accent); }
 .overlay h2 { font-size: 40px; letter-spacing: 3px; }
