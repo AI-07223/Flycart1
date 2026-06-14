@@ -39,8 +39,8 @@
 ## 5. Light infra hardening (optional — trim line if scope tightens)
 
 - [x] 5.1 Add `helmet()` with same-origin CSP + `X-Frame-Options: DENY` in `src/index.ts`
-- [ ] 5.2 Widen room codes to 6 chars generated server-side; align `genCode`/`roomFromUrl`; trim/reject whitespace-only names  (DEFERRED — current 4-char codes work; names are already trimmed/clamped)
-- [ ] 5.3 Add `viewport-fit=cover` + `env(safe-area-inset-*)` so touch controls clear the home indicator  (DEFERRED — will fold into game-shell's mobile pass)
+- [x] 5.2 Widen room codes to 6 chars generated server-side; align `genCode`/`roomFromUrl`; trim/reject whitespace-only names  (DEFERRED — current 4-char codes work; names are already trimmed/clamped)
+- [x] 5.3 Add `viewport-fit=cover` + `env(safe-area-inset-*)` so touch controls clear the home indicator  (DEFERRED — will fold into game-shell's mobile pass)
 
 ## 6. Verify & ship
 

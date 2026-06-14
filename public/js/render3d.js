@@ -9,6 +9,7 @@ import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
 import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
+import { CSS3DRenderer, CSS3DObject } from "three/addons/renderers/CSS3DRenderer.js";
 
 (function () {
   const G = window.GAME;
@@ -59,6 +60,40 @@ import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
   // local-plane prediction: p (dir), f (forward tangent), speed
   const predict = { p: { x: 0, y: 1, z: 0 }, f: { x: 1, y: 0, z: 0 }, speed: G.CRUISE_SPEED };
 
+  // ---- CSS3D + immersive menu state ----
+  let cssRenderer = null, cssScene = null;
+  let menuSection = "main";      // current menu sub-state
+  let menuAngle = 0;             // smooth camera azimuth for focused sections
+  let homeBase = null;           // THREE.Group for home-base structures
+  const homeStructures = [];     // {mesh, section} for raycasting
+  const cssPanels = {};          // section -> {obj, el} CSS3D wrappers
+  let menuRaycaster = null;
+  let introPhase = 0;            // 0=not started, 1=swooping, 2=done
+  let introT = 0;
+  let menuTransition = 0;        // cross-fade progress 0→1
+
+  // Direction on the planet surface for the home base (opposite from the arena hotspot)
+  const HOME_DIR = SP.normalize(SP.vec(0, 1, 0));
+
+  // Camera framings per menu section: azimuth offset from HOME_DIR, distance (×visR), altitude (×visR)
+  const MENU_CAM = {
+    main:    { az: 0,     dist: 2.6, alt: 1.15, lspd: 1.4, orbit: true },
+    hangar:  { az: -0.55, dist: 1.85, alt: 0.55, lspd: 2.8, orbit: false },
+    tower:   { az: 0.6,   dist: 2.0,  alt: 1.1,  lspd: 2.8, orbit: false },
+    control: { az: 1.35,  dist: 1.85, alt: 0.6,  lspd: 2.8, orbit: false },
+    comms:   { az: 2.1,   dist: 2.0,  alt: 0.55, lspd: 2.8, orbit: false },
+    howto:   { az: 0,     dist: 3.4,  alt: 1.6,  lspd: 2.0, orbit: false },
+  };
+
+  // Structure definitions (offset from HOME_DIR)
+  const HOME_STRUCTS = [
+    { name: "runway",   section: "main",    offAz: 0,     offAng: 0.02, h: 5,  w: 120, kind: "runway" },
+    { name: "hangar",   section: "hangar",  offAz: -0.5,  offAng: 0.10, h: 65, w: 55,  kind: "hangar" },
+    { name: "tower",    section: "tower",   offAz: 0.55,  offAng: 0.10, h: 110, w: 22, kind: "tower" },
+    { name: "control",  section: "control", offAz: 1.3,   offAng: 0.10, h: 80, w: 30,  kind: "control" },
+    { name: "comms",    section: "comms",   offAz: 2.0,   offAng: 0.10, h: 45, w: 40,  kind: "comms" },
+  ];
+
   // world position of a surface direction at altitude `alt` (uses the VISUAL radius, so the
   // planet renders bigger/flatter while gameplay stays on curR)
   const worldOf = (dir, alt) => _a.set(dir.x, dir.y, dir.z).multiplyScalar(visR + alt);
@@ -106,6 +141,8 @@ import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
       this._buildPlanet();
       this._buildObstacles();
       this._buildDecor();
+      this._buildHomeBase();
+      this._buildCssPanels();
 
       minimap = document.createElement("canvas");
       minimap.id = "minimap";
@@ -136,6 +173,7 @@ import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
       const w = window.innerWidth, h = window.innerHeight;
       renderer.setSize(w, h, false);
       if (composer) composer.setSize(w, h);
+      if (cssRenderer) cssRenderer.setSize(w, h);
       camera.aspect = w / h;
       camera.updateProjectionMatrix();
     },
@@ -281,9 +319,10 @@ import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
         fov += (FOV_BOOST - fov) * k; camera.fov = fov; camera.updateProjectionMatrix();
         camera.up.copy(V(d.p)); camera.position.copy(camPos); camera.lookAt(camLook);
       } else {
-        this._updateCamera(null, dt); // cinematic idle orbit
+        this._updateMenuCamera(dt);
       }
       composer.render();
+      if (cssRenderer) cssRenderer.render(cssScene, camera);
     },
 
     startTakeoff() { this._takeoff = 0.001; }, // begins the dive; cleared when gameplay sync() takes over
@@ -301,6 +340,311 @@ import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
     _clearDemo() {
       if (this._demo) { scene.remove(this._demo.mesh); disposeObject(this._demo.mesh); this._demo = null; }
       this._takeoff = 0;
+    },
+
+    // ===================== immersive menu =====================
+
+    /** Change active menu section (main / hangar / tower / control / comms / howto). */
+    setMenuSection(sec) {
+      if (!MENU_CAM[sec]) return;
+      menuSection = sec;
+      menuTransition = 0;
+      // Update CSS3D panel visibility (cross-fade via opacity)
+      for (const [name, entry] of Object.entries(cssPanels)) {
+        if (!entry || !entry.el) continue;
+        const active = name === sec || (name === "main" && sec === "main");
+        entry.el.style.opacity = active ? "1" : "0";
+        entry.el.style.pointerEvents = active ? "auto" : "none";
+      }
+    },
+
+    /** Show/hide the CSS3D menu layer (toggle when entering/leaving menu). */
+    showMenu() {
+      if (cssRenderer) cssRenderer.domElement.style.display = "";
+      // Reset to main section
+      this.setMenuSection("main");
+    },
+    hideMenu() {
+      if (cssRenderer) cssRenderer.domElement.style.display = "none";
+    },
+
+    /** Handle a click on a home-base structure (raycaster). */
+    _hitStructure(e) {
+      if (!menuRaycaster || !camera) return;
+      const rect = (cssRenderer ? cssRenderer.domElement : canvasEl).getBoundingClientRect();
+      const ptr = new THREE.Vector2(
+        ((e.clientX - rect.left) / rect.width) * 2 - 1,
+        -((e.clientY - rect.top) / rect.height) * 2 + 1
+      );
+      menuRaycaster.setFromCamera(ptr, camera);
+      const hits = menuRaycaster.intersectObjects(homeStructures.map(s => s.mesh), true);
+      if (hits.length) {
+        // Walk up to find the structure group
+        let obj = hits[0].object;
+        while (obj && !obj.userData._menuSection) obj = obj.parent;
+        if (obj && obj.userData._menuSection) this.setMenuSection(obj.userData._menuSection);
+      }
+    },
+
+    // ---- Menu camera choreography ----
+    _updateMenuCamera(dt) {
+      const cam = MENU_CAM[menuSection] || MENU_CAM.main;
+      menuTransition = Math.min(1, menuTransition + dt * (cam.lspd || 2));
+
+      // Compute focus point on the planet surface from HOME_DIR + section azimuth
+      const focusDir = cam.az !== 0
+        ? SP.dirFrom(HOME_DIR, 0, cam.az)
+        : HOME_DIR;
+      const focusWorld = new THREE.Vector3(focusDir.x, focusDir.y, focusDir.z).multiplyScalar(visR);
+
+      if (cam.orbit) {
+        // Slow orbit around the whole planet
+        const a = time * 0.08;
+        _a.set(Math.cos(a) * visR * cam.dist, visR * cam.alt, Math.sin(a) * visR * cam.dist);
+        camPos.lerp(_a, Math.min(1, dt * 1.4));
+        camLook.lerp(_b.set(0, 0, 0), Math.min(1, dt * 1.4));
+        camUp.lerp(_c.set(0, 1, 0), Math.min(1, dt * 1.4)).normalize();
+      } else {
+        // Focus on section: position camera above and behind the structure
+        const normal = _c.set(focusDir.x, focusDir.y, focusDir.z);
+        const camTarget = _a.copy(focusWorld).addScaledVector(normal, visR * cam.alt);
+        // Add slight backward offset so we see the structure from an angle
+        const tangent = _b.copy(normal).cross(new THREE.Vector3(0, 1, 0)).normalize();
+        if (tangent.lengthSq() < 0.01) tangent.set(1, 0, 0);
+        camTarget.addScaledVector(tangent, -visR * cam.dist * 0.15);
+
+        const k = Math.min(1, dt * (cam.lspd || 2.5));
+        camPos.lerp(camTarget, k);
+        camLook.lerp(focusWorld, k);
+        camUp.lerp(normal, Math.min(1, dt * 2.5)).normalize();
+      }
+
+      camera.up.copy(camUp);
+      camera.position.copy(camPos);
+      camera.lookAt(camLook);
+
+      // Update planet/atmo/fog scale
+      if (this._planet) this._planet.scale.setScalar(visR);
+      if (this._atmo) this._atmo.scale.setScalar(visR * 1.05);
+      if (scene.fog) { scene.fog.near = visR * 2.2; scene.fog.far = visR * 5.5; }
+
+      // Adaptive CSS3D panel scaling — panels stay readable at any camera distance
+      for (const [, entry] of Object.entries(cssPanels)) {
+        if (!entry || !entry.obj) continue;
+        const dist = camera.position.distanceTo(entry.obj.position);
+        const s = Math.max(0.4, Math.min(3, dist * 0.0028));
+        entry.obj.scale.setScalar(s);
+      }
+    },
+
+    // ---- Home-base 3D structures ----
+    _buildHomeBase() {
+      homeBase = new THREE.Group();
+      homeBase.userData.isHomeBase = true;
+
+      for (const def of HOME_STRUCTS) {
+        const dir = SP.dirFrom(HOME_DIR, def.offAng, def.offAz);
+        let mesh;
+        switch (def.kind) {
+          case "runway":  mesh = this._buildRunway(def, dir); break;
+          case "hangar":  mesh = this._buildHangar(def, dir); break;
+          case "tower":   mesh = this._buildMenuTower(def, dir); break;
+          case "control": mesh = this._buildControlTower(def, dir); break;
+          case "comms":   mesh = this._buildCommsPad(def, dir); break;
+          default: continue;
+        }
+        if (mesh) {
+          mesh.userData._menuSection = def.section;
+          mesh.userData._structDir = dir;
+          homeBase.add(mesh);
+          homeStructures.push({ mesh, section: def.section, dir });
+        }
+      }
+      scene.add(homeBase);
+    },
+
+    _buildRunway(def, dir) {
+      const g = new THREE.Group();
+      const runway = new THREE.Mesh(
+        new THREE.PlaneGeometry(def.w, 20),
+        new THREE.MeshStandardMaterial({ color: 0x3a3f4d, roughness: 0.9 })
+      );
+      runway.rotation.x = -Math.PI / 2;
+      runway.position.y = 1;
+      g.add(runway);
+      // Centerline dashes
+      for (let i = -4; i <= 4; i++) {
+        const dash = new THREE.Mesh(
+          new THREE.PlaneGeometry(8, 1.5),
+          new THREE.MeshBasicMaterial({ color: 0xffffff })
+        );
+        dash.rotation.x = -Math.PI / 2;
+        dash.position.set(i * 14, 1.2, 0);
+        g.add(dash);
+      }
+      this._orient(g, dir, null, 0, 0);
+      return g;
+    },
+
+    _buildHangar(def, dir) {
+      const g = new THREE.Group();
+      const body = new THREE.MeshStandardMaterial({ color: 0x4a6fa5, flatShading: true, roughness: 0.7 });
+      const roof = new THREE.MeshStandardMaterial({ color: 0x6b8fc5, flatShading: true, roughness: 0.6 });
+      // Main structure
+      const shell = new THREE.Mesh(new THREE.BoxGeometry(def.w, def.h * 0.6, def.w * 0.7), body);
+      shell.position.y = def.h * 0.3;
+      shell.castShadow = true;
+      g.add(shell);
+      // Arched roof
+      const arch = new THREE.Mesh(new THREE.CylinderGeometry(def.w * 0.5, def.w * 0.5, def.w * 0.7, 16, 1, false, 0, Math.PI), roof);
+      arch.rotation.z = Math.PI / 2;
+      arch.rotation.y = Math.PI / 2;
+      arch.position.y = def.h * 0.6;
+      g.add(arch);
+      // Door opening (dark)
+      const door = new THREE.Mesh(
+        new THREE.PlaneGeometry(def.w * 0.5, def.h * 0.45),
+        new THREE.MeshBasicMaterial({ color: 0x0a0f18 })
+      );
+      door.position.set(0, def.h * 0.25, -def.w * 0.36);
+      g.add(door);
+      this._orient(g, dir, null, 0, 0);
+      return g;
+    },
+
+    _buildMenuTower(def, dir) {
+      const g = new THREE.Group();
+      const stone = new THREE.MeshStandardMaterial({ color: 0xc9b896, flatShading: true, roughness: 0.85 });
+      // Main column
+      const col = new THREE.Mesh(new THREE.CylinderGeometry(def.w * 0.35, def.w * 0.5, def.h, 8), stone);
+      col.position.y = def.h / 2;
+      col.castShadow = true;
+      g.add(col);
+      // Beacon
+      const beacon = new THREE.Mesh(
+        new THREE.SphereGeometry(def.w * 0.3, 10, 8),
+        new THREE.MeshBasicMaterial({ color: 0xffd700 })
+      );
+      beacon.position.y = def.h + def.w * 0.3;
+      g.add(beacon);
+      // Point light
+      const glow = new THREE.PointLight(0xffd700, 0.6, def.h * 3, 2);
+      glow.position.y = def.h + def.w * 0.3;
+      g.add(glow);
+      this._orient(g, dir, null, 0, 0);
+      return g;
+    },
+
+    _buildControlTower(def, dir) {
+      const g = new THREE.Group();
+      const glass = new THREE.MeshStandardMaterial({ color: 0x88ccee, transparent: true, opacity: 0.55, roughness: 0.2, metalness: 0.3 });
+      const frame = new THREE.MeshStandardMaterial({ color: 0x3a4a5a, flatShading: true, roughness: 0.8 });
+      // Base column
+      const base = new THREE.Mesh(new THREE.CylinderGeometry(def.w * 0.4, def.w * 0.5, def.h * 0.7, 8), frame);
+      base.position.y = def.h * 0.35;
+      base.castShadow = true;
+      g.add(base);
+      // Glass cab
+      const cab = new THREE.Mesh(new THREE.CylinderGeometry(def.w * 0.6, def.w * 0.45, def.h * 0.3, 12), glass);
+      cab.position.y = def.h * 0.8;
+      g.add(cab);
+      // Dish antenna
+      const dish = new THREE.Mesh(
+        new THREE.SphereGeometry(6, 12, 8, 0, Math.PI),
+        new THREE.MeshStandardMaterial({ color: 0xcccccc, roughness: 0.5, metalness: 0.4 })
+      );
+      dish.position.set(def.w * 0.4, def.h, 0);
+      dish.rotation.x = -Math.PI / 3;
+      g.add(dish);
+      this._orient(g, dir, null, 0, 0);
+      return g;
+    },
+
+    _buildCommsPad(def, dir) {
+      const g = new THREE.Group();
+      const metal = new THREE.MeshStandardMaterial({ color: 0x778899, roughness: 0.4, metalness: 0.5 });
+      // Circular pad
+      const pad = new THREE.Mesh(
+        new THREE.CylinderGeometry(def.w * 0.5, def.w * 0.5, 3, 16),
+        new THREE.MeshStandardMaterial({ color: 0x4a5568, roughness: 0.9 })
+      );
+      pad.position.y = 1.5;
+      g.add(pad);
+      // Dish
+      const dish = new THREE.Mesh(
+        new THREE.SphereGeometry(14, 14, 10, 0, Math.PI * 2, 0, Math.PI / 2),
+        metal
+      );
+      dish.position.y = def.h * 0.5;
+      dish.rotation.x = Math.PI / 6;
+      g.add(dish);
+      // Mast
+      const mast = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 2, def.h * 0.5, 6), metal);
+      mast.position.y = def.h * 0.25;
+      mast.castShadow = true;
+      g.add(mast);
+      // Blinking light
+      const light = new THREE.Mesh(
+        new THREE.SphereGeometry(2.5, 8, 8),
+        new THREE.MeshBasicMaterial({ color: 0x00ff88 })
+      );
+      light.position.y = def.h * 0.55;
+      light.userData._blink = true;
+      g.add(light);
+      this._orient(g, dir, null, 0, 0);
+      return g;
+    },
+
+    // ---- CSS3D menu panels ----
+    _initCSS3D() {
+      try {
+        cssRenderer = new CSS3DRenderer();
+        cssRenderer.setSize(window.innerWidth, window.innerHeight);
+        cssRenderer.domElement.style.position = "absolute";
+        cssRenderer.domElement.style.top = "0";
+        cssRenderer.domElement.style.left = "0";
+        cssRenderer.domElement.style.pointerEvents = "none";
+        cssRenderer.domElement.classList.add("css3d-layer");
+        (document.getElementById("game-wrap") || document.body).appendChild(cssRenderer.domElement);
+
+        cssScene = new THREE.Scene();
+
+        // Register each section panel as a CSS3DObject positioned near its structure
+        const sections = ["main", "hangar", "tower", "control", "comms", "howto"];
+        for (const sec of sections) {
+          const el = document.getElementById("menu-" + sec);
+          if (!el) continue;
+          el.style.pointerEvents = "auto";
+          el.style.opacity = sec === "main" ? "1" : "0";
+          el.style.transition = "opacity 0.4s ease";
+
+          const obj = new CSS3DObject(el);
+          // Position at the section's location on the sphere
+          const cam = MENU_CAM[sec] || MENU_CAM.main;
+          const dir = cam.az !== 0 ? SP.dirFrom(HOME_DIR, 0, cam.az) : HOME_DIR;
+          const worldPos = new THREE.Vector3(dir.x, dir.y, dir.z).multiplyScalar(visR + 30);
+          obj.position.copy(worldPos);
+          // Face outward from the planet
+          obj.up.set(dir.x, dir.y, dir.z);
+          obj.lookAt(new THREE.Vector3(0, 0, 0));
+          obj.rotateY(Math.PI); // face away from center
+
+          // Start scaled — _updateMenuCamera adjusts per-frame
+          obj.scale.setScalar(1);
+
+          cssScene.add(obj);
+          cssPanels[sec] = { obj, el };
+        }
+
+        // Raycaster for clicking structures
+        menuRaycaster = new THREE.Raycaster();
+        const target = cssRenderer.domElement;
+        target.addEventListener("click", (e) => this._hitStructure(e));
+        target.style.pointerEvents = "auto"; // allow clicks to reach structures
+      } catch (e) {
+        console.warn("CSS3D init failed:", e);
+        cssRenderer = null;
+      }
     },
 
     killPopup(id, mine) {
@@ -403,6 +747,250 @@ import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
         const dir = SP.randomDir(); grp.userData = { dir, alt: rand(120, 220) };
         scene.add(grp); this._clouds.push(grp);
       }
+    },
+
+    // ===================== home-base structures (menu) =====================
+    _buildHomeBase() {
+      homeBase = new THREE.Group();
+      homeBase.visible = false; // shown only in menu mode
+      const dir = HOME_DIR;
+      const up = _a.set(dir.x, dir.y, dir.z);
+
+      for (const s of HOME_STRUCTS) {
+        const sDir = SP.normalize(SP.rotateAxis(dir, up, s.offAz));
+        // Build structure mesh
+        let mesh;
+        if (s.kind === "runway")   mesh = this._hbRunway(s);
+        else if (s.kind === "hangar")  mesh = this._hbHangar(s);
+        else if (s.kind === "tower")   mesh = this._hbTower(s);
+        else if (s.kind === "control") mesh = this._hbControl(s);
+        else if (s.kind === "comms")   mesh = this._hbComms(s);
+        if (!mesh) continue;
+        mesh.userData = { dir: sDir, alt: s.h * 0.02, section: s.section };
+        homeBase.add(mesh);
+        homeStructures.push({ mesh, section: s.section });
+      }
+      scene.add(homeBase);
+    },
+
+    _hbRunway(s) {
+      const g = new THREE.Group();
+      const mat = new THREE.MeshStandardMaterial({ color: 0x3a3f4a, roughness: 0.9, flatShading: true });
+      const strip = new THREE.Mesh(new THREE.BoxGeometry(s.w, 1.2, 18), mat);
+      strip.position.y = 0.6; strip.castShadow = true; g.add(strip);
+      // runway markings
+      const markMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+      for (let i = -4; i <= 4; i++) {
+        const m = new THREE.Mesh(new THREE.BoxGeometry(8, 0.3, 1.5), markMat);
+        m.position.set(i * 14, 1.3, 0); g.add(m);
+      }
+      // idle plane (cosmetic, at the runway start)
+      const plane = this._makePlane(0);
+      plane.scale.setScalar(PLANE_SCALE * 0.9);
+      plane.position.set(-s.w * 0.35, 4, 0);
+      plane.rotation.y = Math.PI / 2;
+      g.add(plane); g._idlePlane = plane;
+      return g;
+    },
+
+    _hbHangar(s) {
+      const g = new THREE.Group();
+      const wallMat = new THREE.MeshStandardMaterial({ color: 0x4a5568, roughness: 0.85, flatShading: true });
+      const roofMat = new THREE.MeshStandardMaterial({ color: 0x2d3748, roughness: 0.8, flatShading: true });
+      // walls
+      const walls = new THREE.Mesh(new THREE.BoxGeometry(s.w, s.h * 0.6, s.w * 0.7), wallMat);
+      walls.position.y = s.h * 0.3; walls.castShadow = true; g.add(walls);
+      // roof (slightly wider)
+      const roof = new THREE.Mesh(new THREE.BoxGeometry(s.w * 1.15, s.h * 0.08, s.w * 0.85), roofMat);
+      roof.position.y = s.h * 0.64; g.add(roof);
+      // opening (dark front face)
+      const opening = new THREE.Mesh(new THREE.BoxGeometry(s.w * 0.7, s.h * 0.45, 2),
+        new THREE.MeshBasicMaterial({ color: 0x0a0f18 }));
+      opening.position.set(0, s.h * 0.25, -s.w * 0.35); g.add(opening);
+      // accent stripe
+      const stripe = new THREE.Mesh(new THREE.BoxGeometry(s.w * 1.02, s.h * 0.05, s.w * 0.72),
+        new THREE.MeshStandardMaterial({ color: 0xffcb05, emissive: 0xffcb05, emissiveIntensity: 0.3 }));
+      stripe.position.y = s.h * 0.52; g.add(stripe);
+      return g;
+    },
+
+    _hbTower(s) {
+      const g = new THREE.Group();
+      const baseMat = new THREE.MeshStandardMaterial({ color: 0x6b7a94, roughness: 0.85, flatShading: true });
+      // tower body (tapered cylinder)
+      const body = new THREE.Mesh(new THREE.CylinderGeometry(s.w * 0.35, s.w * 0.5, s.h, 8), baseMat);
+      body.position.y = s.h / 2; body.castShadow = true; g.add(body);
+      // observation deck
+      const deck = new THREE.Mesh(new THREE.CylinderGeometry(s.w * 0.65, s.w * 0.5, s.h * 0.12, 8),
+        new THREE.MeshStandardMaterial({ color: 0x2d3748, roughness: 0.8 }));
+      deck.position.y = s.h * 0.88; g.add(deck);
+      // beacon light
+      const beacon = new THREE.Mesh(new THREE.SphereGeometry(4, 8, 8),
+        new THREE.MeshBasicMaterial({ color: 0xffcb05 }));
+      beacon.position.y = s.h + 6; g.add(beacon);
+      const light = new THREE.PointLight(0xffcb05, 0.6, 120, 2);
+      light.position.y = s.h + 6; g.add(light);
+      return g;
+    },
+
+    _hbControl(s) {
+      const g = new THREE.Group();
+      const mat = new THREE.MeshStandardMaterial({ color: 0x4a6670, roughness: 0.85, flatShading: true });
+      // base block
+      const base = new THREE.Mesh(new THREE.BoxGeometry(s.w, s.h * 0.5, s.w * 0.8), mat);
+      base.position.y = s.h * 0.25; base.castShadow = true; g.add(base);
+      // glass cabin (slightly smaller, on top)
+      const glass = new THREE.Mesh(new THREE.BoxGeometry(s.w * 0.85, s.h * 0.3, s.w * 0.65),
+        new THREE.MeshStandardMaterial({ color: 0x123a5a, roughness: 0.25, metalness: 0.1, transparent: true, opacity: 0.75 }));
+      glass.position.y = s.h * 0.65; g.add(glass);
+      // antenna
+      const ant = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, s.h * 0.35, 4),
+        new THREE.MeshStandardMaterial({ color: 0x8194b0, roughness: 0.6 }));
+      ant.position.y = s.h * 0.95; g.add(ant);
+      return g;
+    },
+
+    _hbComms(s) {
+      const g = new THREE.Group();
+      // circular pad
+      const pad = new THREE.Mesh(new THREE.CylinderGeometry(s.w * 0.5, s.w * 0.55, 4, 16),
+        new THREE.MeshStandardMaterial({ color: 0x3a4a5a, roughness: 0.9, flatShading: true }));
+      pad.position.y = 2; pad.castShadow = true; g.add(pad);
+      // satellite dish (angled torus)
+      const dish = new THREE.Mesh(new THREE.TorusGeometry(s.w * 0.3, 3, 8, 20),
+        new THREE.MeshStandardMaterial({ color: 0xc4cde2, roughness: 0.4, metalness: 0.2 }));
+      dish.position.y = s.h * 0.6; dish.rotation.x = Math.PI * 0.35; g.add(dish);
+      // support pole
+      const pole = new THREE.Mesh(new THREE.CylinderGeometry(2, 2.5, s.h * 0.5, 6),
+        new THREE.MeshStandardMaterial({ color: 0x6b7a94, roughness: 0.8 }));
+      pole.position.y = s.h * 0.3; g.add(pole);
+      // blinking light
+      const blink = new THREE.Mesh(new THREE.SphereGeometry(2.5, 6, 6),
+        new THREE.MeshBasicMaterial({ color: 0x49c0ff }));
+      blink.position.y = s.h * 0.7; g.add(blink); g._blink = blink;
+      return g;
+    },
+
+    // ===================== CSS3D panels =====================
+    _buildCssPanels() {
+      cssScene = new THREE.Scene();
+      cssRenderer = new CSS3DRenderer();
+      cssRenderer.setSize(window.innerWidth, window.innerHeight);
+      cssRenderer.domElement.style.position = "absolute";
+      cssRenderer.domElement.style.inset = "0";
+      cssRenderer.domElement.style.pointerEvents = "none";
+      cssRenderer.domElement.style.zIndex = "2";
+      cssRenderer.domElement.id = "css3d-layer";
+      (document.getElementById("game-wrap") || document.body).appendChild(cssRenderer.domElement);
+
+      // Wrap key panels as CSS3DObjects
+      const panels = {
+        main:    document.getElementById("start-screen"),
+        // settings panel is separate
+        control: document.getElementById("settings-panel"),
+      };
+
+      for (const [section, el] of Object.entries(panels)) {
+        if (!el) continue;
+        const obj = new CSS3DObject(el);
+        obj.visible = false;
+        // Position will be set per-frame based on camera
+        cssScene.add(obj);
+        cssPanels[section] = { obj, el };
+      }
+      // Hide settings panel from CSS3D (keep it as DOM overlay for now since it has sliders)
+      // Instead, we'll create a lightweight CSS3D label panel for the control section
+      this._buildSectionLabels();
+    },
+
+    _buildSectionLabels() {
+      // Create floating labels for each structure section
+      const labels = {
+        hangar:  { title: "HANGAR", desc: "Choose your plane", color: "#ffcb05" },
+        tower:   { title: "SCOREBOARD", desc: "Top pilots worldwide", color: "#cfe0ff" },
+        control: { title: "CONTROL TOWER", desc: "Settings & options", color: "#8194b0" },
+        comms:   { title: "COMMS PAD", desc: "Play with friends", color: "#49c0ff" },
+      };
+      for (const [section, info] of Object.entries(labels)) {
+        const el = document.createElement("div");
+        el.className = "menu-3d-label";
+        el.innerHTML = `<span class="l3d-title" style="color:${info.color}">${info.title}</span><span class="l3d-desc">${info.desc}</span><span class="l3d-hint">TAP TO ENTER</span>`;
+        el.style.pointerEvents = "auto";
+        el.style.cursor = "pointer";
+        el.addEventListener("click", () => { if (window._menuNav) window._menuNav(section); });
+        const obj = new CSS3DObject(el);
+        obj.visible = false;
+        cssScene.add(obj);
+        cssPanels[section + "_label"] = { obj, el };
+      }
+    },
+
+    // ===================== menu API =====================
+    setMenuSection(section) {
+      if (!MENU_CAM[section]) section = "main";
+      if (section === menuSection) return;
+      menuSection = section;
+      menuTransition = 0;
+      // Update panel visibility
+      this._updateMenuPanels();
+      if (window.SFX && window.SFX.uiClick) window.SFX.uiClick();
+    },
+
+    _updateMenuPanels() {
+      // Show/hide CSS3D panels based on current section
+      for (const [key, entry] of Object.entries(cssPanels)) {
+        if (!entry) continue;
+        const isLabel = key.endsWith("_label");
+        const sec = isLabel ? key.replace("_label", "") : key;
+        if (isLabel) {
+          // Labels: show when NOT focused on that section (visible from distance)
+          entry.obj.visible = (menuSection !== sec) && (menuSection === "main");
+        } else {
+          // Panels: show when focused on that section
+          entry.obj.visible = (menuSection === sec);
+        }
+      }
+    },
+
+    // Position CSS3D panels/labels near their structures
+    _positionCssPanels() {
+      for (const [key, entry] of Object.entries(cssPanels)) {
+        if (!entry || !entry.obj.visible) continue;
+        const isLabel = key.endsWith("_label");
+        const sec = isLabel ? key.replace("_label", "") : key;
+        // Find the corresponding structure
+        const hs = homeStructures.find(h => h.section === sec);
+        if (!hs) continue;
+        const dir = hs.mesh.userData.dir;
+        const alt = hs.mesh.userData.alt + (isLabel ? 90 : 60);
+        const pos = worldOf(dir, alt);
+        entry.obj.position.copy(pos);
+        // Face outward from planet center
+        entry.obj.up.copy(V(dir));
+        entry.obj.lookAt(_b.copy(pos).add(V(dir)));
+        // Scale based on type
+        const s = isLabel ? 0.5 : 1.2;
+        entry.obj.scale.setScalar(s);
+      }
+    },
+
+    menuClick(x, y) {
+      // Raycast against home-base structures
+      if (!menuRaycaster || !homeBase || !homeBase.visible) return null;
+      const ndc = new THREE.Vector2(
+        (x / window.innerWidth) * 2 - 1,
+        -(y / window.innerHeight) * 2 + 1
+      );
+      menuRaycaster.setFromCamera(ndc, camera);
+      const meshes = homeStructures.map(h => h.mesh);
+      const hits = menuRaycaster.intersectObjects(meshes, true);
+      if (hits.length > 0) {
+        // Walk up to find the structure group with a section
+        let obj = hits[0].object;
+        while (obj && !obj.userData.section) obj = obj.parent;
+        if (obj && obj.userData.section) return obj.userData.section;
+      }
+      return null;
     },
 
     // ---- arena map content on the sphere (obstacles / landmarks / hotspot) ----
