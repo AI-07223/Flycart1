@@ -12,7 +12,7 @@
 - [x] 1.5 Working flow preserved (presentation only) — the menu overlay is now translucent so the planet shows through; all buttons still call the existing logic. Verified Quick Play opens (4 players), no `Renderer.init` regression
 - [x] 1.6 Quality-tier + landscape: on low tier face panels flat (no tilt) + fewer particles; keep the rotate guard
 - [x] 1.7 Verify: headless Preview — Quick Play opens (no `Renderer.init`/flow regression), panels render + inputs typeable, no console errors; `verify-sphere.cjs` + `verify-leaderboard.cjs` green
-- [ ] 1.8 Commit → push → Coolify redeploy (patient) → verify live; fly-test the feel
+- [x] 1.8 Commit → push → Coolify redeploy (patient) → verify live; fly-test the feel
 
 ## 2. Phase 2 — diegetic structures + interaction
 
@@ -26,6 +26,6 @@
 
 - [x] 3.1 Intro swoop: camera descends from space to home base; logo forms
 - [x] 3.2 How-to-play: a ghost plane flies a demo loop with 3D steer/boost/fire callouts
-- [ ] 3.3 Results podium: top-3 planes on a podium with the player's placement + rematch
+- [x] 3.3 Results podium: top-3 planes on a podium with the player's placement + rematch
 - [x] 3.4 Menu sound design (ambient + transition cues), respecting the audio mixer/mute
 - [x] 3.5 Verify + fly-test; commit → deploy (patient) → verify live

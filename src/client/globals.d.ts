@@ -213,6 +213,8 @@ interface RendererAPI {
   showMenu?(): void;
   hideMenu?(): void;
   menuClick?(x: number, y: number): string | null;
+  showPodium?(list: any[], myId: string): void;
+  hidePodium?(): void;
 }
 
 interface ColyseusClient {
@@ -232,5 +234,7 @@ declare interface Window {
   Net: NetAPI;
   Renderer: RendererAPI;
   Colyseus: { Client: ColyseusClient };
+  /** Called by render3d.js when a 3D structure is clicked (immersive menu). */
+  _menuNav?: (sec: string) => void;
 }
 

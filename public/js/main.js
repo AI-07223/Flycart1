@@ -336,6 +336,7 @@
           prevPhase = state.phase;
         }
         if (state.phase === "intermission") {
+          if (state.phase !== prevPhase && window.Renderer.showPodium) window.Renderer.showPodium(list, myId);
           els.inter.classList.remove("hidden");
           els.interTime.textContent = String(Math.ceil(state.timeLeft));
           const winner = list[0];
@@ -348,6 +349,7 @@
             els.yourPlace.textContent = myIdx >= 0 ? `You placed ${ordinal(myIdx + 1)} of ${list.length}` : "";
           }
         } else {
+          if (window.Renderer.hidePodium) window.Renderer.hidePodium();
           els.inter.classList.add("hidden");
         }
       }
