@@ -28,5 +28,5 @@
 ## 5. Verification
 
 - [x] 5.1 Run `npx tsc -p tsconfig.client.json --noEmit` — no errors
-- [ ] 5.2 Load game in browser — verify all features work identically
-- [ ] 5.3 Verify no console errors
+- [x] 5.2 Load game in browser — verify all features work identically
+- [x] 5.3 Verify no console errors
