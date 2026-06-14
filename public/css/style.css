@@ -457,3 +457,20 @@ button.secondary { background: #2b3550; color: #fff; box-shadow: 0 6px 0 #1a2034
 #power-chip .pc-label { display: flex; align-items: center; gap: 6px; letter-spacing: 1px; }
 #power-chip .pc-bar { height: 5px; border-radius: 3px; background: #2b3550; overflow: hidden; }
 #power-chip .pc-fill { height: 100%; width: 100%; border-radius: 3px; transition: width 0.1s linear; }
+
+/* Safe area insets for notched devices (iPhone X+, etc.) */
+#touch-controls {
+  padding-bottom: env(safe-area-inset-bottom, 0);
+}
+#touch-controls .tbtn.boost,
+#touch-controls .tbtn.fire {
+  margin-bottom: env(safe-area-inset-bottom, 0);
+}
+#hud {
+  padding-top: env(safe-area-inset-top, 0);
+  padding-left: env(safe-area-inset-left, 0);
+  padding-right: env(safe-area-inset-right, 0);
+}
+#share-bar {
+  padding-bottom: env(safe-area-inset-bottom, 0);
+}
