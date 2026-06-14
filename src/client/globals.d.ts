@@ -212,6 +212,7 @@ interface RendererAPI {
   setMenuSection?(sec: string): void;
   showMenu?(): void;
   hideMenu?(): void;
+  menuClick?(x: number, y: number): string | null;
 }
 
 interface ColyseusClient {

@@ -443,7 +443,11 @@ import { CSS3DRenderer, CSS3DObject } from "three/addons/renderers/CSS3DRenderer
         // Walk up to find the structure group
         let obj = hits[0].object;
         while (obj && !obj.userData._menuSection) obj = obj.parent;
-        if (obj && obj.userData._menuSection) this.setMenuSection(obj.userData._menuSection);
+        if (obj && obj.userData._menuSection) {
+          // Notify main.ts so DOM panels update too
+          if (typeof window._menuNav === "function") window._menuNav(obj.userData._menuSection);
+          else this.setMenuSection(obj.userData._menuSection);
+        }
       }
     },
 

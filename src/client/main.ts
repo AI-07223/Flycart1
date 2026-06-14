@@ -145,6 +145,9 @@ function menuBack() {
   setMenuSection("main");
 }
 
+// Expose for render3d.js to call when a 3D structure is clicked.
+(window as any)._menuNav = (sec: string) => setMenuSection(sec);
+
 function genCode() {
   const c = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   let s = "";
