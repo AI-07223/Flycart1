@@ -187,6 +187,7 @@
         if (window.Renderer && window.Renderer.setMenuSection) window.Renderer.setMenuSection(sec);
         window.SFX.uiClick();
       }
+      window._menuNav = (sec) => setMenuSection(sec);
       function genCode() {
         const c = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
         let s = "";
