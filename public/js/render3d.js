@@ -71,6 +71,7 @@ import { CSS3DRenderer, CSS3DObject } from "three/addons/renderers/CSS3DRenderer
   let introPhase = 0;            // 0=not started, 1=swooping, 2=done
   let introT = 0;
   let menuTransition = 0;        // cross-fade progress 0→1
+  let podiumGroup = null;        // results podium 3D group
 
   // Direction on the planet surface for the home base (opposite from the arena hotspot)
   const HOME_DIR = SP.normalize(SP.vec(0, 1, 0));
@@ -727,7 +728,7 @@ import { CSS3DRenderer, CSS3DObject } from "three/addons/renderers/CSS3DRenderer
             `<span class="l3d-hint">TAP TO FOCUS</span>`;
           el.style.pointerEvents = "auto";
           el.style.cursor = "pointer";
-          el.addEventListener("click", (e) => { e.stopPropagation(); this.setMenuSection(sec); });
+          el.addEventListener("click", (e) => { e.stopPropagation(); if (typeof window._menuNav === "function") window._menuNav(sec); else this.setMenuSection(sec); });
           const obj = new CSS3DObject(el);
           obj.visible = false;
           cssScene.add(obj);
@@ -791,6 +792,66 @@ import { CSS3DRenderer, CSS3DObject } from "three/addons/renderers/CSS3DRenderer
         textures: renderer ? renderer.info.memory.textures : -1,
         programs: renderer && renderer.info.programs ? renderer.info.programs.length : -1,
       };
+    },
+
+    // ===================== Results podium =====================
+    showPodium(list, myId) {
+      this.hidePodium();
+      if (!list || list.length < 1) return;
+      const pg = new THREE.Group(); pg.name = "podium";
+      const podiumDir = SP.dirFrom(HOME_DIR, 0.025, Math.PI * 0.75); // near home base
+      const steps = [
+        { h: 40, w: 32, color: 0xffd24a, rank: 1 }, // gold (center, tallest)
+        { h: 28, w: 32, color: 0xb8c4d0, rank: 2 }, // silver (left)
+        { h: 18, w: 32, color: 0xcd7f32, rank: 3 }, // bronze (right)
+      ];
+      const offsets = [-36, 0, 36]; // left, center, right (silver, gold, bronze)
+      const boxMat = (c) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.5, metalness: 0.3 });
+      const podiumOrder = [1, 0, 2]; // render order: silver(left), gold(center), bronze(right)
+
+      for (let i = 0; i < 3; i++) {
+        const s = steps[podiumOrder[i]];
+        const bx = new THREE.Mesh(new THREE.BoxGeometry(s.w, s.h, s.w), boxMat(s.color));
+        bx.position.set(offsets[i], s.h / 2, 0);
+        bx.castShadow = true;
+        bx.receiveShadow = true;
+        pg.add(bx);
+        // Rank number on the step face
+        const numGeo = new THREE.BoxGeometry(s.w * 0.4, s.h * 0.3, 1);
+        const numMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+        const numMesh = new THREE.Mesh(numGeo, numMat);
+        numMesh.position.set(offsets[i], s.h / 2, s.w / 2 + 1);
+        pg.add(numMesh);
+      }
+      pg.userData.dir = podiumDir;
+      pg.userData.alt = 0;
+      scene.add(pg);
+      podiumGroup = pg;
+
+      // Position camera for podium view
+      const up = V(podiumDir);
+      const arb = Math.abs(up.y) < 0.9 ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(1, 0, 0);
+      const east = new THREE.Vector3().crossVectors(arb, up).normalize();
+      const north = new THREE.Vector3().crossVectors(up, east).normalize();
+      const dist = 2.8 * visR;
+      const alt = 1.4 * visR;
+      _a.copy(up).multiplyScalar(alt)
+        .addScaledVector(east, dist * 0.5)
+        .addScaledVector(north, dist * 0.7);
+      _b.copy(up).multiplyScalar(visR * 1.01);
+      camPos.copy(_a);
+      camLook.copy(_b);
+      camUp.copy(up).normalize();
+      camera.up.copy(camUp);
+      camera.position.copy(camPos);
+      camera.lookAt(camLook);
+      camera.fov = 55;
+      camera.updateProjectionMatrix();
+    },
+
+    hidePodium() {
+      if (podiumGroup) { scene.remove(podiumGroup); disposeObject(podiumGroup); podiumGroup = null; }
+      if (camera) { camera.fov = FOV_BASE; camera.updateProjectionMatrix(); }
     },
 
     // ---- local-plane prediction (mirrors the server stepPlane on the sphere) ----
