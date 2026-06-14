@@ -182,6 +182,9 @@ import { CSS3DRenderer, CSS3DObject } from "three/addons/renderers/CSS3DRenderer
     sync(state, dt, myId) {
       dt = Math.min(dt, 0.05);
       if (this._demo) this._clearDemo(); // leaving the menu — drop the demo plane
+      // Hide home-base structures, show arena obstacles during gameplay
+      if (homeBase) homeBase.visible = false;
+      if (this._mapGroup) this._mapGroup.visible = true;
       Q.sample(dt);
       time += dt;
       hitStop = Math.max(0, hitStop - dt);
@@ -312,6 +315,10 @@ import { CSS3DRenderer, CSS3DObject } from "three/addons/renderers/CSS3DRenderer
       }
       this._updateMap(dt);
       this._updateParticles(dt);
+      // Animate home-base structure details (blinking lights, etc.)
+      for (const hs of homeStructures) {
+        hs.mesh.traverse((o) => { if (o.userData && o.userData._blink) o.material.opacity = 0.4 + Math.sin(time * 3) * 0.6; });
+      }
       if (this._takeoff > 0 && d) {
         // QUICK PLAY: dive the camera in behind the plane; the game chase cam then continues from
         // camPos (shared) → seamless handoff, no screen cut.
@@ -394,33 +401,50 @@ import { CSS3DRenderer, CSS3DObject } from "three/addons/renderers/CSS3DRenderer
       const cam = MENU_CAM[menuSection] || MENU_CAM.main;
       menuTransition = Math.min(1, menuTransition + dt * (cam.lspd || 2));
 
+      // Intro swoop: on first menu load, camera starts high above and swoops in
+      if (introPhase === 0) {
+        introPhase = 1; introT = 0;
+        camPos.copy(V(HOME_DIR)).multiplyScalar(visR * 5.5);
+        camLook.set(0, 0, 0);
+        camUp.copy(V(HOME_DIR));
+      }
+
       // Compute focus point on the planet surface from HOME_DIR + section azimuth
       const focusDir = cam.az !== 0
         ? SP.dirFrom(HOME_DIR, 0, cam.az)
         : HOME_DIR;
-      const focusWorld = new THREE.Vector3(focusDir.x, focusDir.y, focusDir.z).multiplyScalar(visR);
+      const focusWorld = _c.set(focusDir.x, focusDir.y, focusDir.z).multiplyScalar(visR);
 
+      // Compute goal camera position
+      let goalPos, goalLook, goalUp;
       if (cam.orbit) {
-        // Slow orbit around the whole planet
         const a = time * 0.08;
-        _a.set(Math.cos(a) * visR * cam.dist, visR * cam.alt, Math.sin(a) * visR * cam.dist);
-        camPos.lerp(_a, Math.min(1, dt * 1.4));
-        camLook.lerp(_b.set(0, 0, 0), Math.min(1, dt * 1.4));
-        camUp.lerp(_c.set(0, 1, 0), Math.min(1, dt * 1.4)).normalize();
+        goalPos = new THREE.Vector3(Math.cos(a) * visR * cam.dist, visR * cam.alt, Math.sin(a) * visR * cam.dist);
+        goalLook = new THREE.Vector3(0, 0, 0);
+        goalUp = new THREE.Vector3(0, 1, 0);
       } else {
-        // Focus on section: position camera above and behind the structure
-        const normal = _c.set(focusDir.x, focusDir.y, focusDir.z);
-        const camTarget = _a.copy(focusWorld).addScaledVector(normal, visR * cam.alt);
-        // Add slight backward offset so we see the structure from an angle
-        const tangent = _b.copy(normal).cross(new THREE.Vector3(0, 1, 0)).normalize();
+        const normal = new THREE.Vector3(focusDir.x, focusDir.y, focusDir.z);
+        goalPos = focusWorld.clone().addScaledVector(normal, visR * cam.alt);
+        const tangent = normal.clone().cross(new THREE.Vector3(0, 1, 0)).normalize();
         if (tangent.lengthSq() < 0.01) tangent.set(1, 0, 0);
-        camTarget.addScaledVector(tangent, -visR * cam.dist * 0.15);
-
-        const k = Math.min(1, dt * (cam.lspd || 2.5));
-        camPos.lerp(camTarget, k);
-        camLook.lerp(focusWorld, k);
-        camUp.lerp(normal, Math.min(1, dt * 2.5)).normalize();
+        goalPos.addScaledVector(tangent, -visR * cam.dist * 0.15);
+        goalLook = focusWorld.clone();
+        goalUp = normal;
       }
+
+      // Lerp speed: ease during intro swoop
+      let lspd = cam.lspd || 1.4;
+      if (introPhase === 1) {
+        introT += dt;
+        const ik = Math.min(1, introT / 2.5);
+        lspd = 0.6 + ik * 2.5; // slow start, accelerate
+        if (ik >= 1) introPhase = 2;
+      }
+
+      const k = Math.min(1, dt * lspd);
+      camPos.lerp(goalPos, k);
+      camLook.lerp(goalLook, k);
+      camUp.lerp(goalUp, Math.min(1, dt * 2)).normalize();
 
       camera.up.copy(camUp);
       camera.position.copy(camPos);
@@ -431,12 +455,33 @@ import { CSS3DRenderer, CSS3DObject } from "three/addons/renderers/CSS3DRenderer
       if (this._atmo) this._atmo.scale.setScalar(visR * 1.05);
       if (scene.fog) { scene.fog.near = visR * 2.2; scene.fog.far = visR * 5.5; }
 
-      // Adaptive CSS3D panel scaling — panels stay readable at any camera distance
-      for (const [, entry] of Object.entries(cssPanels)) {
+      // Position CSS3D labels near their structures; visible in main overview
+      const isLow = Q.current === "low";
+      for (const [key, entry] of Object.entries(cssPanels)) {
         if (!entry || !entry.obj) continue;
+        const sec = entry.section;
+        if (!sec) continue;
+        const hs = homeStructures.find((h) => h.section === sec);
+        if (!hs) continue;
+        // Show labels only in the main overview; hide when focused on a section
+        entry.obj.visible = (menuSection === "main") && (introPhase === 2);
+        if (!entry.obj.visible) continue;
+        // Position above the structure on the planet surface
+        const sDir = hs.mesh.userData._structDir || hs.mesh.userData.dir;
+        if (!sDir) continue;
+        const labelPos = worldOf(sDir, (hs.mesh.userData.alt || 1) + 55);
+        entry.obj.position.copy(labelPos);
+        entry.obj.up.copy(V(sDir));
+        entry.obj.lookAt(new THREE.Vector3(0, 0, 0));
+        entry.obj.rotateY(Math.PI);
+        // Adaptive scale based on camera distance
         const dist = camera.position.distanceTo(entry.obj.position);
-        const s = Math.max(0.4, Math.min(3, dist * 0.0028));
+        const s = Math.max(0.35, Math.min(2.5, dist * 0.0025));
         entry.obj.scale.setScalar(s);
+        // Low quality tier: face camera flat (no planet-surface tilt)
+        if (isLow) {
+          entry.obj.quaternion.copy(camera.quaternion);
+        }
       }
     },
 
@@ -609,45 +654,57 @@ import { CSS3DRenderer, CSS3DObject } from "three/addons/renderers/CSS3DRenderer
         cssRenderer.domElement.style.pointerEvents = "none";
         cssRenderer.domElement.classList.add("css3d-layer");
         (document.getElementById("game-wrap") || document.body).appendChild(cssRenderer.domElement);
-
         cssScene = new THREE.Scene();
 
-        // Register each section panel as a CSS3DObject positioned near its structure
-        const sections = ["main", "hangar", "tower", "control", "comms", "howto"];
-        for (const sec of sections) {
-          const el = document.getElementById("menu-" + sec);
-          if (!el) continue;
+        // Create floating labels for each home-base structure
+        const LABELS = {
+          hangar:  { title: "HANGAR",        desc: "Choose your plane",    color: "#ffcb05" },
+          tower:   { title: "SCOREBOARD",     desc: "Top pilots worldwide", color: "#cfe0ff" },
+          control: { title: "CONTROL TOWER",  desc: "Settings & options",   color: "#8194b0" },
+          comms:   { title: "COMMS PAD",      desc: "Play with friends",    color: "#49c0ff" },
+        };
+        for (const [sec, info] of Object.entries(LABELS)) {
+          const el = document.createElement("div");
+          el.className = "menu-3d-label";
+          el.innerHTML =
+            `<span class="l3d-title" style="color:${info.color}">${info.title}</span>` +
+            `<span class="l3d-desc">${info.desc}</span>` +
+            `<span class="l3d-hint">TAP TO FOCUS</span>`;
           el.style.pointerEvents = "auto";
-          el.style.opacity = sec === "main" ? "1" : "0";
-          el.style.transition = "opacity 0.4s ease";
-
+          el.style.cursor = "pointer";
+          el.addEventListener("click", (e) => { e.stopPropagation(); this.setMenuSection(sec); });
           const obj = new CSS3DObject(el);
-          // Position at the section's location on the sphere
-          const cam = MENU_CAM[sec] || MENU_CAM.main;
-          const dir = cam.az !== 0 ? SP.dirFrom(HOME_DIR, 0, cam.az) : HOME_DIR;
-          const worldPos = new THREE.Vector3(dir.x, dir.y, dir.z).multiplyScalar(visR + 30);
-          obj.position.copy(worldPos);
-          // Face outward from the planet
-          obj.up.set(dir.x, dir.y, dir.z);
-          obj.lookAt(new THREE.Vector3(0, 0, 0));
-          obj.rotateY(Math.PI); // face away from center
-
-          // Start scaled — _updateMenuCamera adjusts per-frame
-          obj.scale.setScalar(1);
-
+          obj.visible = false;
           cssScene.add(obj);
-          cssPanels[sec] = { obj, el };
+          cssPanels[sec + "_label"] = { obj, el, section: sec };
         }
 
-        // Raycaster for clicking structures
+        // Raycaster for clicking 3D structures directly
         menuRaycaster = new THREE.Raycaster();
         const target = cssRenderer.domElement;
         target.addEventListener("click", (e) => this._hitStructure(e));
-        target.style.pointerEvents = "auto"; // allow clicks to reach structures
+        target.style.pointerEvents = "auto";
       } catch (e) {
         console.warn("CSS3D init failed:", e);
         cssRenderer = null;
       }
+    },
+
+    /** Public API: raycast from screen coords, return the section name or null. */
+    menuClick(x, y) {
+      if (!menuRaycaster || !homeBase || !homeBase.visible) return null;
+      const ndc = new THREE.Vector2(
+        (x / window.innerWidth) * 2 - 1,
+        -(y / window.innerHeight) * 2 + 1
+      );
+      menuRaycaster.setFromCamera(ndc, camera);
+      const hits = menuRaycaster.intersectObjects(homeStructures.map((h) => h.mesh), true);
+      if (hits.length > 0) {
+        let obj = hits[0].object;
+        while (obj && !obj.userData._menuSection) obj = obj.parent;
+        if (obj && obj.userData._menuSection) return obj.userData._menuSection;
+      }
+      return null;
     },
 
     killPopup(id, mine) {

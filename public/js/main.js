@@ -380,6 +380,12 @@
         buildPlanePicker();
         fetchLeaderboard();
         setupTouchButtons();
+        setMenuSection("main");
+        const applyQualityClass = () => {
+          document.body.classList.toggle("quality-low", window.Quality.current === "low");
+        };
+        window.Quality.onChange(applyQualityClass);
+        applyQualityClass();
         const urlCode = roomFromUrl();
         if (urlCode) {
           els.status.textContent = "Joining room " + urlCode;
@@ -392,6 +398,20 @@
         els.friends.addEventListener("click", () => {
           window.SFX.uiClick();
           startGame(genCode());
+        });
+        document.querySelectorAll(".nav-btn[data-section]").forEach((btn) => {
+          btn.addEventListener("click", () => {
+            const sec = btn.dataset.section;
+            if (sec) {
+              window.SFX.uiClick();
+              setMenuSection(sec);
+            }
+          });
+        });
+        const menuSettingsOpen = document.getElementById("menu-settings-open");
+        if (menuSettingsOpen) menuSettingsOpen.addEventListener("click", () => {
+          window.SFX.uiClick();
+          els.settingsPanel.classList.toggle("hidden");
         });
         els.name.addEventListener("keydown", (e) => {
           if (e.key === "Enter") {

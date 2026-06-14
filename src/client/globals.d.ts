@@ -207,6 +207,9 @@ interface RendererAPI {
   killPopup(killerId: string, mine: boolean): void;
   hitStop(ms: number): void;
   startTakeoff?(): void;
+  setMenuSection?(sec: string): void;
+  showMenu?(): void;
+  hideMenu?(): void;
 }
 
 interface ColyseusClient {

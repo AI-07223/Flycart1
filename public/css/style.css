@@ -474,3 +474,260 @@ button.secondary { background: #2b3550; color: #fff; box-shadow: 0 6px 0 #1a2034
 #share-bar {
   padding-bottom: env(safe-area-inset-bottom, 0);
 }
+
+/* ============ Immersive Menu Panels (CSS3D) ============ */
+.menu-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 14px;
+  padding: 28px 32px;
+  width: 420px;
+  max-width: 90vw;
+  background: radial-gradient(circle at 50% 42%, rgba(10, 20, 34, 0.75), rgba(6, 10, 16, 0.92));
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  border-radius: 18px;
+  backdrop-filter: blur(8px);
+  color: #fff;
+  transition: opacity 0.4s ease;
+  pointer-events: auto;
+  transform-style: preserve-3d;
+}
+.menu-panel h1 {
+  font-size: clamp(36px, 8vw, 64px);
+  letter-spacing: 4px;
+  text-shadow: 0 5px 0 rgba(0,0,0,.35);
+}
+.menu-panel h1 span { color: var(--accent); }
+.menu-panel h2 {
+  font-size: 28px;
+  letter-spacing: 2px;
+  color: var(--accent);
+}
+.menu-panel .hidden { display: none; }
+
+/* Section navigation */
+.menu-nav {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-top: 8px;
+}
+.nav-btn {
+  background: rgba(255, 203, 5, 0.12);
+  color: var(--accent);
+  border: 1px solid rgba(255, 203, 5, 0.25);
+  padding: 8px 16px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  letter-spacing: 1px;
+  transition: background 0.15s, transform 90ms;
+}
+.nav-btn:hover { background: rgba(255, 203, 5, 0.22); }
+.nav-btn:active { transform: scale(0.95); }
+.back-btn {
+  background: rgba(255, 255, 255, 0.06);
+  color: #8194b0;
+  border-color: rgba(255, 255, 255, 0.12);
+  margin-top: 8px;
+}
+.back-btn:hover { background: rgba(255, 255, 255, 0.12); }
+
+/* CSS3D renderer layer */
+.css3d-layer {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.css3d-layer .menu-panel {
+  pointer-events: auto;
+}
+
+/* Quality tier: low → flat panels (no perspective tilt) */
+body.quality-low .menu-panel {
+  transform: none !important;
+}
+body.quality-low .css3d-layer {
+  display: none; /* fallback to regular DOM positioning on low tier */
+}
+body.quality-low #start-screen {
+  display: flex;
+}
+
+/* Plane swatches in hangar */
+.menu-panel #plane-picker {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+.menu-panel #plane-swatches {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+}
+
+/* ---- Immersive menu panel elements ---- */
+.hidden-panel { opacity: 0; pointer-events: none; }
+.menu-title {
+  font-size: clamp(32px, 7vw, 56px);
+  letter-spacing: 5px;
+  text-shadow: 0 5px 0 rgba(0,0,0,.4);
+}
+.menu-title span { color: var(--accent); }
+.menu-tagline { font-size: 15px; color: #8194b0; letter-spacing: 2px; margin-top: -6px; }
+.panel-heading {
+  font-size: 24px;
+  letter-spacing: 2px;
+  color: var(--accent);
+}
+.panel-sub { font-size: 14px; color: #8194b0; margin-top: -6px; }
+
+.menu-btn {
+  display: inline-block;
+  padding: 12px 28px;
+  border: none;
+  border-radius: 12px;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  cursor: pointer;
+  transition: transform 90ms, box-shadow 0.2s;
+}
+.menu-btn.primary {
+  background: var(--accent);
+  color: #1a0f00;
+  box-shadow: 0 4px 18px rgba(255,203,5,0.35);
+}
+.menu-btn.primary:hover { box-shadow: 0 6px 28px rgba(255,203,5,0.50); }
+.menu-btn.primary:active { transform: scale(0.96); }
+.menu-btn.secondary {
+  background: rgba(255,255,255,0.08);
+  color: #cfe0ff;
+  border: 1px solid rgba(255,255,255,0.12);
+}
+.menu-btn.small { font-size: 12px; padding: 6px 14px; }
+.menu-link {
+  background: none;
+  border: none;
+  color: #8194b0;
+  font-size: 13px;
+  letter-spacing: 1px;
+  cursor: pointer;
+  padding: 6px 10px;
+  transition: color 0.2s;
+}
+.menu-link:hover { color: var(--accent); }
+.menu-bottom-row {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+  margin-top: 6px;
+}
+
+.menu-panel input[type="text"] {
+  width: 100%;
+  max-width: 260px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.18);
+  background: rgba(0,0,0,0.35);
+  color: #fff;
+  font-size: 15px;
+  text-align: center;
+  outline: none;
+}
+.menu-panel input[type="text"]:focus { border-color: var(--accent); }
+
+.menu-panel .set-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: 4px 0;
+}
+.menu-panel .set-row label {
+  font-size: 13px;
+  color: #8194b0;
+}
+.menu-panel .seg {
+  display: flex;
+  gap: 4px;
+}
+.menu-panel .seg button {
+  background: rgba(255,255,255,0.08);
+  color: #aeb8d0;
+  border: 1px solid rgba(255,255,255,0.10);
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.menu-panel .seg button.on {
+  background: var(--accent);
+  color: #1a0f00;
+  border-color: var(--accent);
+}
+.menu-panel input[type="range"] {
+  width: 100px;
+  accent-color: var(--accent);
+}
+
+.menu-swatches {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+.menu-swatches .swatch {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 3px solid transparent;
+  cursor: pointer;
+  transition: border-color 0.2s, transform 90ms;
+}
+.menu-swatches .swatch.on,
+.menu-swatches .swatch:hover { border-color: #fff; transform: scale(1.15); }
+
+.menu-lb-list {
+  font-size: 13px;
+  line-height: 1.8;
+  max-height: 180px;
+  overflow-y: auto;
+  width: 100%;
+}
+
+.howto-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 16px;
+  font-size: 13px;
+  text-align: left;
+}
+.howto-key {
+  display: inline-block;
+  background: rgba(255,255,255,0.12);
+  border: 1px solid rgba(255,255,255,0.2);
+  border-radius: 4px;
+  padding: 2px 8px;
+  font-size: 12px;
+  font-weight: 600;
+  margin-right: 6px;
+}
+.howto-tip {
+  font-size: 12px;
+  color: #8194b0;
+  margin-top: 8px;
+  line-height: 1.5;
+}
+
+.menu-room { font-size: 13px; margin-top: 6px; }
+.menu-status { font-size: 13px; color: #8194b0; min-height: 18px; }

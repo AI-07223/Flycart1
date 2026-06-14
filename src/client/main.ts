@@ -358,6 +358,13 @@ function init() {
   // Initialize immersive menu to main section
   setMenuSection("main");
 
+  // Quality tier: apply class for CSS3D low-tier fallback
+  const applyQualityClass = () => {
+    document.body.classList.toggle("quality-low", window.Quality.current === "low");
+  };
+  window.Quality.onChange(applyQualityClass);
+  applyQualityClass();
+
   const urlCode = roomFromUrl();
   if (urlCode) {
     els.status.textContent = "Joining room " + urlCode;

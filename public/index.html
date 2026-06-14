@@ -200,6 +200,76 @@
     </div>
   </div>
 
+    <!-- ==================== CSS3D Immersive Menu Panels ==================== -->
+    <!-- These panels are wrapped as CSS3DObjects by render3d.js -->
+    <div id="menu-main" class="menu-panel">
+      <h1 class="menu-title">SMASH<span>CART</span></h1>
+      <p class="menu-tagline">3D Plane Combat Arena</p>
+      <input id="menu-name" type="text" placeholder="Enter callsign…" maxlength="16" autocomplete="off" />
+      <button id="menu-quickplay" class="menu-btn primary">▶ QUICK PLAY</button>
+      <button id="menu-friends" class="menu-btn secondary">👥 PLAY WITH FRIENDS</button>
+      <div class="menu-bottom-row">
+        <button class="menu-link" data-section="howto">HOW TO PLAY</button>
+        <button class="menu-link" data-section="control">⚙ SETTINGS</button>
+      </div>
+      <div id="menu-room" class="menu-room hidden">
+        Share this link: <input id="menu-share-link" type="text" readonly />
+        <button id="menu-copy-btn" class="menu-btn small">COPY</button>
+      </div>
+      <div id="menu-status" class="menu-status"></div>
+    </div>
+
+    <div id="menu-hangar" class="menu-panel hidden-panel">
+      <h2 class="panel-heading">✈ HANGAR</h2>
+      <p class="panel-sub">Choose your plane</p>
+      <div id="menu-swatches" class="menu-swatches"></div>
+      <button class="menu-link" data-section="main">← BACK TO BASE</button>
+    </div>
+
+    <div id="menu-tower" class="menu-panel hidden-panel">
+      <h2 class="panel-heading">🏆 SCOREBOARD</h2>
+      <p class="panel-sub">Top pilots worldwide</p>
+      <div id="menu-lb" class="menu-lb-list"></div>
+      <button class="menu-link" data-section="main">← BACK TO BASE</button>
+    </div>
+
+    <div id="menu-control" class="menu-panel hidden-panel">
+      <h2 class="panel-heading">⚙ CONTROL TOWER</h2>
+      <div class="set-row"><label>Graphics</label>
+        <div class="seg" id="menu-quality-seg">
+          <button data-q="low">Low</button><button data-q="med">Med</button><button data-q="high">High</button>
+        </div>
+      </div>
+      <div class="set-row"><label>Master</label><input type="range" id="menu-vol" min="0" max="100" /></div>
+      <div class="set-row"><label>Music</label><input type="range" id="menu-vol-music" min="0" max="100" /></div>
+      <div class="set-row"><label>SFX</label><input type="range" id="menu-vol-sfx" min="0" max="100" /></div>
+      <button class="menu-link" data-section="main">← BACK TO BASE</button>
+    </div>
+
+    <div id="menu-comms" class="menu-panel hidden-panel">
+      <h2 class="panel-heading">📡 COMMS PAD</h2>
+      <p class="panel-sub">Play with friends</p>
+      <button id="menu-create-room" class="menu-btn primary">CREATE ROOM</button>
+      <div id="menu-room-info" class="hidden">
+        <p>Room code: <strong id="menu-room-code"></strong></p>
+        <input id="menu-share-url" type="text" readonly />
+        <button id="menu-copy-url" class="menu-btn small">COPY LINK</button>
+      </div>
+      <button class="menu-link" data-section="main">← BACK TO BASE</button>
+    </div>
+
+    <div id="menu-howto" class="menu-panel hidden-panel">
+      <h2 class="panel-heading">📖 HOW TO PLAY</h2>
+      <div class="howto-grid">
+        <div class="howto-item"><span class="howto-key">← →</span> Steer</div>
+        <div class="howto-item"><span class="howto-key">↑</span> Boost</div>
+        <div class="howto-item"><span class="howto-key">Space</span> Fire</div>
+        <div class="howto-item"><span class="howto-key">M</span> Mute</div>
+      </div>
+      <p class="howto-tip">Collect powerups on the planet surface. Smash opponents to climb the scoreboard!</p>
+      <button class="menu-link" data-section="main">← BACK TO BASE</button>
+    </div>
+
   <script src="vendor/colyseus.js"></script>
   <script src="js/sphere.js"></script>
   <script src="js/constants.js"></script>
