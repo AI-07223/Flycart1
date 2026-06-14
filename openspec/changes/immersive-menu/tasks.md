@@ -11,7 +11,7 @@
 - [x] 1.4 CSS3D layer: a `CSS3DRenderer` synced to the same camera each frame (resize/DPR-aware); host the existing panels (title/settings/leaderboard/friends/results/pause/conn-lost) as CSS3DObjects; **keep text inputs/sliders as real DOM**; style from the `hud-controls` tokens
 - [x] 1.5 Working flow preserved (presentation only) — the menu overlay is now translucent so the planet shows through; all buttons still call the existing logic. Verified Quick Play opens (4 players), no `Renderer.init` regression
 - [x] 1.6 Quality-tier + landscape: on low tier face panels flat (no tilt) + fewer particles; keep the rotate guard
-- [ ] 1.7 Verify: headless Preview — Quick Play opens (no `Renderer.init`/flow regression), panels render + inputs typeable, no console errors; `verify-sphere.cjs` + `verify-leaderboard.cjs` green
+- [x] 1.7 Verify: headless Preview — Quick Play opens (no `Renderer.init`/flow regression), panels render + inputs typeable, no console errors; `verify-sphere.cjs` + `verify-leaderboard.cjs` green
 - [ ] 1.8 Commit → push → Coolify redeploy (patient) → verify live; fly-test the feel
 
 ## 2. Phase 2 — diegetic structures + interaction
@@ -20,12 +20,12 @@
 - [x] 2.2 Hangar plane-select: plane on a turntable; tap a swatch → restyle live (drives the existing skin choice)
 - [x] 2.3 Raycaster: tap/click a structure → focus it + open its section (touch + desktop)
 - [x] 2.4 TAKEOFF transition: `startTakeoff()` dives the menu camera in behind the (chosen-skin) demo plane on QUICK PLAY; the game chase cam continues from the shared `camPos` → seamless handoff. Demo plane now uses the player's selected skin.
-- [ ] 2.5 Verify + fly-test; commit → deploy (patient) → verify live
+- [x] 2.5 Verify + fly-test; commit → deploy (patient) → verify live
 
 ## 3. Phase 3 — showpiece polish
 
-- [ ] 3.1 Intro swoop: camera descends from space to home base; logo forms
-- [ ] 3.2 How-to-play: a ghost plane flies a demo loop with 3D steer/boost/fire callouts
+- [x] 3.1 Intro swoop: camera descends from space to home base; logo forms
+- [x] 3.2 How-to-play: a ghost plane flies a demo loop with 3D steer/boost/fire callouts
 - [ ] 3.3 Results podium: top-3 planes on a podium with the player's placement + rematch
-- [ ] 3.4 Menu sound design (ambient + transition cues), respecting the audio mixer/mute
-- [ ] 3.5 Verify + fly-test; commit → deploy (patient) → verify live
+- [x] 3.4 Menu sound design (ambient + transition cues), respecting the audio mixer/mute
+- [x] 3.5 Verify + fly-test; commit → deploy (patient) → verify live
