@@ -549,15 +549,16 @@ button.secondary { background: #2b3550; color: #fff; box-shadow: 0 6px 0 #1a2034
   pointer-events: auto;
 }
 
-/* Quality tier: low → flat panels (no perspective tilt) */
+/* Quality tier: low → flat panels (no perspective tilt, no CSS3D transforms) */
 body.quality-low .menu-panel {
-  transform: none !important;
+  position: fixed !important;
+  left: 50% !important;
+  top: 50% !important;
+  transform: translate(-50%, -50%) !important;
+  z-index: 20;
 }
 body.quality-low .css3d-layer {
-  display: none; /* fallback to regular DOM positioning on low tier */
-}
-body.quality-low #start-screen {
-  display: flex;
+  pointer-events: auto;
 }
 
 /* Plane swatches in hangar */
@@ -731,3 +732,32 @@ body.quality-low #start-screen {
 
 .menu-room { font-size: 13px; margin-top: 6px; }
 .menu-status { font-size: 13px; color: #8194b0; min-height: 18px; }
+
+/* ---- Phase 3: Immersive menu polish ---- */
+
+/* Rematch button */
+.intermission-actions { margin-top: 16px; text-align: center; }
+#rematch-btn { font-size: 1rem; padding: 10px 28px; animation: pulse-glow 2s ease-in-out infinite; }
+
+/* How-to-play enhanced */
+.howto-row { display: block; margin: 6px 0; font-size: 0.95rem; }
+.howto-row em { color: var(--accent); font-style: normal; margin-left: 4px; }
+.howto-tips { margin-top: 14px; padding: 12px 16px; background: var(--panel); border-radius: 8px; }
+.howto-tips p { margin: 4px 0; font-size: 0.88rem; }
+
+/* Ambient glow on home-base structures */
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 8px rgba(255, 203, 5, 0.3); }
+  50% { box-shadow: 0 0 20px rgba(255, 203, 5, 0.6); }
+}
+
+/* Menu panel transitions */
+.menu-panel { transition: opacity 0.3s ease, transform 0.3s ease; }
+.menu-panel.hidden-panel { opacity: 0; pointer-events: none; transform: translateY(8px); }
+
+/* CSS3D layer pointer passthrough */
+.css3d-layer { pointer-events: none; }
+.css3d-layer > * { pointer-events: auto; }
+
+/* Winner celebration */
+.winner { font-size: 1.3rem; color: var(--accent); margin-bottom: 8px; animation: pulse-glow 1.5s ease-in-out infinite; }

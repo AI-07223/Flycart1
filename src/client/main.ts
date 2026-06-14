@@ -85,19 +85,69 @@ function buildPlanePicker() {
   });
 }
 
+// Build plane swatches for the hangar menu panel
+function buildMenuSwatches() {
+  const container = document.getElementById("menu-swatches");
+  if (!container) return;
+  container.innerHTML = "";
+  SKINS.forEach((c, i) => {
+    const b = document.createElement("button");
+    b.className = "swatch" + (i === selectedSkin ? " on" : "");
+    b.style.background = "#" + c.toString(16).padStart(6, "0");
+    b.title = "Plane " + (i + 1);
+    b.addEventListener("click", () => {
+      selectedSkin = i;
+      try { localStorage.setItem("smashcart.skin", String(i)); } catch (_e) { /* noop */ }
+      container.querySelectorAll(".swatch").forEach((el, j) => el.classList.toggle("on", j === i));
+      // Also update the original swatch picker
+      if (els.planeSwatches) els.planeSwatches.querySelectorAll(".plane-swatch").forEach((el, j) => el.classList.toggle("selected", j === i));
+      window.SFX.uiClick();
+    });
+    container.appendChild(b);
+  });
+}
+
+// Fetch leaderboard for the tower menu panel
+function fetchMenuLeaderboard() {
+  const list = document.getElementById("menu-lb");
+  if (!list) return;
+  fetch("/leaderboard?n=10")
+    .then((r) => (r.ok ? r.json() : []))
+    .then((rows) => {
+      if (!Array.isArray(rows) || !rows.length) { list.innerHTML = '<p class="muted">No scores yet — be the first!</p>'; return; }
+      list.innerHTML = rows.map((e: any, i: number) =>
+        `<div class="lb-row"><span>${i + 1}. ${escapeHtml(e.name)}</span><span>${e.score | 0}</span></div>`
+      ).join("");
+    })
+    .catch(() => { list.innerHTML = '<p class="muted">Leaderboard unavailable</p>'; });
+}
+
 // Immersive menu: navigate to a section (main / hangar / tower / control / comms / howto).
 function setMenuSection(sec: string) {
   menuSection = sec;
-  // Hide all panels, show the active one
-  const sections = ["main", "hangar", "tower", "control", "comms", "howto"];
-  for (const s of sections) {
-    const el = document.getElementById("menu-" + s);
-    if (!el) continue;
-    if (s === sec) { el.classList.remove("hidden"); el.style.opacity = "1"; el.style.pointerEvents = "auto"; }
-    else { el.classList.add("hidden"); el.style.opacity = "0"; el.style.pointerEvents = "none"; }
+
+  // "main" shows the primary start-screen; sub-sections hide it and show their panel.
+  els.start.classList.toggle("hidden", sec !== "main");
+
+  // Hide every section panel, then reveal the active one.
+  document.querySelectorAll(".menu-section-panel").forEach((el) => el.classList.add("hidden"));
+  if (sec !== "main") {
+    const panel = document.getElementById("menu-" + sec);
+    if (panel) panel.classList.remove("hidden");
   }
-  // Tell the 3D renderer
-  if (window.Renderer && window.Renderer.setMenuSection) window.Renderer.setMenuSection(sec);
+
+  // Control section also opens the settings panel.
+  if (sec === "control") els.settingsPanel.classList.remove("hidden");
+  else els.settingsPanel.classList.add("hidden");
+
+  // Tell the 3D renderer.
+  if (window.Renderer && (window.Renderer as any).setMenuSection) (window.Renderer as any).setMenuSection(sec);
+  window.SFX.uiClick();
+}
+
+// Return to the main menu section from any sub-section.
+function menuBack() {
+  setMenuSection("main");
 }
 
 function genCode() {
@@ -154,6 +204,7 @@ async function startGame(code) {
     }
   }
 
+  if (window.SFX.stopMenuAmbient) window.SFX.stopMenuAmbient();
   window.SFX.startMusic();
 
   if (code !== "PUBLIC") {
@@ -354,6 +405,8 @@ function init() {
   buildPlanePicker();
   fetchLeaderboard();
   setupTouchButtons();
+  // Start menu ambient audio
+  try { window.SFX.unlock(); if (window.SFX.startMenuAmbient) window.SFX.startMenuAmbient(); } catch (_e) {}
 
   // Initialize immersive menu to main section
   setMenuSection("main");
@@ -374,16 +427,44 @@ function init() {
   els.quick.addEventListener("click", () => { window.SFX.uiClick(); startGame(urlCode || "PUBLIC"); });
   els.friends.addEventListener("click", () => { window.SFX.uiClick(); startGame(genCode()); });
 
-  // Immersive menu: section navigation buttons (.nav-btn[data-section])
-  document.querySelectorAll(".nav-btn[data-section]").forEach((btn) => {
+  // Immersive menu: section navigation buttons (.nav-btn[data-section] + .menu-link[data-section])
+  const navHandler = (btn: Element) => {
     btn.addEventListener("click", () => {
       const sec = (btn as HTMLElement).dataset.section;
       if (sec) { window.SFX.uiClick(); setMenuSection(sec); }
     });
+  };
+  document.querySelectorAll(".nav-btn[data-section]").forEach(navHandler);
+  document.querySelectorAll(".menu-link[data-section]").forEach(navHandler);
+
+  // Wire CSS3D menu-panel buttons
+  const menuQP = document.getElementById("menu-quickplay");
+  if (menuQP) menuQP.addEventListener("click", () => { window.SFX.uiClick(); startGame(urlCode || "PUBLIC"); });
+  const menuFr = document.getElementById("menu-friends");
+  if (menuFr) menuFr.addEventListener("click", () => { window.SFX.uiClick(); startGame(genCode()); });
+  const menuName = document.getElementById("menu-name") as HTMLInputElement | null;
+  if (menuName) {
+    menuName.addEventListener("input", () => { els.name.value = menuName.value; });
+    menuName.addEventListener("keydown", (e: KeyboardEvent) => { if (e.key === "Enter") { e.preventDefault(); startGame(urlCode || "PUBLIC"); } });
+    els.name.addEventListener("input", () => { menuName.value = els.name.value; });
+    menuName.value = els.name.value;
+  }
+  buildMenuSwatches();
+  fetchMenuLeaderboard();
+  // Quality segment in control panel
+  document.querySelectorAll("#menu-quality-seg button").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const q = (btn as HTMLElement).dataset.q;
+      if (q) { window.Quality.set(q); window.SFX.uiClick(); }
+    });
   });
-  // Settings shortcut from menu-control section
-  const menuSettingsOpen = document.getElementById("menu-settings-open");
-  if (menuSettingsOpen) menuSettingsOpen.addEventListener("click", () => { window.SFX.uiClick(); els.settingsPanel.classList.toggle("hidden"); });
+  // Volume sliders in control panel → mirror to the main settings
+  const mVol = document.getElementById("menu-vol") as HTMLInputElement | null;
+  const mMusic = document.getElementById("menu-vol-music") as HTMLInputElement | null;
+  const mSfx = document.getElementById("menu-vol-sfx") as HTMLInputElement | null;
+  if (mVol) mVol.addEventListener("input", () => { els.volMaster.value = mVol.value; els.volMaster.dispatchEvent(new Event("input")); });
+  if (mMusic) mMusic.addEventListener("input", () => { els.volMusic.value = mMusic.value; els.volMusic.dispatchEvent(new Event("input")); });
+  if (mSfx) mSfx.addEventListener("input", () => { els.volSfx.value = mSfx.value; els.volSfx.dispatchEvent(new Event("input")); });
 
   els.name.addEventListener("keydown", (e) => {
     if (e.key === "Enter") { e.preventDefault(); startGame(urlCode || "PUBLIC"); }
@@ -487,7 +568,8 @@ function toggleMute() {
 function resetToMenu() {
   try { window.Net.leave(); } catch (_e) { /* noop */ }
   if (window.SFX.stopLoops) window.SFX.stopLoops();
-  mode = "menu"; engineStarted = false; _powerType = ""; prevPhase = "playing"; prevHp = 100; streak = 0; lastFireSnd = 0;
+  if (window.SFX.startMenuAmbient) window.SFX.startMenuAmbient();
+  mode = "menu"; engineStarted = false;
   window.Input.stickActive = false;
   ["hud", "health", "touch", "steerPad", "stick", "recenter", "share", "inter", "pause", "powerChip", "connLost"].forEach((k) => els[k] && els[k].classList.add("hidden"));
   els.quick.disabled = els.friends.disabled = false;

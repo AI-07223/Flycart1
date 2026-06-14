@@ -319,6 +319,19 @@ import { CSS3DRenderer, CSS3DObject } from "three/addons/renderers/CSS3DRenderer
       for (const hs of homeStructures) {
         hs.mesh.traverse((o) => { if (o.userData && o.userData._blink) o.material.opacity = 0.4 + Math.sin(time * 3) * 0.6; });
       }
+      // How-to-play ghost plane: flies a demo loop when howto section is active
+      if (menuSection === "howto") {
+        this._ensureGhost();
+        const g = this._ghost;
+        if (g) {
+          const adv = SP.advance(g.p, g.f, (G.CRUISE_SPEED / curR) * dt * 0.9);
+          g.p = adv.p; g.f = adv.f;
+          this._orient(g.mesh, g.p, g.f, ALT + 8, Math.sin(time * 0.8) * 0.3);
+          if (time - (g.lastPuff || 0) > 0.22) { g.lastPuff = time; const back = SP.advance(g.p, g.f, -24 / visR).p; this._puff(worldOf(back, ALT + 8).clone(), true); }
+        }
+      } else {
+        this._clearGhost();
+      }
       if (this._takeoff > 0 && d) {
         // QUICK PLAY: dive the camera in behind the plane; the game chase cam then continues from
         // camPos (shared) → seamless handoff, no screen cut.
@@ -350,6 +363,44 @@ import { CSS3DRenderer, CSS3DObject } from "three/addons/renderers/CSS3DRenderer
     _clearDemo() {
       if (this._demo) { scene.remove(this._demo.mesh); disposeObject(this._demo.mesh); this._demo = null; }
       this._takeoff = 0;
+    },
+
+    _ensureGhost() {
+      if (this._ghost) return;
+      // Spawn the ghost near the howto section direction
+      const howtoCam = MENU_CAM.howto || MENU_CAM.main;
+      const dir = howtoCam.az !== 0 ? SP.dirFrom(HOME_DIR, 0, howtoCam.az) : HOME_DIR;
+      const p = SP.dirFrom(dir, 0.04, 0);
+      const tangent = SP.anyTangent(p);
+      const f = SP.normalize(tangent);
+
+      const group = new THREE.Group();
+      const mat = new THREE.MeshBasicMaterial({ color: 0x88ddff, transparent: true, opacity: 0.45, wireframe: false });
+      const wireMat = new THREE.MeshBasicMaterial({ color: 0x88ddff, transparent: true, opacity: 0.2, wireframe: true });
+      // Ghost fuselage
+      const fuselage = new THREE.Mesh(new THREE.ConeGeometry(PLANE_SCALE * 4, PLANE_SCALE * 12, 4), mat);
+      fuselage.rotation.x = Math.PI / 2;
+      group.add(fuselage);
+      const fuselageW = new THREE.Mesh(new THREE.ConeGeometry(PLANE_SCALE * 4, PLANE_SCALE * 12, 4), wireMat);
+      fuselageW.rotation.x = Math.PI / 2;
+      group.add(fuselageW);
+      // Ghost wings
+      const wing = new THREE.Mesh(new THREE.BoxGeometry(PLANE_SCALE * 18, 1.5, PLANE_SCALE * 4), mat);
+      group.add(wing);
+      // Ghost tail
+      const tail = new THREE.Mesh(new THREE.BoxGeometry(PLANE_SCALE * 8, 1, PLANE_SCALE * 3), mat);
+      tail.position.z = PLANE_SCALE * 6;
+      group.add(tail);
+
+      scene.add(group);
+      this._ghost = { p, f, mesh: group, skin: -1, lastPuff: 0 };
+    },
+
+    _clearGhost() {
+      if (!this._ghost) return;
+      scene.remove(this._ghost.mesh);
+      disposeObject(this._ghost.mesh);
+      this._ghost = null;
     },
 
     // ===================== immersive menu =====================

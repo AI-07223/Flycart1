@@ -131,6 +131,40 @@
         engineSrc.connect(engineGain);
         engineSrc.start();
       }
+      var menuAmbient = null;
+      var menuAmbientGain = null;
+      function startMenuAmbient() {
+        if (!ctx || menuAmbient) return;
+        try {
+          menuAmbient = ctx.createOscillator();
+          menuAmbientGain = ctx.createGain();
+          menuAmbient.type = "sine";
+          menuAmbient.frequency.value = 82;
+          menuAmbientGain.gain.value = 0;
+          menuAmbientGain.gain.linearRampToValueAtTime(0.06, ctx.currentTime + 1.5);
+          menuAmbient.connect(menuAmbientGain);
+          menuAmbientGain.connect(masterBus);
+          menuAmbient.start();
+        } catch (_e) {
+          menuAmbient = null;
+        }
+      }
+      function stopMenuAmbient() {
+        if (menuAmbientGain) {
+          try {
+            menuAmbientGain.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.5);
+          } catch (_e) {
+          }
+        }
+        setTimeout(() => {
+          try {
+            menuAmbient && menuAmbient.stop();
+          } catch (_e) {
+          }
+          menuAmbient = null;
+          menuAmbientGain = null;
+        }, 600);
+      }
       window.SFX = {
         unlock() {
           ensureCtx();
@@ -174,6 +208,13 @@
         startEngine() {
           want.engine = true;
           if (loaded) startEngineNow();
+        },
+        startMenuAmbient() {
+          ensureCtx();
+          startMenuAmbient();
+        },
+        stopMenuAmbient() {
+          stopMenuAmbient();
         },
         setEngine(speed, boosting) {
           if (!ctx || !engineGain) return;

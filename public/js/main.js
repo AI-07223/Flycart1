@@ -84,7 +84,6 @@
       var streak = 0;
       var lastKill = 0;
       var lastFireSnd = 0;
-      var _powerType = "";
       var mode = "menu";
       var menuSection = "main";
       var last = 0;
@@ -141,23 +140,55 @@
           els.planeSwatches.appendChild(b);
         });
       }
+      function buildMenuSwatches() {
+        const container = document.getElementById("menu-swatches");
+        if (!container) return;
+        container.innerHTML = "";
+        SKINS.forEach((c, i) => {
+          const b = document.createElement("button");
+          b.className = "swatch" + (i === selectedSkin ? " on" : "");
+          b.style.background = "#" + c.toString(16).padStart(6, "0");
+          b.title = "Plane " + (i + 1);
+          b.addEventListener("click", () => {
+            selectedSkin = i;
+            try {
+              localStorage.setItem("smashcart.skin", String(i));
+            } catch (_e) {
+            }
+            container.querySelectorAll(".swatch").forEach((el, j) => el.classList.toggle("on", j === i));
+            if (els.planeSwatches) els.planeSwatches.querySelectorAll(".plane-swatch").forEach((el, j) => el.classList.toggle("selected", j === i));
+            window.SFX.uiClick();
+          });
+          container.appendChild(b);
+        });
+      }
+      function fetchMenuLeaderboard() {
+        const list = document.getElementById("menu-lb");
+        if (!list) return;
+        fetch("/leaderboard?n=10").then((r) => r.ok ? r.json() : []).then((rows) => {
+          if (!Array.isArray(rows) || !rows.length) {
+            list.innerHTML = '<p class="muted">No scores yet \u2014 be the first!</p>';
+            return;
+          }
+          list.innerHTML = rows.map(
+            (e, i) => `<div class="lb-row"><span>${i + 1}. ${escapeHtml(e.name)}</span><span>${e.score | 0}</span></div>`
+          ).join("");
+        }).catch(() => {
+          list.innerHTML = '<p class="muted">Leaderboard unavailable</p>';
+        });
+      }
       function setMenuSection(sec) {
         menuSection = sec;
-        const sections = ["main", "hangar", "tower", "control", "comms", "howto"];
-        for (const s of sections) {
-          const el = document.getElementById("menu-" + s);
-          if (!el) continue;
-          if (s === sec) {
-            el.classList.remove("hidden");
-            el.style.opacity = "1";
-            el.style.pointerEvents = "auto";
-          } else {
-            el.classList.add("hidden");
-            el.style.opacity = "0";
-            el.style.pointerEvents = "none";
-          }
+        els.start.classList.toggle("hidden", sec !== "main");
+        document.querySelectorAll(".menu-section-panel").forEach((el) => el.classList.add("hidden"));
+        if (sec !== "main") {
+          const panel = document.getElementById("menu-" + sec);
+          if (panel) panel.classList.remove("hidden");
         }
+        if (sec === "control") els.settingsPanel.classList.remove("hidden");
+        else els.settingsPanel.classList.add("hidden");
         if (window.Renderer && window.Renderer.setMenuSection) window.Renderer.setMenuSection(sec);
+        window.SFX.uiClick();
       }
       function genCode() {
         const c = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -215,6 +246,7 @@
             els.steerPad.classList.remove("hidden");
           }
         }
+        if (window.SFX.stopMenuAmbient) window.SFX.stopMenuAmbient();
         window.SFX.startMusic();
         if (code !== "PUBLIC") {
           const url = location.origin + location.pathname + "?room=" + code;
@@ -380,6 +412,11 @@
         buildPlanePicker();
         fetchLeaderboard();
         setupTouchButtons();
+        try {
+          window.SFX.unlock();
+          if (window.SFX.startMenuAmbient) window.SFX.startMenuAmbient();
+        } catch (_e) {
+        }
         setMenuSection("main");
         const applyQualityClass = () => {
           document.body.classList.toggle("quality-low", window.Quality.current === "low");
@@ -399,7 +436,7 @@
           window.SFX.uiClick();
           startGame(genCode());
         });
-        document.querySelectorAll(".nav-btn[data-section]").forEach((btn) => {
+        const navHandler = (btn) => {
           btn.addEventListener("click", () => {
             const sec = btn.dataset.section;
             if (sec) {
@@ -407,11 +444,60 @@
               setMenuSection(sec);
             }
           });
-        });
-        const menuSettingsOpen = document.getElementById("menu-settings-open");
-        if (menuSettingsOpen) menuSettingsOpen.addEventListener("click", () => {
+        };
+        document.querySelectorAll(".nav-btn[data-section]").forEach(navHandler);
+        document.querySelectorAll(".menu-link[data-section]").forEach(navHandler);
+        const menuQP = document.getElementById("menu-quickplay");
+        if (menuQP) menuQP.addEventListener("click", () => {
           window.SFX.uiClick();
-          els.settingsPanel.classList.toggle("hidden");
+          startGame(urlCode || "PUBLIC");
+        });
+        const menuFr = document.getElementById("menu-friends");
+        if (menuFr) menuFr.addEventListener("click", () => {
+          window.SFX.uiClick();
+          startGame(genCode());
+        });
+        const menuName = document.getElementById("menu-name");
+        if (menuName) {
+          menuName.addEventListener("input", () => {
+            els.name.value = menuName.value;
+          });
+          menuName.addEventListener("keydown", (e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              startGame(urlCode || "PUBLIC");
+            }
+          });
+          els.name.addEventListener("input", () => {
+            menuName.value = els.name.value;
+          });
+          menuName.value = els.name.value;
+        }
+        buildMenuSwatches();
+        fetchMenuLeaderboard();
+        document.querySelectorAll("#menu-quality-seg button").forEach((btn) => {
+          btn.addEventListener("click", () => {
+            const q = btn.dataset.q;
+            if (q) {
+              window.Quality.set(q);
+              window.SFX.uiClick();
+            }
+          });
+        });
+        const mVol = document.getElementById("menu-vol");
+        const mMusic = document.getElementById("menu-vol-music");
+        const mSfx = document.getElementById("menu-vol-sfx");
+        if (mVol) mVol.addEventListener("input", () => {
+          els.volMaster.value = mVol.value;
+          els.volMaster.dispatchEvent(new Event("input"));
+        });
+        if (mMusic) mMusic.addEventListener("input", () => {
+          els.volMusic.value = mMusic.value;
+          els.volMusic.dispatchEvent(new Event("input"));
+        });
+        if (mSfx) mSfx.addEventListener("input", () => {
+          els.volSfx.value = mSfx.value;
+          els.volSfx.dispatchEvent(new Event("input"));
         });
         els.name.addEventListener("keydown", (e) => {
           if (e.key === "Enter") {
@@ -540,13 +626,9 @@
         } catch (_e) {
         }
         if (window.SFX.stopLoops) window.SFX.stopLoops();
+        if (window.SFX.startMenuAmbient) window.SFX.startMenuAmbient();
         mode = "menu";
         engineStarted = false;
-        _powerType = "";
-        prevPhase = "playing";
-        prevHp = 100;
-        streak = 0;
-        lastFireSnd = 0;
         window.Input.stickActive = false;
         ["hud", "health", "touch", "steerPad", "stick", "recenter", "share", "inter", "pause", "powerChip", "connLost"].forEach((k) => els[k] && els[k].classList.add("hidden"));
         els.quick.disabled = els.friends.disabled = false;

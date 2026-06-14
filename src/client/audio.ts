@@ -99,6 +99,32 @@ function startEngineNow(): void {
   engineSrc.connect(engineGain!); engineSrc.start();
 }
 
+// Menu ambient: subtle low drone while in menu
+let menuAmbient: OscillatorNode | null = null;
+let menuAmbientGain: GainNode | null = null;
+
+function startMenuAmbient(): void {
+  if (!ctx || menuAmbient) return;
+  try {
+    menuAmbient = ctx.createOscillator();
+    menuAmbientGain = ctx.createGain();
+    menuAmbient.type = "sine";
+    menuAmbient.frequency.value = 82; // low hum
+    menuAmbientGain.gain.value = 0;
+    menuAmbientGain.gain.linearRampToValueAtTime(0.06, ctx.currentTime + 1.5);
+    menuAmbient.connect(menuAmbientGain);
+    menuAmbientGain.connect(masterBus!);
+    menuAmbient.start();
+  } catch (_e) { menuAmbient = null; }
+}
+
+function stopMenuAmbient(): void {
+  if (menuAmbientGain) {
+    try { menuAmbientGain.gain.linearRampToValueAtTime(0, ctx!.currentTime + 0.5); } catch (_e) {}
+  }
+  setTimeout(() => { try { menuAmbient && menuAmbient.stop(); } catch (_e) {} menuAmbient = null; menuAmbientGain = null; }, 600);
+}
+
 (window as any).SFX = {
   unlock(): void { ensureCtx(); if (ctx && ctx.state === "suspended") ctx.resume(); load(); },
   suspend(): void { if (ctx && ctx.state === "running") { try { ctx.suspend(); } catch (_e) { /* ignore */ } } },
@@ -110,6 +136,8 @@ function startEngineNow(): void {
   },
   startMusic(): void { want.music = true; if (loaded) startMusicNow(); },
   startEngine(): void { want.engine = true; if (loaded) startEngineNow(); },
+  startMenuAmbient(): void { ensureCtx(); startMenuAmbient(); },
+  stopMenuAmbient(): void { stopMenuAmbient(); },
   setEngine(speed: number, boosting: boolean): void {
     if (!ctx || !engineGain) return;
     engineGain.gain.value = boosting ? 0.22 : 0.04 + (speed || 0) * 0.14;
