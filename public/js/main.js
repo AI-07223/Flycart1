@@ -51,7 +51,7 @@
   let botsEnabled = true;
   try { botsEnabled = localStorage.getItem("smashcart.bots") !== "0"; } catch (e) {}
   let steerMode = "arrows";
-  try { const m = localStorage.getItem("smashcart.steer"); if (m === "tilt" || m === "arrows") steerMode = m; } catch (e) {}
+  try { const m = localStorage.getItem("smashcart.steer"); if (m === "tilt" || m === "arrows" || m === "stick") steerMode = m; } catch (e) {}
 
   // Fetch + render the global leaderboard on the menu; degrade gracefully on error.
   function fetchLeaderboard() {

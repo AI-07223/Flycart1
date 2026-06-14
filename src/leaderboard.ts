@@ -4,6 +4,7 @@
 // lifetime (local dev, or prod before the volume is mounted) — never crashes.
 import fs from "fs";
 import path from "path";
+import { log } from "./logger";
 
 export interface Entry { name: string; score: number; }
 
@@ -23,7 +24,7 @@ function topAll(): Entry[] {
 }
 
 export function init(): void {
-  if (!FILE) { console.log("📊 leaderboard: in-memory (no DATA_DIR)"); return; }
+  if (!FILE) { log("info", "leaderboard: in-memory (no DATA_DIR)"); return; }
   try {
     fs.mkdirSync(DATA_DIR, { recursive: true });
     if (fs.existsSync(FILE)) {
@@ -35,10 +36,10 @@ export function init(): void {
     // confirm writable (a read-only mount would throw here, not at runtime)
     fs.writeFileSync(FILE + ".probe", "1"); fs.unlinkSync(FILE + ".probe");
     persistent = true;
-    console.log(`📊 leaderboard: persistent at ${FILE} (${board.size} entries)`);
+    log("info", "leaderboard: persistent", { file: FILE, entries: board.size });
   } catch (e) {
     persistent = false;
-    console.warn("📊 leaderboard: DATA_DIR not writable — running in-memory:", (e as Error).message);
+    log("warn", "leaderboard: DATA_DIR not writable, running in-memory", { error: (e as Error).message });
   }
 }
 

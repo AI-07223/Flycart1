@@ -7,16 +7,19 @@
   "main": "dist/index.js",
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "build": "tsc",
+    "gen-constants": "node scripts/gen-constants.mjs",
+    "build": "npm run gen-constants && tsc",
     "start": "node dist/index.js",
     "vendor": "cp node_modules/colyseus.js/dist/colyseus.js public/vendor/colyseus.js && cp node_modules/three/build/three.module.min.js public/vendor/three.module.min.js && cp node_modules/three/build/three.core.min.js public/vendor/three.core.min.js && node scripts/vendor-three-addons.mjs",
     "gen-audio": "node scripts/gen-audio.mjs",
+    "test": "vitest run",
     "clean": "rm -rf dist"
   },
   "dependencies": {
     "@colyseus/monitor": "^0.16.0",
     "@colyseus/schema": "^3.0.0",
     "@colyseus/ws-transport": "^0.16.0",
+    "@sentry/node": "^10.57.0",
     "colyseus": "^0.16.0",
     "express": "^4.21.2"
   },
@@ -26,6 +29,7 @@
     "colyseus.js": "^0.16.22",
     "three": "^0.184.0",
     "tsx": "^4.19.2",
-    "typescript": "^5.7.2"
+    "typescript": "^5.7.2",
+    "vitest": "^4.1.8"
   }
 }

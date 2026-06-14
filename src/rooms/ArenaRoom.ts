@@ -3,12 +3,15 @@ import { ArenaState, Player, Bullet, Pickup } from "../schema/ArenaState";
 import * as C from "../shared/constants";
 import * as S from "../shared/sphere";
 import * as leaderboard from "../leaderboard";
+import { log } from "../logger";
 
 interface Input {
   turn: number; // -1, 0, 1
   boost: boolean;
   fire: boolean;
 }
+
+type BotTier = "rookie" | "veteran" | "ace";
 
 interface BotBrain {
   targetId: string | null;
@@ -17,6 +20,23 @@ interface BotBrain {
   react: number;
   aimErr: number;
   lead: number;
+  tier: BotTier;
+  evadeUntil: number;
+  powerupTarget: string | null;
+  weavePhase: number;
+}
+
+function pickTier(): BotTier {
+  const r = Math.random();
+  return r < 0.50 ? "rookie" : r < 0.85 ? "veteran" : "ace";
+}
+
+function tierParams(tier: BotTier) {
+  switch (tier) {
+    case "rookie":  return { react: 2.0 + Math.random(), aimErr: 0.15 + Math.random() * 0.10, lead: 0.3 + Math.random() * 0.2, evade: false, seekPower: false, useCover: false };
+    case "veteran": return { react: 1.0 + Math.random() * 0.8, aimErr: 0.06 + Math.random() * 0.06, lead: 0.6 + Math.random() * 0.2, evade: true, seekPower: true, useCover: false };
+    case "ace":     return { react: 0.5 + Math.random() * 0.3, aimErr: 0.02 + Math.random() * 0.03, lead: 0.85 + Math.random() * 0.15, evade: true, seekPower: true, useCover: true };
+  }
 }
 
 const ZERO_INPUT: Input = { turn: 0, boost: false, fire: false };
@@ -49,6 +69,7 @@ export class ArenaRoom extends Room<ArenaState> {
   private powerUntil = new Map<string, number>();
   private shield = new Map<string, number>();
   private invulnUntil = new Map<string, number>();
+  private bulletLife = new Map<string, number>();
   private msgTimes = new Map<string, number[]>();
   private sized = false; // has the first round's radius been computed once bots filled?
   private botsEnabled = true; // false in the no-bots matchmaking bucket (code "NOBOTS")
@@ -76,7 +97,15 @@ export class ArenaRoom extends Room<ArenaState> {
     });
 
     this.setPatchRate(33);
-    this.setSimulationInterval((dt) => this.update(Math.min(dt / 1000, C.DT_MAX)));
+    this.setSimulationInterval((dt) => {
+      try {
+        this.update(Math.min(dt / 1000, C.DT_MAX));
+      } catch (e) {
+        log("error", "update loop error", { room: this.roomId, error: (e as Error).message });
+        try { require("@sentry/node").captureException(e, { tags: { room: this.roomId } }); } catch {}
+        throw e;
+      }
+    });
   }
 
   onJoin(client: Client, options: { name?: string; skin?: number } = {}) {
@@ -237,8 +266,7 @@ export class ArenaRoom extends Room<ArenaState> {
     b.owner = id;
     b.homing = homing;
     const key = "b" + this.bulletSeq++;
-    (b as any).__life = C.BULLET_LIFE;
-    (b as any).__key = key;
+    this.bulletLife.set(key, C.BULLET_LIFE);
     this.state.bullets.set(key, b);
   }
 
@@ -246,9 +274,9 @@ export class ArenaRoom extends Room<ArenaState> {
     const hitAng = (C.PLANE_RADIUS + C.BULLET_RADIUS) / R;
     const bulletThin = C.BULLET_RADIUS / R;
     for (const [key, b] of this.state.bullets) {
-      const life = ((b as any).__life ?? C.BULLET_LIFE) - dt;
-      if (life <= 0) { this.state.bullets.delete(key); continue; }
-      (b as any).__life = life;
+      const life = (this.bulletLife.get(key) ?? C.BULLET_LIFE) - dt;
+      if (life <= 0) { this.state.bullets.delete(key); this.bulletLife.delete(key); continue; }
+      this.bulletLife.set(key, life);
 
       let pos = getP(b), fwd = getF(b);
 
@@ -292,6 +320,7 @@ export class ArenaRoom extends Room<ArenaState> {
       if (hit) {
         if (victim) this.damage(victim, victimId, b.owner); // obstacle (victim===null) deals no damage
         this.state.bullets.delete(key);
+        this.bulletLife.delete(key);
       } else {
         setP(b, pos); setF(b, fwd);
       }
@@ -490,12 +519,12 @@ export class ArenaRoom extends Room<ArenaState> {
     this.spawn(id, p);
     this.state.players.set(id, p);
     this.inputs.set(id, { ...ZERO_INPUT });
-    const skill = Math.random();
+    const tier = pickTier();
+    const params = tierParams(tier);
     this.bots.set(id, {
       targetId: null, retargetAt: 0, wander: Math.random() * Math.PI * 2,
-      react: 1.2 + (1 - skill) * 2.2,
-      aimErr: 0.02 + (1 - skill) * 0.22,
-      lead: 0.4 + skill * 0.6,
+      react: params.react, aimErr: params.aimErr, lead: params.lead,
+      tier, evadeUntil: 0, powerupTarget: null, weavePhase: Math.random() * Math.PI * 2,
     });
   }
 
@@ -505,6 +534,7 @@ export class ArenaRoom extends Room<ArenaState> {
     if (!me || !input) return;
     if (!me.alive) { input.turn = 0; input.fire = false; input.boost = false; return; }
 
+    const params = tierParams(brain.tier);
     const myPos = getP(me), myFwd = getF(me);
     let target = brain.targetId ? this.state.players.get(brain.targetId) : undefined;
     if (this.now >= brain.retargetAt || !target || !target.alive || brain.targetId === id) {
@@ -516,15 +546,62 @@ export class ArenaRoom extends Room<ArenaState> {
     let desiredBearing: S.Vec3;
     let wantFire = false, wantBoost = false;
 
+    // --- Obstacle avoidance (veteran+ only) ---
+    let avoidance: S.Vec3 | null = null;
+    if (params.seekPower || params.useCover) {
+      for (const ob of C.OBSTACLES) {
+        if (!C.OBSTACLE_BEHAVIOR[ob.kind].solid) continue;
+        const d = S.angBetween(myPos, ob.dir);
+        if (d < ob.angRadius * 1.5) {
+          const away = S.normalize(S.sub(myPos, ob.dir));
+          avoidance = avoidance ? S.add(avoidance, away) : away;
+        }
+      }
+    }
+
+    // --- Powerup seeking (veteran+ only, not in close combat) ---
+    let powerupDir: S.Vec3 | null = null;
+    if (params.seekPower && this.state.pickups.size > 0) {
+      let bestScore = 0;
+      for (const [pk, pickup] of this.state.pickups) {
+        const pPos = S.vec(pickup.px, pickup.py, pickup.pz);
+        const d = S.angBetween(myPos, pPos) * R;
+        if (d > 400) continue;
+        if (me.power === pickup.type) continue;
+        // Priority: shield (when low HP) > afterburner > spread > rapid > homing > repair
+        const priority = pickup.type === "shield" && me.hp < 50 ? 6 :
+          pickup.type === "afterburner" ? 5 : pickup.type === "spread" ? 4 :
+          pickup.type === "rapid" ? 3 : pickup.type === "homing" ? 2 : 1;
+        const score = priority / (d + 1);
+        if (score > bestScore) { bestScore = score; powerupDir = bearingTo(myPos, pPos); }
+      }
+    }
+
     if (target) {
       const tPos = getP(target);
       const distWorld = S.angBetween(myPos, tPos) * R;
-      if (me.hp <= 35 && distWorld < 520) {
-        // flee: aim away from the threat
-        desiredBearing = bearingTo(myPos, S.scale(tPos, -1)); // toward the antipode of the threat
+      const fleeing = me.hp <= 35 && distWorld < 520;
+
+      if (fleeing && params.useCover) {
+        // Ace: flee toward nearest solid obstacle for cover
+        let nearestOb: S.Vec3 | null = null;
+        let nearestD = Infinity;
+        for (const ob of C.OBSTACLES) {
+          if (!C.OBSTACLE_BEHAVIOR[ob.kind].solid) continue;
+          const d = S.angBetween(myPos, ob.dir);
+          if (d < nearestD) { nearestD = d; nearestOb = ob.dir; }
+        }
+        if (nearestOb && nearestD < 1.2) {
+          desiredBearing = bearingTo(myPos, nearestOb);
+        } else {
+          desiredBearing = bearingTo(myPos, S.scale(tPos, -1));
+        }
+        wantBoost = true;
+      } else if (fleeing) {
+        desiredBearing = bearingTo(myPos, S.scale(tPos, -1));
         wantBoost = true;
       } else {
-        // predictive lead: advance the target along its heading and aim there
+        // Engage with predictive lead
         const tid = brain.targetId as string;
         const tSpeed = this.speed.get(tid) ?? C.CRUISE_SPEED;
         const leadT = (distWorld / C.BULLET_SPEED) * brain.lead;
@@ -534,9 +611,44 @@ export class ArenaRoom extends Room<ArenaState> {
         wantFire = aim < 0.16 && distWorld < 640;
         wantBoost = distWorld > 720 && Math.random() < 0.4;
       }
+
+      // --- Evasion weaving (veteran+ only) ---
+      if (params.evade) {
+        let threatCount = 0;
+        for (const [, b] of this.state.bullets) {
+          if (b.owner === id) continue;
+          const bPos = getP(b);
+          const bToMe = S.normalize(S.sub(myPos, bPos));
+          const dot = S.dot(bToMe, getF(b));
+          if (dot > 0.7) threatCount++; // bullet heading toward us
+        }
+        if (threatCount > 0) {
+          brain.weavePhase += 0.3;
+          const weave = Math.sin(brain.weavePhase) * 0.4;
+          const perp = S.normalize(S.cross(myPos, desiredBearing));
+          desiredBearing = S.normalize(S.add(desiredBearing, S.scale(perp, weave)));
+        }
+      }
     } else {
-      brain.wander += (Math.random() - 0.5) * 0.6;
-      desiredBearing = S.turn(myPos, myFwd, brain.wander * 0.02);
+      // No target: wander or seek powerup
+      if (powerupDir) {
+        desiredBearing = powerupDir;
+      } else {
+        brain.wander += (Math.random() - 0.5) * 0.6;
+        desiredBearing = S.turn(myPos, myFwd, brain.wander * 0.02);
+      }
+    }
+
+    // --- Blend avoidance into heading ---
+    if (avoidance && !target) {
+      desiredBearing = S.normalize(S.add(desiredBearing, S.scale(avoidance, 0.5)));
+    }
+
+    // --- Seek powerup if in range and not in close combat ---
+    if (powerupDir && target) {
+      const tPos = getP(target);
+      const distWorld = S.angBetween(myPos, tPos) * R;
+      if (distWorld > 500) desiredBearing = powerupDir; // divert only if not in close combat
     }
 
     const diff = signedAngle(myPos, myFwd, desiredBearing);
@@ -547,11 +659,17 @@ export class ArenaRoom extends Room<ArenaState> {
 
   private pickTarget(selfId: string, myPos: S.Vec3): Player | undefined {
     let best: Player | undefined;
-    let bestD = Infinity;
+    let bestScore = -Infinity;
     for (const [pid, p] of this.state.players) {
       if (pid === selfId || !p.alive) continue;
       const d = S.angBetween(getP(p), myPos);
-      if (d < bestD) { bestD = d; best = p; }
+      let score = 1 / (d + 0.1); // closer = higher priority
+      // Threats aiming at us get priority
+      const pFwd = getF(p);
+      const toMe = S.normalize(S.sub(myPos, getP(p)));
+      if (S.dot(pFwd, toMe) > 0.7) score *= 2; // target is facing us
+      if (p.hp < 30) score *= 1.5; // finish off weak targets
+      if (score > bestScore) { bestScore = score; best = p; }
     }
     return best;
   }

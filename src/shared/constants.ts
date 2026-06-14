@@ -123,7 +123,7 @@ export interface Obstacle {
 // authoring spec: angular distance from hotspot, azimuth, angular radius
 interface ObSpec { ang: number; az: number; angRadius: number; height: number; kind: ObstacleKind; landmark?: LandmarkKind; }
 const T = Math.PI / 3; // 60°
-const OB_SPECS: ObSpec[] = [
+export const OB_SPECS: ObSpec[] = [
   { ang: 0.0,  az: 0,     angRadius: 0.12, height: 240, kind: "tower", landmark: "volcano" },
   // mid-ring cover (~0.55 rad from hotspot), three double as landmarks
   { ang: 0.55, az: 0 * T, angRadius: 0.09, height: 170, kind: "spire", landmark: "lighthouse" },

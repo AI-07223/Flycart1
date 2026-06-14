@@ -7,6 +7,18 @@ import { monitor } from "@colyseus/monitor";
 import crypto from "crypto";
 import { ArenaRoom } from "./rooms/ArenaRoom";
 import * as leaderboard from "./leaderboard";
+import { log } from "./logger";
+
+// Initialize Sentry if DSN is provided (must be before other imports that might throw)
+if (process.env.SENTRY_DSN) {
+  try {
+    const Sentry = require("@sentry/node");
+    Sentry.init({ dsn: process.env.SENTRY_DSN, tracesSampleRate: 0.1 });
+    log("info", "sentry initialized", { dsn: process.env.SENTRY_DSN });
+  } catch (e) {
+    log("warn", "sentry init failed", { error: (e as Error).message });
+  }
+}
 
 const PORT = Number(process.env.PORT) || 2567;
 leaderboard.init();
@@ -40,6 +52,20 @@ app.get("/leaderboard", (req, res) => {
   res.json(lbCache.data.slice(0, n));
 });
 
+// Client error reporting endpoint — forwards browser errors to Sentry
+app.post("/api/errors", (req, res) => {
+  const { message, filename, lineno, colno, stack } = req.body || {};
+  log("error", "client error", { message, filename, lineno, colno, stack });
+  try {
+    const Sentry = require("@sentry/node");
+    Sentry.captureException(new Error(message || "Client error"), {
+      tags: { source: "client" },
+      extra: { filename, lineno, colno, stack },
+    });
+  } catch {}
+  res.status(204).end();
+});
+
 // Colyseus monitor dashboard — protected with HTTP Basic Auth.
 // Credentials come from env (MONITOR_USER / MONITOR_PASS). If no password is
 // configured the dashboard is disabled outright rather than left open.
@@ -52,20 +78,20 @@ function safeEqual(a: string, b: string): boolean {
   return ab.length === bb.length && crypto.timingSafeEqual(ab, bb);
 }
 
-function monitorAuth(req: express.Request, res: express.Response, next: express.NextFunction) {
-  if (!MONITOR_PASS) return res.status(404).end(); // disabled when unconfigured
-  const [scheme, encoded] = (req.headers.authorization || "").split(" ");
-  if (scheme === "Basic" && encoded) {
-    const [user, pass] = Buffer.from(encoded, "base64").toString().split(":");
-    if (safeEqual(user || "", MONITOR_USER) && safeEqual(pass || "", MONITOR_PASS)) {
-      return next();
+if (MONITOR_PASS) {
+  function monitorAuth(req: express.Request, res: express.Response, next: express.NextFunction) {
+    const [scheme, encoded] = (req.headers.authorization || "").split(" ");
+    if (scheme === "Basic" && encoded) {
+      const [user, pass] = Buffer.from(encoded, "base64").toString().split(":");
+      if (safeEqual(user || "", MONITOR_USER) && safeEqual(pass || "", MONITOR_PASS)) {
+        return next();
+      }
     }
+    res.set("WWW-Authenticate", 'Basic realm="SmashCart Monitor"');
+    return res.status(401).end();
   }
-  res.set("WWW-Authenticate", 'Basic realm="SmashCart Monitor"');
-  return res.status(401).end();
+  app.use("/colyseus", monitorAuth, monitor());
 }
-
-app.use("/colyseus", monitorAuth, monitor());
 
 const server = http.createServer(app);
 const gameServer = new Server({
@@ -77,5 +103,5 @@ const gameServer = new Server({
 gameServer.define("arena", ArenaRoom).filterBy(["code"]);
 
 server.listen(PORT, () => {
-  console.log(`🛩  SmashCart server listening on http://localhost:${PORT}`);
+  log("info", "server started", { port: PORT });
 });
