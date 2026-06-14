@@ -47,4 +47,4 @@
 - [x] 6.2 Headless verification (Preview): joins live, decodes the new schema, planet + 12 obstacles built, 4 planes placed exactly on the surface (|pos| = radius+ALT), 1900+ frames pumped with no console errors
 - [x] 6.3 Netcode: slerp interpolation + tangentize (no chord-cutting) and spherical prediction/reconciliation implemented and load-verified (live feel is the user's test)
 - [x] 6.4 Dynamic-size check: `radiusForBodies` follows √N (571/700/808 for 4/6/8), clamped to R_MIN/R_MAX; radius stable within a round, recomputed at round start; resize doesn't teleport/alter aim (verify-sphere.cjs, 20/20); live shows radius 572 for 4 bodies
-- [ ] 6.5 Commit → push `main` → redeploy via Coolify; verify live
+- [x] 6.5 Commit (8a3fe6a) → push `main` → redeploy via Coolify (first attempt failed on the host's transient "Server is not functional" blip; retry succeeded ~13 min) → verified live: healthz/page 200, js/sphere.js 200, constants has OB_SPECS, render3d has _buildPlanet

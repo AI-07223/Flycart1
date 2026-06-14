@@ -37,4 +37,4 @@
 - [x] 5.3 Preview: over a round, pickups visibly cluster toward the centre with some edge spawns; none embedded in obstacles  (T5a 0/8000 in solid, T5b centre>edge)
 - [x] 5.4 Preview: minimap shows obstacles + landmarks; regions read as distinct  (pixel-verified: volcano #ff7b2e, landmark tan, ring cyan outline, zone tint)
 - [x] 5.5 Leak check: sustained session → `renderer.info.memory` counts stay bounded after obstacle/VFX churn  (1400 frames: geometries/textures/programs flat at 69/6/26; particles bounded)
-- [ ] 5.6 Commit → push `main` → Coolify redeploy → verify live (game 200, matchmake + WebSocket 101, no environment damage in a live match)
+- [x] 5.6 Commit → push `main` → Coolify redeploy → verify live (game 200, matchmake + WebSocket 101, no environment damage in a live match)  (commit bafa537; live: healthz 200, page 200, served constants.js has OBSTACLES + metric)
