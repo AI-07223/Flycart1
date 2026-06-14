@@ -125,6 +125,8 @@ interface SFXAPI {
   setMusic(v: number): void;
   setSfx(v: number): void;
   vols(): { master: number; music: number; sfx: number; muted: boolean };
+  startMenuAmbient(): void;
+  stopMenuAmbient(): void;
 }
 
 interface AssetsAPI {

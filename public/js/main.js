@@ -179,12 +179,9 @@
       }
       function setMenuSection(sec) {
         menuSection = sec;
-        els.start.classList.toggle("hidden", sec !== "main");
-        document.querySelectorAll(".menu-section-panel").forEach((el) => el.classList.add("hidden"));
-        if (sec !== "main") {
-          const panel = document.getElementById("menu-" + sec);
-          if (panel) panel.classList.remove("hidden");
-        }
+        document.querySelectorAll(".menu-panel").forEach((el) => el.classList.add("hidden"));
+        const active = document.getElementById("menu-" + sec);
+        if (active) active.classList.remove("hidden");
         if (sec === "control") els.settingsPanel.classList.remove("hidden");
         else els.settingsPanel.classList.add("hidden");
         if (window.Renderer && window.Renderer.setMenuSection) window.Renderer.setMenuSection(sec);
@@ -635,6 +632,7 @@
         els.status.textContent = "";
         if (window.Renderer && window.Renderer.showMenu) window.Renderer.showMenu();
         setMenuSection("main");
+        if (window.SFX && window.SFX.startMusic) window.SFX.startMusic();
         fetchLeaderboard();
         updateRotateOverlay();
       }

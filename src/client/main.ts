@@ -126,15 +126,10 @@ function fetchMenuLeaderboard() {
 function setMenuSection(sec: string) {
   menuSection = sec;
 
-  // "main" shows the primary start-screen; sub-sections hide it and show their panel.
-  els.start.classList.toggle("hidden", sec !== "main");
-
-  // Hide every section panel, then reveal the active one.
-  document.querySelectorAll(".menu-section-panel").forEach((el) => el.classList.add("hidden"));
-  if (sec !== "main") {
-    const panel = document.getElementById("menu-" + sec);
-    if (panel) panel.classList.remove("hidden");
-  }
+  // Hide ALL menu panels first, then show the active one.
+  document.querySelectorAll(".menu-panel").forEach((el) => el.classList.add("hidden"));
+  const active = document.getElementById("menu-" + sec);
+  if (active) active.classList.remove("hidden");
 
   // Control section also opens the settings panel.
   if (sec === "control") els.settingsPanel.classList.remove("hidden");
@@ -577,6 +572,8 @@ function resetToMenu() {
   // Show immersive menu (reset to main section)
   if (window.Renderer && window.Renderer.showMenu) window.Renderer.showMenu();
   setMenuSection("main");
+  // Menu ambient: start music when returning to menu
+  if (window.SFX && window.SFX.startMusic) window.SFX.startMusic();
   fetchLeaderboard(); // refresh standings after a game
   updateRotateOverlay();
 }

@@ -143,7 +143,7 @@
           menuAmbientGain.gain.value = 0;
           menuAmbientGain.gain.linearRampToValueAtTime(0.06, ctx.currentTime + 1.5);
           menuAmbient.connect(menuAmbientGain);
-          menuAmbientGain.connect(masterBus);
+          menuAmbientGain.connect(master);
           menuAmbient.start();
         } catch (_e) {
           menuAmbient = null;
