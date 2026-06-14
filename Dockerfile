@@ -14,6 +14,7 @@ RUN for i in 1 2 3 4 5; do \
 COPY tsconfig.json ./
 COPY src ./src
 COPY scripts ./scripts
+COPY public ./public
 RUN npm run build
 # Drop devDependencies so the pruned node_modules can be reused at runtime
 # (avoids a second network install — the step that kept failing with ECONNRESET).
