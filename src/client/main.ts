@@ -38,6 +38,7 @@ let streak = 0, lastKill = 0, lastFireSnd = 0;
 let _powerType = "", _powerStart = 0;
 
 let mode: "menu" | "playing" | "paused" | "lost" = "menu"; // menu | playing | paused
+let menuSection: string = "main"; // immersive menu sub-state
 let last = 0;
 let engineStarted = false;
 
@@ -84,6 +85,21 @@ function buildPlanePicker() {
   });
 }
 
+// Immersive menu: navigate to a section (main / hangar / tower / control / comms / howto).
+function setMenuSection(sec: string) {
+  menuSection = sec;
+  // Hide all panels, show the active one
+  const sections = ["main", "hangar", "tower", "control", "comms", "howto"];
+  for (const s of sections) {
+    const el = document.getElementById("menu-" + s);
+    if (!el) continue;
+    if (s === sec) { el.classList.remove("hidden"); el.style.opacity = "1"; el.style.pointerEvents = "auto"; }
+    else { el.classList.add("hidden"); el.style.opacity = "0"; el.style.pointerEvents = "none"; }
+  }
+  // Tell the 3D renderer
+  if (window.Renderer && window.Renderer.setMenuSection) window.Renderer.setMenuSection(sec);
+}
+
 function genCode() {
   const c = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   let s = "";
@@ -113,7 +129,12 @@ async function startGame(code) {
     return;
   }
 
-  els.start.classList.add("hidden");
+  // Hide immersive menu panels
+  ["main", "hangar", "tower", "control", "comms", "howto"].forEach((s) => {
+    const el = document.getElementById("menu-" + s);
+    if (el) { el.classList.add("hidden"); el.style.opacity = "0"; }
+  });
+  if (window.Renderer && window.Renderer.hideMenu) window.Renderer.hideMenu();
   els.hud.classList.remove("hidden");
   els.health.classList.remove("hidden");
 
@@ -334,6 +355,9 @@ function init() {
   fetchLeaderboard();
   setupTouchButtons();
 
+  // Initialize immersive menu to main section
+  setMenuSection("main");
+
   const urlCode = roomFromUrl();
   if (urlCode) {
     els.status.textContent = "Joining room " + urlCode;
@@ -342,6 +366,17 @@ function init() {
 
   els.quick.addEventListener("click", () => { window.SFX.uiClick(); startGame(urlCode || "PUBLIC"); });
   els.friends.addEventListener("click", () => { window.SFX.uiClick(); startGame(genCode()); });
+
+  // Immersive menu: section navigation buttons (.nav-btn[data-section])
+  document.querySelectorAll(".nav-btn[data-section]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const sec = (btn as HTMLElement).dataset.section;
+      if (sec) { window.SFX.uiClick(); setMenuSection(sec); }
+    });
+  });
+  // Settings shortcut from menu-control section
+  const menuSettingsOpen = document.getElementById("menu-settings-open");
+  if (menuSettingsOpen) menuSettingsOpen.addEventListener("click", () => { window.SFX.uiClick(); els.settingsPanel.classList.toggle("hidden"); });
 
   els.name.addEventListener("keydown", (e) => {
     if (e.key === "Enter") { e.preventDefault(); startGame(urlCode || "PUBLIC"); }
@@ -450,7 +485,9 @@ function resetToMenu() {
   ["hud", "health", "touch", "steerPad", "stick", "recenter", "share", "inter", "pause", "powerChip", "connLost"].forEach((k) => els[k] && els[k].classList.add("hidden"));
   els.quick.disabled = els.friends.disabled = false;
   els.status.textContent = "";
-  els.start.classList.remove("hidden");
+  // Show immersive menu (reset to main section)
+  if (window.Renderer && window.Renderer.showMenu) window.Renderer.showMenu();
+  setMenuSection("main");
   fetchLeaderboard(); // refresh standings after a game
   updateRotateOverlay();
 }

@@ -86,6 +86,7 @@
       var lastFireSnd = 0;
       var _powerType = "";
       var mode = "menu";
+      var menuSection = "main";
       var last = 0;
       var engineStarted = false;
       var SKINS = [16739179, 4833535, 9167690, 16765514, 12614655];
@@ -140,6 +141,24 @@
           els.planeSwatches.appendChild(b);
         });
       }
+      function setMenuSection(sec) {
+        menuSection = sec;
+        const sections = ["main", "hangar", "tower", "control", "comms", "howto"];
+        for (const s of sections) {
+          const el = document.getElementById("menu-" + s);
+          if (!el) continue;
+          if (s === sec) {
+            el.classList.remove("hidden");
+            el.style.opacity = "1";
+            el.style.pointerEvents = "auto";
+          } else {
+            el.classList.add("hidden");
+            el.style.opacity = "0";
+            el.style.pointerEvents = "none";
+          }
+        }
+        if (window.Renderer && window.Renderer.setMenuSection) window.Renderer.setMenuSection(sec);
+      }
       function genCode() {
         const c = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
         let s = "";
@@ -166,7 +185,14 @@
           els.quick.disabled = els.friends.disabled = false;
           return;
         }
-        els.start.classList.add("hidden");
+        ["main", "hangar", "tower", "control", "comms", "howto"].forEach((s) => {
+          const el = document.getElementById("menu-" + s);
+          if (el) {
+            el.classList.add("hidden");
+            el.style.opacity = "0";
+          }
+        });
+        if (window.Renderer && window.Renderer.hideMenu) window.Renderer.hideMenu();
         els.hud.classList.remove("hidden");
         els.health.classList.remove("hidden");
         if (window.Input.isTouchDevice()) {
@@ -505,7 +531,8 @@
         ["hud", "health", "touch", "steerPad", "stick", "recenter", "share", "inter", "pause", "powerChip", "connLost"].forEach((k) => els[k] && els[k].classList.add("hidden"));
         els.quick.disabled = els.friends.disabled = false;
         els.status.textContent = "";
-        els.start.classList.remove("hidden");
+        if (window.Renderer && window.Renderer.showMenu) window.Renderer.showMenu();
+        setMenuSection("main");
         fetchLeaderboard();
         updateRotateOverlay();
       }

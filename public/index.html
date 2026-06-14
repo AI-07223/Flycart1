@@ -122,26 +122,11 @@
       <button class="nav-btn back-btn" data-section="main">← BACK</button>
     </div>
 
-    <!-- CONTROL section: settings -->
+    <!-- CONTROL section: opens settings panel -->
     <div id="menu-control" class="menu-panel">
       <h2>⚙️ SETTINGS</h2>
-      <div class="set-row"><label>Graphics</label>
-        <div class="seg" id="quality-seg">
-          <button data-q="low">Low</button><button data-q="med">Med</button><button data-q="high">High</button>
-        </div>
-      </div>
-      <div class="set-row" id="steer-row"><label>Steering</label>
-        <div class="seg" id="steer-seg">
-          <button data-steer="arrows">Arrows</button><button data-steer="stick">Stick</button><button data-steer="tilt">Tilt</button>
-        </div>
-      </div>
-      <div class="set-row"><label>Invert</label>
-        <label class="switch sm"><input type="checkbox" id="invert-check" /> Reverse L/R</label>
-      </div>
-      <div class="set-row" id="sens-row"><label>Sensitivity</label><input type="range" id="sens-range" min="50" max="200" /></div>
-      <div class="set-row"><label>Master</label><input type="range" id="vol-master" min="0" max="100" /></div>
-      <div class="set-row"><label>Music</label><input type="range" id="vol-music" min="0" max="100" /></div>
-      <div class="set-row"><label>SFX</label><input type="range" id="vol-sfx" min="0" max="100" /></div>
+      <p class="muted">Audio, graphics, and control settings are accessible via the gear icon during gameplay, or tap below.</p>
+      <button id="menu-settings-open" class="nav-btn">OPEN SETTINGS ⚙</button>
       <button class="nav-btn back-btn" data-section="main">← BACK</button>
     </div>
 
