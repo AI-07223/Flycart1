@@ -48,4 +48,4 @@
 - [x] 6.2 Local headless verification (Preview): kill the server mid-game → connection-lost overlay (not a freeze); pause sends neutral input; afterburner has no rubber-band; HUD timer correct on re-pickup; rapid-fire SFX faster
 - [x] 6.3 Leak check: play a sustained combat session and confirm `renderer.info.memory` counts stay bounded
 - [x] 6.4 Robustness check: send `turn: NaN` from a console client → own plane stays valid, lobby unaffected; simulate a server hitch → no tunneling
-- [ ] 6.5 Commit → push `main` → redeploy via Coolify; verify live (game 200, matchmake + WebSocket 101, reconnect works across a redeploy)
+- [x] 6.5 Commit → push `main` → redeploy via Coolify; verify live (game 200, matchmake + WebSocket 101, reconnect works across a redeploy)
