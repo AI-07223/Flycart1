@@ -1,13 +1,67 @@
 "use strict";
 (() => {
   var __getOwnPropNames = Object.getOwnPropertyNames;
+  var __esm = (fn, res) => function __init() {
+    return fn && (res = (0, fn[__getOwnPropNames(fn)[0]])(fn = 0)), res;
+  };
   var __commonJS = (cb, mod) => function __require() {
     return mod || (0, cb[__getOwnPropNames(cb)[0]])((mod = { exports: {} }).exports, mod), mod.exports;
   };
 
+  // src/shared/sphere.ts
+  function normalize(a) {
+    const l = len(a);
+    return l > 1e-9 ? { x: a.x / l, y: a.y / l, z: a.z / l } : { x: 1, y: 0, z: 0 };
+  }
+  var dot, lenSq, len, lerp;
+  var init_sphere = __esm({
+    "src/shared/sphere.ts"() {
+      "use strict";
+      dot = (a, b) => a.x * b.x + a.y * b.y + a.z * b.z;
+      lenSq = (a) => dot(a, a);
+      len = (a) => Math.sqrt(lenSq(a));
+      lerp = (a, b, t) => a + (b - a) * t;
+    }
+  });
+
+  // src/shared/flight.ts
+  function resolveLandmarkCollisions(pos, fwd, landmarks, radius) {
+    let nextPos = { ...pos };
+    let nextFwd = normalize(fwd);
+    let collided = false;
+    for (const landmark of landmarks) {
+      const dx = nextPos.x - landmark.x;
+      const dz = nextPos.z - landmark.z;
+      const rr = landmark.radius + radius;
+      if (dx * dx + dz * dz > rr * rr) continue;
+      const floor = landmark.height + radius;
+      if (nextPos.y > floor) continue;
+      const out = normalize({ x: dx || 1, y: 0, z: dz || 0 });
+      nextPos = {
+        x: landmark.x + out.x * rr,
+        y: Math.max(nextPos.y, floor),
+        z: landmark.z + out.z * rr
+      };
+      nextFwd = normalize({
+        x: lerp(nextFwd.x, out.x, 0.35),
+        y: Math.max(0.08, nextFwd.y),
+        z: lerp(nextFwd.z, out.z, 0.35)
+      });
+      collided = true;
+    }
+    return { pos: nextPos, fwd: nextFwd, collided };
+  }
+  var init_flight = __esm({
+    "src/shared/flight.ts"() {
+      "use strict";
+      init_sphere();
+    }
+  });
+
   // src/client/net.ts
   var require_net = __commonJS({
     "src/client/net.ts"() {
+      init_flight();
       var BUFFER_MS = 1400;
       var MAX_EXTRAP_MS = 120;
       var SEND_HEARTBEAT_MS = 100;
@@ -166,6 +220,9 @@
             });
           }
           let next = Sp.advance(pos, fwd, this.localPose.speed * dt).p;
+          const collision = resolveLandmarkCollisions(next, fwd, G.LANDMARKS, G.PLANE_RADIUS);
+          next = collision.pos;
+          fwd = collision.fwd;
           next.x = Sp.clamp(next.x, -G.MAP_HALF, G.MAP_HALF);
           next.z = Sp.clamp(next.z, -G.MAP_HALF, G.MAP_HALF);
           next.y = Sp.clamp(next.y, G.MIN_ALT, G.MAX_ALT);

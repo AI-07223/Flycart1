@@ -1,6 +1,7 @@
 import { Room, Client } from "colyseus";
 import { ArenaState, Player, Bullet, Pickup } from "../schema/ArenaState";
 import * as C from "../shared/constants";
+import { resolveLandmarkCollisions } from "../shared/flight";
 import * as S from "../shared/sphere";
 import * as leaderboard from "../leaderboard";
 import { log } from "../logger";
@@ -26,6 +27,29 @@ const getP = (e: { px: number; py: number; pz: number }): S.Vec3 => ({ x: e.px, 
 const getF = (e: { fx: number; fy: number; fz: number }): S.Vec3 => ({ x: e.fx, y: e.fy, z: e.fz });
 const setP = (e: { px: number; py: number; pz: number }, v: S.Vec3) => { e.px = v.x; e.py = v.y; e.pz = v.z; };
 const setF = (e: { fx: number; fy: number; fz: number }, v: S.Vec3) => { e.fx = v.x; e.fy = v.y; e.fz = v.z; };
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function normalizeName(value: unknown, fallback: string): string {
+  if (typeof value !== "string") return fallback;
+  const next = value.trim().slice(0, 14);
+  return next || fallback;
+}
+
+function applyInputPatch(current: Input, data: unknown): Input | null {
+  if (!isRecord(data)) return null;
+  const next = { ...current };
+  const seq = typeof data.seq === "number" && Number.isFinite(data.seq) ? Math.floor(data.seq) : current.seq;
+  if (seq < current.seq) return null;
+  next.seq = seq;
+  if (typeof data.turn === "number" && Number.isFinite(data.turn)) next.turn = S.clamp(data.turn, -1, 1);
+  if (typeof data.climb === "number" && Number.isFinite(data.climb)) next.climb = S.clamp(data.climb, -1, 1);
+  if (typeof data.boost === "boolean") next.boost = data.boost;
+  if (typeof data.fire === "boolean") next.fire = data.fire;
+  return next;
+}
 
 function rand(min: number, max: number): number {
   return min + Math.random() * (max - min);
@@ -95,23 +119,18 @@ export class ArenaRoom extends Room<ArenaState> {
     this.botsEnabled = (options.code || "PUBLIC") !== "NOBOTS";
     this.setMetadata({ code: options.code || "PUBLIC" });
 
-    this.onMessage("input", (client, data: Partial<Input>) => {
+    this.onMessage("input", (client, data: unknown) => {
       if (!this.rateOk(client.sessionId, C.INPUT_RATE_MAX)) return;
       const cur = this.inputs.get(client.sessionId) ?? { ...ZERO_INPUT };
-      const seq = typeof data.seq === "number" && Number.isFinite(data.seq) ? Math.floor(data.seq) : cur.seq;
-      if (seq < cur.seq) return;
-      cur.seq = seq;
-      if (typeof data.turn === "number" && Number.isFinite(data.turn)) cur.turn = S.clamp(data.turn, -1, 1);
-      if (typeof data.climb === "number" && Number.isFinite(data.climb)) cur.climb = S.clamp(data.climb, -1, 1);
-      if (typeof data.boost === "boolean") cur.boost = data.boost;
-      if (typeof data.fire === "boolean") cur.fire = data.fire;
-      this.inputs.set(client.sessionId, cur);
+      const next = applyInputPatch(cur, data);
+      if (!next) return;
+      this.inputs.set(client.sessionId, next);
     });
 
-    this.onMessage("setName", (client, name: string) => {
+    this.onMessage("setName", (client, name: unknown) => {
       if (!this.rateOk(client.sessionId, C.NAME_RATE_MAX)) return;
       const p = this.state.players.get(client.sessionId);
-      if (p && typeof name === "string") p.name = name.trim().slice(0, 14) || p.name;
+      if (p) p.name = normalizeName(name, p.name);
     });
 
     this.setPatchRate(33);
@@ -126,11 +145,12 @@ export class ArenaRoom extends Room<ArenaState> {
     });
   }
 
-  onJoin(client: Client, options: { name?: string; skin?: number } = {}) {
+  onJoin(client: Client, options: { name?: unknown; skin?: unknown } | null = {}) {
+    const joinOptions = isRecord(options) ? options : {};
     const p = new Player();
-    p.name = (options.name || "Pilot").trim().slice(0, 14) || "Pilot";
-    p.skin = typeof options.skin === "number" && Number.isInteger(options.skin) && options.skin >= 0 && options.skin < C.SKIN_COUNT
-      ? options.skin
+    p.name = normalizeName(joinOptions.name, "Pilot");
+    p.skin = typeof joinOptions.skin === "number" && Number.isInteger(joinOptions.skin) && joinOptions.skin >= 0 && joinOptions.skin < C.SKIN_COUNT
+      ? joinOptions.skin
       : Math.floor(Math.random() * C.SKIN_COUNT);
     p.bot = false;
     this.spawn(client.sessionId, p);
@@ -228,19 +248,9 @@ export class ArenaRoom extends Room<ArenaState> {
 
     pos = S.advance(pos, fwd, p.speed * dt).p;
 
-    for (const landmark of C.LANDMARKS) {
-      const dx = pos.x - landmark.x;
-      const dz = pos.z - landmark.z;
-      const rr = landmark.radius + C.PLANE_RADIUS;
-      if (dx * dx + dz * dz > rr * rr) continue;
-      const floor = landmark.height + C.PLANE_RADIUS;
-      if (pos.y > floor) continue;
-      const out = S.normalize({ x: dx || 1, y: 0, z: dz || 0 });
-      pos.x = landmark.x + out.x * rr;
-      pos.z = landmark.z + out.z * rr;
-      pos.y = Math.max(pos.y, floor);
-      fwd = S.normalize({ x: S.lerp(fwd.x, out.x, 0.35), y: Math.max(0.08, fwd.y), z: S.lerp(fwd.z, out.z, 0.35) });
-    }
+    const collision = resolveLandmarkCollisions(pos, fwd, C.LANDMARKS, C.PLANE_RADIUS);
+    pos = collision.pos;
+    fwd = collision.fwd;
 
     pos.x = S.clamp(pos.x, -C.MAP_HALF, C.MAP_HALF);
     pos.z = S.clamp(pos.z, -C.MAP_HALF, C.MAP_HALF);

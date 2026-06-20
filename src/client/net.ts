@@ -1,3 +1,5 @@
+import { resolveLandmarkCollisions } from "../shared/flight";
+
 // Thin Colyseus wrapper with flat-world local prediction and bounded remote interpolation.
 
 const BUFFER_MS = 1400;
@@ -197,6 +199,9 @@ const Net = {
     }
 
     let next = Sp.advance(pos, fwd, this.localPose.speed * dt).p;
+    const collision = resolveLandmarkCollisions(next, fwd, G.LANDMARKS, G.PLANE_RADIUS);
+    next = collision.pos;
+    fwd = collision.fwd;
     next.x = Sp.clamp(next.x, -G.MAP_HALF, G.MAP_HALF);
     next.z = Sp.clamp(next.z, -G.MAP_HALF, G.MAP_HALF);
     next.y = Sp.clamp(next.y, G.MIN_ALT, G.MAX_ALT);

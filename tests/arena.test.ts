@@ -89,6 +89,29 @@ describe("ArenaRoom flat-world simulation", () => {
     expect(p.fy).toBeGreaterThanOrEqual(-0.05);
   });
 
+  it("pushes low-altitude planes away from landmarks", () => {
+    const room = createRoom();
+    const tower = C.LANDMARKS.find((landmark) => landmark.kind === "tower");
+    if (!tower) throw new Error("Expected tower landmark");
+
+    const p = addPlayer(room, "p1", {
+      px: tower.x + tower.radius + C.PLANE_RADIUS + 4,
+      py: tower.height - 20,
+      pz: tower.z,
+      fx: -1,
+      fy: -0.15,
+      fz: 0,
+    });
+
+    (room as any).stepPlane("p1", p, 0.15, true);
+
+    const dx = p.px - tower.x;
+    const dz = p.pz - tower.z;
+    expect(dx * dx + dz * dz).toBeGreaterThanOrEqual((tower.radius + C.PLANE_RADIUS - 0.5) ** 2);
+    expect(p.py).toBeGreaterThanOrEqual(tower.height + C.PLANE_RADIUS);
+    expect(p.fy).toBeGreaterThan(0);
+  });
+
   it("projectiles hit targets in 3D space", () => {
     const room = createRoom();
     const shooter = addPlayer(room, "p1", { px: -420, py: 100, pz: -220, fx: 1, fy: 0, fz: 0 });

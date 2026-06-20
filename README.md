@@ -1,146 +1,104 @@
-# 🛩️ SmashCart
+# SmashCart
 
-Online, **3D plane combat arena** — fly, shoot, and smash everyone out of the sky in
-a bright **arcade-cute** toy world. Built to be instantly playable and easy to share
-with friends: click **Quick Play** and you're dogfighting in seconds, or spin up a
-private room and send the link. Empty slots are filled with AI bots so a match is
-never empty.
-
-Authoritative **Colyseus** multiplayer server (2D-plane simulation) + a **Three.js**
-3D client, designed to be self-hosted on your own VPS — no CDNs, everything vendored.
+Online 3D plane combat on a large flat battlefield. Launch straight into `Quick Play` or share a private room code; bots keep public matches populated when humans are scarce. The game is self-hosted: the Colyseus server, browser client, and vendored runtime assets all live in this repository.
 
 ![gameplay](docs/screenshot.png)
 
 ## Features
 
-- **Real-time online multiplayer** — server-authoritative simulation at 30 Hz with
-  client-side smoothing/interpolation.
-- **Quick Play + private rooms** — `?room=CODE` share links; bots auto-fill to keep
-  the arena lively.
-- **Fast, one-axis controls** — auto-thrust; you steer, boost, and fire. Anyone gets
-  it in five seconds.
-- **Plays on phones** — on-screen FIRE/BOOST buttons plus **gyro tilt-to-steer**
-  (tilt your phone to bank), with a tap-to-recenter button. Falls back to on-screen
-  arrows if you turn gyro off.
-- **Arcade-cute 3D** — rounded low-poly toy planes (banking, spinning props) over a
-  toy-island arena (grass, water, blimp, balloons, clouds), with soft/blob shadows,
-  bloom, and a speed-sensing chase camera.
-- **Juice** — boost smoke + flames, bullet tracers, poofy explosions (shockwave ring +
-  sparkles + smoke), screen shake, hit-stop, kill feed, floating "+1 SMASH!" popups,
-  combo / kill-streak callouts, damage vignette, low-health pulse, and a minimap.
-- **Sampled audio** — looping music, engine, gunfire, explosions, kill jingle, and UI
-  sounds (self-hosted WAVs in `public/assets/audio/`), with a master/music/sfx mixer,
-  mute, and a synth fallback if a sample fails to load.
-- **Quality settings** — Low/Med/High tiers (pixel-ratio, bloom, shadows, particles)
-  with automatic FPS-based downscaling, so it stays smooth on mid-range phones.
-- **Self-hosted / CC0** — geometry is procedural; audio is generated-original (CC0);
-  legacy Kenney *Pixel Shmup* sprites remain in-repo (CC0).
+- Server-authoritative multiplayer at 30 Hz with client-side interpolation, local prediction, and reconnect support.
+- Flat-world 3D flight with altitude control, slow readable pacing, boost, pickups, and AI bots.
+- Quick Play plus 6-character private room codes and share links.
+- Desktop and touch controls, including dedicated climb and dive inputs.
+- Vendored browser dependencies under `public/vendor/` so deployment does not depend on a CDN.
 
 ## Controls
 
-**Desktop**
+### Desktop
 
 | Action | Keys |
 | ------ | ---- |
-| Steer  | `A` / `D` or `◀` / `▶` |
-| Boost  | `W` / `Shift` |
-| Fire   | `Space` |
-| Pause  | `P` |
-| Mute   | `M` |
+| Turn | `A` / `D` or `Left` / `Right` |
+| Climb | `W` or `Up` |
+| Dive | `S` or `Down` |
+| Boost | `Shift` |
+| Fire | `Space` |
+| Pause | `P` |
+| Mute | `M` |
 
-**Mobile** — on-screen **FIRE** and **BOOST** buttons. Steering is **gyro tilt** by
-default (tilt the phone left/right; tap **⟳** to recenter neutral). Uncheck *"Tilt to
-steer"* on the start screen to use on-screen **◀ ▶** arrows instead. iOS prompts for
-motion permission on first start.
+### Mobile
 
-## Tech stack
+Use the on-screen `LEFT`, `RIGHT`, `CLIMB`, `DIVE`, `BOOST`, and `FIRE` buttons.
 
-- **Server:** Node.js + [Colyseus](https://colyseus.io) `0.16` (`@colyseus/schema` v3),
-  Express for static hosting, TypeScript.
-- **Client:** vanilla JS + [Three.js](https://threejs.org) (WebGL) with EffectComposer
-  bloom. Three.js, its post-processing addons, and the Colyseus browser client are all
-  vendored under `public/vendor/` (no CDN needed) and loaded via an import map.
+## Tech Stack
 
-> **Version note:** the stack is pinned to the **Colyseus 0.16 line** because the
-> published browser client (`colyseus.js@0.16.x`) ships schema **v3**, while server
-> core `0.17` requires schema **v4** — mixing them breaks state decoding in the
-> browser. Keep server and client on the same major line.
+- Server: Node.js, TypeScript, Express, Colyseus `0.16`
+- Client source: `src/client/*.ts`, bundled into `public/js/*.js`
+- Renderer: hand-authored Three.js scene code in `public/js/render3d.js`
+- Shared game model: `src/shared/constants.ts` and `src/shared/sphere.ts`
 
-## Local development
+## Local Development
 
 ```bash
-npm install          # install deps + vendor the browser client
-npm run dev          # tsx watch — http://localhost:2567
+npm ci
+npm run dev
 ```
 
-Open http://localhost:2567 in two tabs to test multiplayer. The Colyseus monitor is
-at http://localhost:2567/colyseus (lock this down in production).
+Open `http://localhost:2567` in two tabs to test multiplayer. The Colyseus monitor is available at `http://localhost:2567/colyseus` and should be locked down in production.
 
-## Production build
+Useful commands:
 
 ```bash
-npm run build        # tsc -> dist/
-npm start            # node dist/index.js
+npm run build-client   # rebuild public/js from src/client
+npm run build          # rebuild client assets and compile the server into dist/
+npm test               # run Vitest
+npm start              # run the production build
+npm run clean          # remove dist/ cross-platform
 ```
 
-## Deploying to your VPS
+## Deployment
 
-### Option A — Docker (recommended)
+### Docker
 
 ```bash
 docker compose up -d --build
-# app on :2567 — put nginx in front for TLS (see deploy/nginx.conf.example)
 ```
 
-### Option B — systemd
+### systemd
 
 ```bash
 git clone <repo> /opt/smashcart && cd /opt/smashcart
-npm ci && npm run build
+npm ci
+npm run build
 sudo cp deploy/smashcart.service /etc/systemd/system/
 sudo systemctl daemon-reload && sudo systemctl enable --now smashcart
 ```
 
-Then reverse-proxy with nginx (WebSocket upgrade headers are **required** for
-Colyseus — see [`deploy/nginx.conf.example`](deploy/nginx.conf.example)) and add TLS
-with certbot.
+If you front the app with nginx, keep WebSocket upgrade headers enabled for Colyseus.
 
-## Project layout
+## Project Layout
 
-```
-src/                       Colyseus server (TypeScript)
-  index.ts                 bootstrap: serves client + WebSocket, defines room
-  rooms/ArenaRoom.ts       authoritative game loop, physics, bots, scoring
-  schema/ArenaState.ts     synchronized state (players, bullets, timer)
-  shared/constants.ts      gameplay tuning
-public/                    static client (served by the server)
-  index.html, css/, js/    UI + 3D client (constants/quality/audio/input/net/render3d/main)
-  vendor/                  vendored colyseus.js + three.module.min.js + jsm post-FX addons
-  assets/audio/            generated-original WAV SFX + music (see scripts/gen-audio.mjs)
-  assets/planes, tiles/    legacy Kenney Pixel Shmup sprites (CC0)
-scripts/                   vendor-three-addons.mjs, gen-audio.mjs (build helpers)
-deploy/                    systemd unit + nginx example
-Dockerfile, docker-compose.yml
+```text
+src/
+  index.ts                 Express + Colyseus bootstrap
+  rooms/ArenaRoom.ts       authoritative match loop, bots, combat, pickups
+  schema/ArenaState.ts     synchronized room state
+  shared/                  shared constants and flat-world vector math
+  client/                  browser TypeScript sources
+public/
+  index.html               menu and HUD shell
+  js/                      generated client bundles + hand-authored render3d.js
+  css/                     UI styling
+  vendor/                  vendored three.js and colyseus browser runtime
+  assets/                  audio and legacy art assets
+scripts/                   build helpers
+openspec/changes/          proposals, specs, and tasks for tracked changes
 ```
 
 ## Tuning
 
-Gameplay values live in `src/shared/constants.ts` (server, authoritative) mirrored in
-`public/js/constants.js` (client prediction/rendering). Edit speeds, damage, round
-length, arena size, bot count, etc. — **keep the two files in sync.**
-
-## Credits
-
-- 3D engine: [Three.js](https://threejs.org) (MIT) — vendored, incl. EffectComposer/
-  UnrealBloomPass post-processing addons.
-- Multiplayer framework: [Colyseus](https://colyseus.io).
-- Audio: **generated-original** arcade SFX + music (CC0), produced by
-  `scripts/gen-audio.mjs`. Drop-in replaceable with Kenney CC0 packs using the same
-  filenames in `public/assets/audio/`.
-- Legacy sprites: **"Pixel Shmup" by Kenney** — [kenney.nl](https://kenney.nl),
-  CC0 1.0 (public domain). See `public/assets/CREDITS.txt`. (Now superseded by the
-  procedural 3D planes; kept in-repo.)
+Gameplay tuning lives in `src/shared/constants.ts`. `public/js/constants.js` is generated from that shared source via `npm run build-client`; do not hand-edit the generated constants bundle.
 
 ## License
 
-MIT (code). Bundled audio is generated-original CC0; legacy art is CC0.
+MIT for code. Bundled generated audio is CC0, and legacy art credits remain in `public/assets/CREDITS.txt`.

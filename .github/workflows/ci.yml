@@ -24,7 +24,6 @@ jobs:
 
       - name: Test
         run: npm test
-        continue-on-error: true
 
   deploy:
     needs: build
@@ -37,4 +36,4 @@ jobs:
           COOLIFY_WEBHOOK_URL: ${{ secrets.COOLIFY_WEBHOOK_URL }}
         run: |
           echo "Triggering Coolify deploy..."
-          curl -sf -X POST "$COOLIFY_WEBHOOK_URL" || echo "Deploy webhook failed (non-fatal)"
+          curl -fsS -X POST "$COOLIFY_WEBHOOK_URL"

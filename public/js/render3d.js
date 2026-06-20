@@ -39,6 +39,23 @@ import * as THREE from "three";
   const v3 = (p) => new THREE.Vector3(p.x, p.y, p.z);
   const flat = (p) => ({ x: p.x, y: 0, z: p.z });
 
+  function disposeMaterial(material) {
+    if (material && typeof material.dispose === "function") material.dispose();
+  }
+
+  function disposeObject(obj) {
+    if (!obj) return;
+    const geometries = new Set();
+    const materials = new Set();
+    obj.traverse((child) => {
+      if (child.geometry) geometries.add(child.geometry);
+      if (Array.isArray(child.material)) child.material.forEach((material) => materials.add(material));
+      else if (child.material) materials.add(child.material);
+    });
+    geometries.forEach((geometry) => geometry.dispose && geometry.dispose());
+    materials.forEach((material) => disposeMaterial(material));
+  }
+
   function applyQuality() {
     if (!renderer || !Q || !Q.cfg) return;
     const cfg = Q.cfg();
@@ -207,6 +224,7 @@ import * as THREE from "three";
   function clearMenuDemo() {
     if (!menuDemo) return;
     scene.remove(menuDemo);
+    disposeObject(menuDemo);
     menuDemo = null;
   }
 
@@ -345,7 +363,11 @@ import * as THREE from "three";
       for (const [id, view] of stateMaps.views) {
         if (seen.has(id)) continue;
         scene.remove(view.mesh);
-        if (view.shield) scene.remove(view.shield);
+        disposeObject(view.mesh);
+        if (view.shield) {
+          scene.remove(view.shield);
+          disposeObject(view.shield);
+        }
         stateMaps.views.delete(id);
       }
 
@@ -375,6 +397,7 @@ import * as THREE from "three";
       for (const [key, mesh] of stateMaps.bullets) {
         if (bulletSeen.has(key)) continue;
         scene.remove(mesh);
+        disposeObject(mesh);
         stateMaps.bullets.delete(key);
       }
 
@@ -392,6 +415,7 @@ import * as THREE from "three";
       for (const [key, mesh] of stateMaps.pickups) {
         if (pickupSeen.has(key)) continue;
         scene.remove(mesh);
+        disposeObject(mesh);
         stateMaps.pickups.delete(key);
       }
 
@@ -400,6 +424,7 @@ import * as THREE from "three";
         part.life -= rawDt;
         if (part.life <= 0) {
           scene.remove(part.mesh);
+          disposeObject(part.mesh);
           particles.splice(i, 1);
           continue;
         }
@@ -546,6 +571,20 @@ import * as THREE from "three";
 
     startTakeoff() {
       takeoff = 0.6;
+    },
+
+    __debug() {
+      const info = renderer && renderer.info ? renderer.info : null;
+      const memory = info ? info.memory : null;
+      return {
+        views: stateMaps.views.size,
+        bullets: stateMaps.bullets.size,
+        pickups: stateMaps.pickups.size,
+        particles: particles.length,
+        geometries: memory ? memory.geometries : 0,
+        textures: memory ? memory.textures : 0,
+        programs: renderer && renderer.info && renderer.info.programs ? renderer.info.programs.length : 0,
+      };
     },
 
     setMenuSection() {},
