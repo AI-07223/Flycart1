@@ -13,7 +13,7 @@
       var buzz = (ms) => {
         try {
           if (navigator.vibrate) navigator.vibrate(ms);
-        } catch (_e) {
+        } catch {
         }
       };
       var els = {
@@ -21,6 +21,8 @@
         hud: dollar("hud"),
         score: dollar("hud-score"),
         time: dollar("hud-time"),
+        alt: dollar("hud-alt"),
+        speed: dollar("hud-speed"),
         leaderboard: dollar("leaderboard"),
         health: dollar("healthbar"),
         healthfill: dollar("healthfill"),
@@ -30,233 +32,151 @@
         quick: dollar("quickplay-btn"),
         friends: dollar("friends-btn"),
         status: dollar("status"),
+        mute: dollar("mute-btn"),
         pause: dollar("pause-screen"),
         resume: dollar("resume-btn"),
-        mute: dollar("mute-btn"),
+        pauseMenu: dollar("pause-menu-btn"),
         share: dollar("share-bar"),
         shareLink: dollar("share-link"),
         copy: dollar("copy-btn"),
         inter: dollar("intermission"),
         finalBoard: dollar("final-board"),
         interTime: dollar("inter-time"),
-        killfeed: dollar("killfeed"),
-        touch: dollar("touch-controls"),
-        steerPad: dollar("steer-pad"),
-        left: dollar("left-btn"),
-        right: dollar("right-btn"),
-        boost: dollar("boost-btn"),
-        fire: dollar("fire-btn"),
-        recenter: dollar("recenter-btn"),
-        stick: dollar("thumbstick"),
-        gyroOpt: dollar("gyro-opt"),
-        gyroCheck: dollar("gyro-check"),
-        kbdControls: dollar("kbd-controls"),
-        touchHint: dollar("touch-controls-hint"),
-        planeSwatches: dollar("plane-swatches"),
         winnerLine: dollar("winner-line"),
         yourPlace: dollar("your-place"),
-        lbList: dollar("lb-list"),
-        botsOpt: dollar("bots-opt"),
-        botsCheck: dollar("bots-check"),
-        steerRow: dollar("steer-row"),
-        steerSeg: dollar("steer-seg"),
-        invertCheck: dollar("invert-check"),
-        sensRow: dollar("sens-row"),
-        sensRange: dollar("sens-range"),
-        vignette: dollar("vignette"),
-        rotate: dollar("rotate-overlay"),
-        settingsBtn: dollar("settings-btn"),
-        settingsPanel: dollar("settings-panel"),
-        qSeg: dollar("quality-seg"),
-        volMaster: dollar("vol-master"),
-        volMusic: dollar("vol-music"),
-        volSfx: dollar("vol-sfx"),
-        settingsClose: dollar("settings-close"),
+        killfeed: dollar("killfeed"),
         callout: dollar("callout"),
+        vignette: dollar("vignette"),
         powerChip: dollar("power-chip"),
+        touch: dollar("touch-controls"),
+        left: dollar("left-btn"),
+        right: dollar("right-btn"),
+        climb: dollar("climb-btn"),
+        dive: dollar("dive-btn"),
+        boost: dollar("boost-btn"),
+        fire: dollar("fire-btn"),
+        rotate: dollar("rotate-overlay"),
         connLost: dollar("conn-lost"),
         connMsg: dollar("conn-msg"),
         connRetry: dollar("conn-retry"),
-        connMenu: dollar("conn-menu")
+        connMenu: dollar("conn-menu"),
+        bots: dollar("bots-check"),
+        planeSwatches: dollar("plane-swatches")
       };
+      var mode = "menu";
+      var last = 0;
       var prevPhase = "playing";
-      var prevHp = 100;
+      var prevHp = G.MAX_HP;
       var streak = 0;
       var lastKill = 0;
       var lastFireSnd = 0;
-      var mode = "menu";
-      var menuSection = "main";
-      var last = 0;
       var engineStarted = false;
-      var SKINS = [16739179, 4833535, 9167690, 16765514, 12614655];
-      var selectedSkin = 0;
-      try {
-        const s = parseInt(localStorage.getItem("smashcart.skin"), 10);
-        if (Number.isInteger(s) && s >= 0 && s < SKINS.length) selectedSkin = s;
-      } catch (_e) {
-      }
       var botsEnabled = true;
+      var selectedSkin = 0;
+      var SKINS = [16739179, 4833535, 9167690, 16765514, 12614655];
+      try {
+        const saved = parseInt(localStorage.getItem("smashcart.skin") || "", 10);
+        if (Number.isInteger(saved) && saved >= 0 && saved < SKINS.length) selectedSkin = saved;
+      } catch {
+      }
       try {
         botsEnabled = localStorage.getItem("smashcart.bots") !== "0";
-      } catch (_e) {
+      } catch {
       }
-      var steerMode = "arrows";
-      try {
-        const m = localStorage.getItem("smashcart.steer");
-        if (m === "tilt" || m === "arrows" || m === "stick") steerMode = m;
-      } catch (_e) {
+      function escapeHtml(s) {
+        return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+      }
+      function ordinal(n) {
+        const s = ["th", "st", "nd", "rd"];
+        const v = n % 100;
+        return n + (s[(v - 20) % 10] || s[v] || s[0]);
+      }
+      function genCode() {
+        const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+        let out = "";
+        for (let i = 0; i < 6; i++) out += chars[Math.floor(Math.random() * chars.length)];
+        return out;
+      }
+      function roomFromUrl() {
+        const params = new URLSearchParams(location.search);
+        const room = params.get("room");
+        return room ? room.toUpperCase().slice(0, 6) : null;
       }
       function fetchLeaderboard() {
-        if (!els.lbList) return;
         fetch("/leaderboard?n=10").then((r) => r.ok ? r.json() : []).then((rows) => {
           if (!Array.isArray(rows) || !rows.length) {
-            els.lbList.innerHTML = '<li class="muted">No scores yet \u2014 be the first!</li>';
+            els.leaderboard.innerHTML = '<div class="lb-row muted">No scores yet</div>';
             return;
           }
-          els.lbList.innerHTML = rows.map(
-            (e, i) => `<li><span>${i + 1}. ${escapeHtml(e.name)}</span><span>${e.score | 0}</span></li>`
+          els.leaderboard.innerHTML = rows.slice(0, 5).map(
+            (entry, i) => `<div class="lb-row"><span>${i + 1}. ${escapeHtml(entry.name)}</span><span>${entry.score | 0}</span></div>`
           ).join("");
         }).catch(() => {
-          els.lbList.innerHTML = '<li class="muted">Leaderboard unavailable</li>';
+          els.leaderboard.innerHTML = '<div class="lb-row muted">Leaderboard unavailable</div>';
         });
       }
       function buildPlanePicker() {
-        if (!els.planeSwatches) return;
         els.planeSwatches.innerHTML = "";
-        SKINS.forEach((c, i) => {
-          const b = document.createElement("button");
-          b.className = "plane-swatch" + (i === selectedSkin ? " selected" : "");
-          b.style.background = "#" + c.toString(16).padStart(6, "0");
-          b.title = "Plane " + (i + 1);
-          b.addEventListener("click", () => {
-            selectedSkin = i;
+        SKINS.forEach((color, index) => {
+          const button = document.createElement("button");
+          button.className = "plane-swatch" + (index === selectedSkin ? " selected" : "");
+          button.style.background = "#" + color.toString(16).padStart(6, "0");
+          button.title = `Plane ${index + 1}`;
+          button.addEventListener("click", () => {
+            selectedSkin = index;
             try {
-              localStorage.setItem("smashcart.skin", String(i));
-            } catch (_e) {
+              localStorage.setItem("smashcart.skin", String(index));
+            } catch {
             }
-            els.planeSwatches.querySelectorAll(".plane-swatch").forEach((el, j) => el.classList.toggle("selected", j === i));
+            els.planeSwatches.querySelectorAll(".plane-swatch").forEach((node, i) => node.classList.toggle("selected", i === index));
             window.SFX.uiClick();
           });
-          els.planeSwatches.appendChild(b);
+          els.planeSwatches.appendChild(button);
         });
-      }
-      function buildMenuSwatches() {
-        const container = document.getElementById("menu-swatches");
-        if (!container) return;
-        container.innerHTML = "";
-        SKINS.forEach((c, i) => {
-          const b = document.createElement("button");
-          b.className = "swatch" + (i === selectedSkin ? " on" : "");
-          b.style.background = "#" + c.toString(16).padStart(6, "0");
-          b.title = "Plane " + (i + 1);
-          b.addEventListener("click", () => {
-            selectedSkin = i;
-            try {
-              localStorage.setItem("smashcart.skin", String(i));
-            } catch (_e) {
-            }
-            container.querySelectorAll(".swatch").forEach((el, j) => el.classList.toggle("on", j === i));
-            if (els.planeSwatches) els.planeSwatches.querySelectorAll(".plane-swatch").forEach((el, j) => el.classList.toggle("selected", j === i));
-            window.SFX.uiClick();
-          });
-          container.appendChild(b);
-        });
-      }
-      function fetchMenuLeaderboard() {
-        const list = document.getElementById("menu-lb");
-        if (!list) return;
-        fetch("/leaderboard?n=10").then((r) => r.ok ? r.json() : []).then((rows) => {
-          if (!Array.isArray(rows) || !rows.length) {
-            list.innerHTML = '<p class="muted">No scores yet \u2014 be the first!</p>';
-            return;
-          }
-          list.innerHTML = rows.map(
-            (e, i) => `<div class="lb-row"><span>${i + 1}. ${escapeHtml(e.name)}</span><span>${e.score | 0}</span></div>`
-          ).join("");
-        }).catch(() => {
-          list.innerHTML = '<p class="muted">Leaderboard unavailable</p>';
-        });
-      }
-      function setMenuSection(sec) {
-        menuSection = sec;
-        document.querySelectorAll(".menu-panel").forEach((el) => el.classList.add("hidden"));
-        const active = document.getElementById("menu-" + sec);
-        if (active) active.classList.remove("hidden");
-        if (sec === "control") els.settingsPanel.classList.remove("hidden");
-        else els.settingsPanel.classList.add("hidden");
-        if (window.Renderer && window.Renderer.setMenuSection) window.Renderer.setMenuSection(sec);
-        window.SFX.uiClick();
-      }
-      window._menuNav = (sec) => setMenuSection(sec);
-      function genCode() {
-        const c = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-        let s = "";
-        for (let i = 0; i < 6; i++) s += c[Math.floor(Math.random() * c.length)];
-        return s;
-      }
-      function roomFromUrl() {
-        const p = new URLSearchParams(location.search);
-        const r = p.get("room");
-        return r ? r.toUpperCase().slice(0, 6) : null;
       }
       async function startGame(code) {
         if (code === "PUBLIC" && !botsEnabled) code = "NOBOTS";
-        if (window.Renderer.startTakeoff) window.Renderer.startTakeoff();
         window.SFX.unlock();
         enterImmersive();
+        window.Renderer.startTakeoff && window.Renderer.startTakeoff();
         const name = (els.name.value || "Pilot").slice(0, 14);
         els.status.textContent = "Connecting\u2026";
-        els.quick.disabled = els.friends.disabled = true;
+        els.quick.disabled = true;
+        els.friends.disabled = true;
         try {
           await window.Net.connect(name, code, selectedSkin);
         } catch (e) {
           els.status.textContent = "Could not connect: " + (e && e.message ? e.message : e);
-          els.quick.disabled = els.friends.disabled = false;
+          els.quick.disabled = false;
+          els.friends.disabled = false;
           return;
         }
-        ["main", "hangar", "tower", "control", "comms", "howto"].forEach((s) => {
-          const el = document.getElementById("menu-" + s);
-          if (el) {
-            el.classList.add("hidden");
-            el.style.opacity = "0";
-          }
-        });
-        if (window.Renderer && window.Renderer.hideMenu) window.Renderer.hideMenu();
+        mode = "playing";
+        prevPhase = "playing";
+        prevHp = G.MAX_HP;
+        els.start.classList.add("hidden");
         els.hud.classList.remove("hidden");
         els.health.classList.remove("hidden");
-        if (window.Input.isTouchDevice()) {
-          els.touch.classList.remove("hidden");
-          els.steerPad.classList.add("hidden");
-          els.stick.classList.add("hidden");
-          els.recenter.classList.add("hidden");
-          window.Input.stickActive = steerMode === "stick";
-          if (steerMode === "tilt") {
-            const ok = await window.Input.enableGyro();
-            if (ok) els.recenter.classList.remove("hidden");
-            else {
-              steerMode = "arrows";
-              window.Input.stickActive = false;
-              els.steerPad.classList.remove("hidden");
-            }
-          } else if (steerMode === "stick") {
-            els.stick.classList.remove("hidden");
-          } else {
-            els.steerPad.classList.remove("hidden");
-          }
-        }
-        if (window.SFX.stopMenuAmbient) window.SFX.stopMenuAmbient();
-        window.SFX.startMusic();
-        if (code !== "PUBLIC") {
-          const url = location.origin + location.pathname + "?room=" + code;
-          history.replaceState(null, "", "?room=" + code);
-          els.shareLink.value = url;
-          els.share.classList.remove("hidden");
-        }
+        els.respawn.classList.add("hidden");
+        els.inter.classList.add("hidden");
+        els.connLost.classList.add("hidden");
+        els.status.textContent = "";
+        if (window.Input.isTouchDevice()) els.touch.classList.remove("hidden");
         if (!engineStarted) {
           window.SFX.startEngine();
           engineStarted = true;
         }
-        mode = "playing";
+        if (window.SFX.stopMenuAmbient) window.SFX.stopMenuAmbient();
+        window.SFX.startMusic();
+        if (code !== "PUBLIC" && code !== "NOBOTS") {
+          const url = location.origin + location.pathname + "?room=" + code;
+          history.replaceState(null, "", "?room=" + code);
+          els.shareLink.value = url;
+          els.share.classList.remove("hidden");
+        } else {
+          history.replaceState(null, "", location.pathname);
+          els.share.classList.add("hidden");
+        }
       }
       function loop(ts) {
         requestAnimationFrame(loop);
@@ -268,30 +188,20 @@
         if (mode === "playing" && room && room.state) {
           const state = room.state;
           const myId = window.Net.sessionId;
-          const inp = window.Input.get();
-          window.Net.sendInput(inp.turn, inp.boost, inp.fire);
+          const input = window.Input.get();
+          window.Net.sendInput(input.turn, input.climb, input.boost, input.fire);
+          window.Net.stepLocal && window.Net.stepLocal(dt);
           window.Renderer.sync(state, dt, myId);
           window.Renderer.draw(state, myId);
           updateHud(state, myId);
           const me = state.players.get(myId);
           if (me && engineStarted) {
-            const sp = me.boosting ? 1 : 0.55;
-            window.SFX.setEngine(sp, me.boosting);
-          }
-          const fireCd = (G.FIRE_COOLDOWN || 0.22) * (me && me.power === "rapid" ? G.RAPID_FACTOR || 0.45 : 1);
-          if (me && me.alive && inp.fire && ts / 1e3 - lastFireSnd > fireCd) {
-            window.SFX.fire();
-            lastFireSnd = ts / 1e3;
-            if (els.fire) {
-              els.fire.classList.remove("recoil");
-              void els.fire.offsetWidth;
-              els.fire.classList.add("recoil");
+            window.SFX.setEngine(me.boosting ? 1 : 0.5, !!me.boosting);
+            const fireCd = G.FIRE_COOLDOWN * (me.power === "rapid" ? G.RAPID_FACTOR : 1);
+            if (me.alive && input.fire && ts / 1e3 - lastFireSnd > fireCd) {
+              window.SFX.fire();
+              lastFireSnd = ts / 1e3;
             }
-          }
-          if (els.boost) els.boost.classList.toggle("active", !!(me && me.boosting));
-          if (els.fire) {
-            els.fire.classList.toggle("cooling", !!(me && me.alive && inp.fire && ts / 1e3 - lastFireSnd < fireCd));
-            els.fire.classList.toggle("powered", !!(me && me.power && me.power !== "shield" && me.power !== "repair"));
           }
         } else if (mode === "menu") {
           window.Renderer.drawMenu(dt, selectedSkin);
@@ -301,14 +211,19 @@
       }
       function updateHud(state, myId) {
         const me = state.players.get(myId);
+        const local = window.Net.localPose;
         els.score.textContent = String(me ? me.score : 0);
         els.time.textContent = String(Math.ceil(state.timeLeft));
+        const altitude = local && local.active ? local.p.y : me ? me.py : 0;
+        const speed = local && local.active ? local.speed : me ? me.speed : 0;
+        els.alt.textContent = String(Math.round(altitude));
+        els.speed.textContent = String(Math.round(speed));
         if (me) {
           els.healthfill.style.width = Math.max(0, me.hp / G.MAX_HP * 100) + "%";
           els.respawn.classList.toggle("hidden", me.alive);
           if (me.alive && me.hp < prevHp) {
             els.vignette.classList.add("hit");
-            setTimeout(() => els.vignette.classList.remove("hit"), 130);
+            setTimeout(() => els.vignette.classList.remove("hit"), 120);
             window.SFX.hit();
           }
           els.vignette.classList.toggle("low", me.alive && me.hp > 0 && me.hp < 30);
@@ -319,7 +234,7 @@
             const pct = Math.max(0, Math.min(100, left / G.POWERUP_DURATION * 100));
             const hex = "#" + info.color.toString(16).padStart(6, "0");
             els.powerChip.classList.remove("hidden");
-            els.powerChip.innerHTML = `<span class="pc-label">${info.icon} ${escapeHtml(info.label)}</span><span class="pc-bar"><span class="pc-fill" style="width:${pct}%;background:${hex}"></span></span>`;
+            els.powerChip.innerHTML = `<span class="pc-label">${escapeHtml(info.icon)} ${escapeHtml(info.label)}</span><span class="pc-bar"><span class="pc-fill" style="width:${pct}%;background:${hex}"></span></span>`;
           } else {
             els.powerChip.classList.add("hidden");
           }
@@ -328,7 +243,7 @@
         state.players.forEach((p, id) => list.push({ id, name: p.name, score: p.score, bot: p.bot }));
         list.sort((a, b) => b.score - a.score);
         els.leaderboard.innerHTML = list.slice(0, 5).map(
-          (p, i) => `<div class="lb-row ${p.id === myId ? "me" : ""}"><span><span class="rank">${i + 1}.</span> ${escapeHtml(p.name)}${p.bot ? " \u{1F916}" : ""}</span><span>${p.score}</span></div>`
+          (p, i) => `<div class="lb-row ${p.id === myId ? "me" : ""}"><span>${i + 1}. ${escapeHtml(p.name)}${p.bot ? " \u{1F916}" : ""}</span><span>${p.score}</span></div>`
         ).join("");
         if (state.phase !== prevPhase) {
           if (state.phase === "intermission") window.SFX.explosion();
@@ -336,33 +251,38 @@
           prevPhase = state.phase;
         }
         if (state.phase === "intermission") {
-          if (state.phase !== prevPhase && window.Renderer.showPodium) window.Renderer.showPodium(list, myId);
           els.inter.classList.remove("hidden");
           els.interTime.textContent = String(Math.ceil(state.timeLeft));
           const winner = list[0];
-          if (els.winnerLine) els.winnerLine.textContent = winner ? winner.id === myId ? "\u{1F3C6} You win!" : "\u{1F3C6} " + winner.name + " wins!" : "";
+          els.winnerLine.textContent = winner ? winner.id === myId ? "\u{1F3C6} You win!" : `\u{1F3C6} ${winner.name} wins!` : "";
           els.finalBoard.innerHTML = list.slice(0, 6).map(
             (p, i) => `<li class="${p.id === myId ? "me" : ""}${i === 0 ? " win" : ""}"><span>${i + 1}. ${escapeHtml(p.name)}${p.bot ? " \u{1F916}" : ""}</span><span>${p.score}</span></li>`
           ).join("");
-          if (els.yourPlace) {
-            const myIdx = list.findIndex((p) => p.id === myId);
-            els.yourPlace.textContent = myIdx >= 0 ? `You placed ${ordinal(myIdx + 1)} of ${list.length}` : "";
-          }
+          const myRank = list.findIndex((p) => p.id === myId);
+          els.yourPlace.textContent = myRank >= 0 ? `You placed ${ordinal(myRank + 1)} of ${list.length}` : "";
         } else {
-          if (window.Renderer.hidePodium) window.Renderer.hidePodium();
           els.inter.classList.add("hidden");
         }
+      }
+      function showCallout(text) {
+        els.callout.textContent = text;
+        els.callout.classList.remove("show");
+        void els.callout.offsetWidth;
+        els.callout.classList.add("show");
+      }
+      function streakName(streakSize) {
+        return streakSize >= 6 ? "GODLIKE!" : streakSize >= 5 ? "UNSTOPPABLE!" : streakSize >= 4 ? "RAMPAGE!" : streakSize >= 3 ? "TRIPLE HIT!" : "DOUBLE HIT!";
       }
       function onKill(msg) {
         const myId = window.Net.sessionId;
         const mine = msg.killer === myId;
         const victimIsMe = msg.victim === myId;
-        const div = document.createElement("div");
-        div.className = "kill-msg" + (mine ? " mine" : "");
-        div.innerHTML = `${escapeHtml(mine ? "You" : msg.killerName)} \u{1F4A5} <span class="vic">${escapeHtml(victimIsMe ? "You" : msg.victimName)}</span>`;
-        els.killfeed.appendChild(div);
-        setTimeout(() => div.remove(), 3800);
-        while (els.killfeed.children.length > 5) els.killfeed.firstChild.remove();
+        const row = document.createElement("div");
+        row.className = "kill-msg" + (mine ? " mine" : "");
+        row.innerHTML = `${escapeHtml(mine ? "You" : msg.killerName)} \u{1F4A5} <span class="vic">${escapeHtml(victimIsMe ? "You" : msg.victimName)}</span>`;
+        els.killfeed.appendChild(row);
+        setTimeout(() => row.remove(), 3600);
+        while (els.killfeed.children.length > 5) els.killfeed.firstChild?.remove();
         window.Renderer.killPopup(msg.killer, mine);
         if (victimIsMe) window.SFX.explosion();
         if (mine) {
@@ -374,268 +294,69 @@
           if (streak >= 2) showCallout(streakName(streak));
         }
       }
-      function showCallout(text) {
-        els.callout.textContent = text;
-        els.callout.classList.remove("show");
-        void els.callout.offsetWidth;
-        els.callout.classList.add("show");
-      }
-      function streakName(s) {
-        return s >= 6 ? "GODLIKE!" : s >= 5 ? "UNSTOPPABLE!" : s >= 4 ? "RAMPAGE!" : s >= 3 ? "TRIPLE SMASH!" : "DOUBLE SMASH!";
-      }
       function onPickup(msg) {
         if (!window.Net || msg.by !== window.Net.sessionId) return;
         window.SFX.pickup();
         const info = G.POWERUPS[msg.type];
-        showCallout((info ? info.icon + " " + info.label : "POWERUP") + "!");
-      }
-      function escapeHtml(s) {
-        return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
-      }
-      function ordinal(n) {
-        const s = ["th", "st", "nd", "rd"], v = n % 100;
-        return n + (s[(v - 20) % 10] || s[v] || s[0]);
-      }
-      function init() {
-        window.Renderer.init(els.canvas);
-        window.Input.attach();
-        window.Assets.load();
-        window.Net.onKill = onKill;
-        window.Net.onPickup = onPickup;
-        window.Net.onDisconnect = onDisconnect;
-        if (window.Input.isTouchDevice()) {
-          els.gyroOpt.classList.remove("hidden");
-          els.kbdControls.classList.add("hidden");
-          if (els.touchHint) els.touchHint.classList.remove("hidden");
-          if (!window.Input.gyro.supported) els.gyroCheck.checked = false;
-        }
-        buildPlanePicker();
-        fetchLeaderboard();
-        setupTouchButtons();
-        try {
-          window.SFX.unlock();
-          if (window.SFX.startMenuAmbient) window.SFX.startMenuAmbient();
-        } catch (_e) {
-        }
-        setMenuSection("main");
-        const applyQualityClass = () => {
-          document.body.classList.toggle("quality-low", window.Quality.current === "low");
-        };
-        window.Quality.onChange(applyQualityClass);
-        applyQualityClass();
-        const urlCode = roomFromUrl();
-        if (urlCode) {
-          els.status.textContent = "Joining room " + urlCode;
-          els.quick.textContent = "JOIN ROOM " + urlCode;
-        }
-        els.quick.addEventListener("click", () => {
-          window.SFX.uiClick();
-          startGame(urlCode || "PUBLIC");
-        });
-        els.friends.addEventListener("click", () => {
-          window.SFX.uiClick();
-          startGame(genCode());
-        });
-        const navHandler = (btn) => {
-          btn.addEventListener("click", () => {
-            const sec = btn.dataset.section;
-            if (sec) {
-              window.SFX.uiClick();
-              setMenuSection(sec);
-            }
-          });
-        };
-        document.querySelectorAll(".nav-btn[data-section]").forEach(navHandler);
-        document.querySelectorAll(".menu-link[data-section]").forEach(navHandler);
-        const menuQP = document.getElementById("menu-quickplay");
-        if (menuQP) menuQP.addEventListener("click", () => {
-          window.SFX.uiClick();
-          startGame(urlCode || "PUBLIC");
-        });
-        const menuFr = document.getElementById("menu-friends");
-        if (menuFr) menuFr.addEventListener("click", () => {
-          window.SFX.uiClick();
-          startGame(genCode());
-        });
-        const menuName = document.getElementById("menu-name");
-        if (menuName) {
-          menuName.addEventListener("input", () => {
-            els.name.value = menuName.value;
-          });
-          menuName.addEventListener("keydown", (e) => {
-            if (e.key === "Enter") {
-              e.preventDefault();
-              startGame(urlCode || "PUBLIC");
-            }
-          });
-          els.name.addEventListener("input", () => {
-            menuName.value = els.name.value;
-          });
-          menuName.value = els.name.value;
-        }
-        buildMenuSwatches();
-        fetchMenuLeaderboard();
-        document.querySelectorAll("#menu-quality-seg button").forEach((btn) => {
-          btn.addEventListener("click", () => {
-            const q = btn.dataset.q;
-            if (q) {
-              window.Quality.set(q);
-              window.SFX.uiClick();
-            }
-          });
-        });
-        const mVol = document.getElementById("menu-vol");
-        const mMusic = document.getElementById("menu-vol-music");
-        const mSfx = document.getElementById("menu-vol-sfx");
-        if (mVol) mVol.addEventListener("input", () => {
-          els.volMaster.value = mVol.value;
-          els.volMaster.dispatchEvent(new Event("input"));
-        });
-        if (mMusic) mMusic.addEventListener("input", () => {
-          els.volMusic.value = mMusic.value;
-          els.volMusic.dispatchEvent(new Event("input"));
-        });
-        if (mSfx) mSfx.addEventListener("input", () => {
-          els.volSfx.value = mSfx.value;
-          els.volSfx.dispatchEvent(new Event("input"));
-        });
-        els.name.addEventListener("keydown", (e) => {
-          if (e.key === "Enter") {
-            e.preventDefault();
-            startGame(urlCode || "PUBLIC");
-          }
-        });
-        els.copy.addEventListener("click", () => {
-          els.shareLink.select();
-          navigator.clipboard && navigator.clipboard.writeText(els.shareLink.value);
-          els.copy.textContent = "Copied!";
-          setTimeout(() => els.copy.textContent = "Copy", 1500);
-        });
-        els.mute.addEventListener("click", () => toggleMute());
-        els.resume.addEventListener("click", () => togglePause());
-        setupSettings();
-        setupControls();
-        window.Input.onPause = () => {
-          if (mode !== "menu") togglePause();
-        };
-        window.Input.onMute = () => toggleMute();
-        window.addEventListener("orientationchange", updateRotateOverlay);
-        window.addEventListener("resize", updateRotateOverlay);
-        updateRotateOverlay();
-        els.connMenu.addEventListener("click", () => resetToMenu());
-        els.connRetry.addEventListener("click", () => {
-          els.connMsg.textContent = "Reconnecting\u2026";
-          els.connRetry.classList.add("hidden");
-          window.Net.tryReconnect().then((ok) => {
-            if (ok) {
-              els.connLost.classList.add("hidden");
-              if (window.SFX.resume) window.SFX.resume();
-              mode = "playing";
-            } else {
-              els.connMsg.textContent = "Still down.";
-              els.connRetry.classList.remove("hidden");
-            }
-          });
-        });
-        document.addEventListener("visibilitychange", () => {
-          if (document.hidden) {
-            if (window.Net.room) window.Net.sendInput(0, false, false);
-            if (window.SFX.suspend) window.SFX.suspend();
-          } else if (mode === "playing" && window.SFX.resume) window.SFX.resume();
-        });
-        window.addEventListener("pagehide", () => {
-          if (window.Net.room) window.Net.sendInput(0, false, false);
-        });
-        requestAnimationFrame((t) => {
-          last = t;
-          loop(t);
-        });
+        showCallout((info ? `${info.icon} ${info.label}` : "POWERUP") + "!");
       }
       function setupTouchButtons() {
-        const hold = (el, on) => {
-          const set = (v) => (e) => {
+        const bind = (el, key) => {
+          const set = (value) => (e) => {
             e.preventDefault();
-            on(v);
-            el.classList.toggle("pressed", v);
-            if (v) buzz(8);
+            window.Input.touch[key] = value;
+            el.classList.toggle("pressed", value);
+            if (value) buzz(8);
           };
           el.addEventListener("pointerdown", set(true));
           el.addEventListener("pointerup", set(false));
           el.addEventListener("pointercancel", set(false));
           el.addEventListener("pointerleave", set(false));
         };
-        hold(els.left, (v) => window.Input.touch.left = v);
-        hold(els.right, (v) => window.Input.touch.right = v);
-        hold(els.boost, (v) => window.Input.touch.boost = v);
-        hold(els.fire, (v) => window.Input.touch.fire = v);
-        els.recenter.addEventListener("pointerdown", (e) => {
-          e.preventDefault();
-          window.Input.recalibrateGyro();
-          window.SFX.uiClick();
-        });
-        if (els.stick) {
-          const knob = els.stick.querySelector(".knob");
-          let active = false, cx = 0, half = 1;
-          const apply = (clientX) => {
-            let dx = Math.max(-1, Math.min(1, (clientX - cx) / half));
-            window.Input.touch.stick = Math.abs(dx) < 0.12 ? 0 : dx;
-            if (knob) knob.style.transform = `translateX(${dx * half * 0.55}px)`;
-          };
-          els.stick.addEventListener("pointerdown", (e) => {
-            e.preventDefault();
-            active = true;
-            els.stick.classList.add("pressed");
-            buzz(8);
-            const r = els.stick.getBoundingClientRect();
-            cx = r.left + r.width / 2;
-            half = r.width / 2;
-            apply(e.clientX);
-          });
-          window.addEventListener("pointermove", (e) => {
-            if (active) apply(e.clientX);
-          });
-          const end = () => {
-            if (!active) return;
-            active = false;
-            window.Input.touch.stick = 0;
-            if (knob) knob.style.transform = "translateX(0)";
-            els.stick.classList.remove("pressed");
-          };
-          window.addEventListener("pointerup", end);
-          window.addEventListener("pointercancel", end);
-        }
+        bind(els.left, "left");
+        bind(els.right, "right");
+        bind(els.climb, "climb");
+        bind(els.dive, "dive");
+        bind(els.boost, "boost");
+        bind(els.fire, "fire");
       }
       function togglePause() {
         if (mode === "playing") {
           mode = "paused";
           els.pause.classList.remove("hidden");
+          window.Net.sendInput(0, 0, false, false);
           window.SFX.setEngine(0, false);
-          if (window.Net.room) window.Net.sendInput(0, false, false);
         } else if (mode === "paused") {
           mode = "playing";
           els.pause.classList.add("hidden");
         }
       }
       function toggleMute() {
-        const m = window.SFX.toggleMute();
-        els.mute.textContent = m ? "\u{1F507}" : "\u{1F50A}";
+        const muted = window.SFX.toggleMute();
+        els.mute.textContent = muted ? "\u{1F507}" : "\u{1F50A}";
       }
       function resetToMenu() {
         try {
           window.Net.leave();
-        } catch (_e) {
+        } catch {
         }
         if (window.SFX.stopLoops) window.SFX.stopLoops();
         if (window.SFX.startMenuAmbient) window.SFX.startMenuAmbient();
         mode = "menu";
         engineStarted = false;
-        window.Input.stickActive = false;
-        ["hud", "health", "touch", "steerPad", "stick", "recenter", "share", "inter", "pause", "powerChip", "connLost"].forEach((k) => els[k] && els[k].classList.add("hidden"));
-        els.quick.disabled = els.friends.disabled = false;
+        els.start.classList.remove("hidden");
+        els.hud.classList.add("hidden");
+        els.health.classList.add("hidden");
+        els.touch.classList.add("hidden");
+        els.share.classList.add("hidden");
+        els.inter.classList.add("hidden");
+        els.pause.classList.add("hidden");
+        els.connLost.classList.add("hidden");
+        els.respawn.classList.add("hidden");
+        els.powerChip.classList.add("hidden");
+        els.quick.disabled = false;
+        els.friends.disabled = false;
         els.status.textContent = "";
-        if (window.Renderer && window.Renderer.showMenu) window.Renderer.showMenu();
-        setMenuSection("main");
-        if (window.SFX && window.SFX.startMusic) window.SFX.startMusic();
         fetchLeaderboard();
         updateRotateOverlay();
       }
@@ -663,22 +384,14 @@
           updateRotateOverlay();
           return;
         }
-        const el = document.documentElement;
-        const req = el.requestFullscreen || el.webkitRequestFullscreen || el.msRequestFullscreen;
-        if (req) {
+        const root = document.documentElement;
+        const request = root.requestFullscreen || root.webkitRequestFullscreen || root.msRequestFullscreen;
+        if (request) {
           try {
-            const r = req.call(el);
-            if (r && r.catch) r.catch(() => {
+            const res = request.call(root);
+            if (res && res.catch) res.catch(() => {
             });
-          } catch (_e) {
-          }
-        }
-        if (screen.orientation && screen.orientation.lock) {
-          try {
-            const r = screen.orientation.lock("landscape");
-            if (r && r.catch) r.catch(() => {
-            });
-          } catch (_e) {
+          } catch {
           }
         }
         updateRotateOverlay();
@@ -688,129 +401,89 @@
         const show = window.Input.isTouchDevice() && portrait && mode !== "menu";
         els.rotate.classList.toggle("show", !!show);
       }
-      function setupSettings() {
-        const setOpen = (v2) => els.settingsPanel.classList.toggle("hidden", !v2);
-        els.settingsBtn.addEventListener("click", () => {
-          window.SFX.uiClick();
-          setOpen(els.settingsPanel.classList.contains("hidden"));
-        });
-        els.settingsClose.addEventListener("click", () => {
-          window.SFX.uiClick();
-          setOpen(false);
-        });
-        els.qSeg.querySelectorAll("button").forEach((b) => {
-          b.addEventListener("click", () => {
-            window.SFX.uiClick();
-            window.Quality.set(b.dataset.q, true);
-            refreshQuality();
-          });
-        });
-        window.Quality.onChange(refreshQuality);
-        refreshQuality();
-        const v = window.SFX.vols();
-        els.volMaster.value = String(Math.round(v.master * 100));
-        els.volMusic.value = String(Math.round(v.music * 100));
-        els.volSfx.value = String(Math.round(v.sfx * 100));
-        els.volMaster.addEventListener("input", () => window.SFX.setMaster(parseInt(els.volMaster.value, 10) / 100));
-        els.volMusic.addEventListener("input", () => window.SFX.setMusic(parseInt(els.volMusic.value, 10) / 100));
-        els.volSfx.addEventListener("input", () => window.SFX.setSfx(parseInt(els.volSfx.value, 10) / 100));
-      }
-      function setupControls() {
-        if (!window.Input.gyro.supported && steerMode === "tilt") steerMode = "arrows";
-        if (els.botsCheck) {
-          els.botsCheck.checked = botsEnabled;
-          els.botsCheck.addEventListener("change", () => {
-            botsEnabled = els.botsCheck.checked;
-            try {
-              localStorage.setItem("smashcart.bots", botsEnabled ? "1" : "0");
-            } catch (_e) {
-            }
-            window.SFX.uiClick();
-          });
-        }
-        try {
-          window.Input.invertSteer = localStorage.getItem("smashcart.invert") === "1";
-        } catch (_e) {
-        }
-        if (els.invertCheck) {
-          els.invertCheck.checked = window.Input.invertSteer;
-          els.invertCheck.addEventListener("change", () => {
-            window.Input.invertSteer = els.invertCheck.checked;
-            try {
-              localStorage.setItem("smashcart.invert", window.Input.invertSteer ? "1" : "0");
-            } catch (_e) {
-            }
-            window.SFX.uiClick();
-          });
-        }
-        let sens = 100;
-        try {
-          const s = parseInt(localStorage.getItem("smashcart.sens") || "", 10);
-          if (s >= 50 && s <= 200) sens = s;
-        } catch (_e) {
-        }
-        window.Input.setGyroSensitivity(sens / 100);
-        if (els.sensRange) {
-          els.sensRange.value = String(sens);
-          els.sensRange.addEventListener("input", () => {
-            window.Input.setGyroSensitivity(parseInt(els.sensRange.value, 10) / 100);
-            try {
-              localStorage.setItem("smashcart.sens", String(els.sensRange.value));
-            } catch (_e) {
-            }
-          });
-        }
-        if (els.steerSeg) {
-          els.steerSeg.querySelectorAll("button").forEach((b) => {
-            b.classList.toggle("active", b.dataset.steer === steerMode);
-            b.addEventListener("click", () => {
-              window.SFX.uiClick();
-              applySteerMode(b.dataset.steer);
-            });
-          });
-        }
-        if (els.gyroCheck) {
-          els.gyroCheck.checked = steerMode === "tilt";
-          els.gyroCheck.addEventListener("change", () => applySteerMode(els.gyroCheck.checked ? "tilt" : "arrows"));
-        }
-        if (!window.Input.isTouchDevice()) {
-          if (els.steerRow) els.steerRow.classList.add("hidden");
-          if (els.sensRow) els.sensRow.classList.add("hidden");
-        }
-      }
-      async function applySteerMode(m) {
-        steerMode = m === "tilt" || m === "stick" ? m : "arrows";
-        try {
-          localStorage.setItem("smashcart.steer", steerMode);
-        } catch (_e) {
-        }
-        const reflect = () => {
-          if (els.steerSeg) els.steerSeg.querySelectorAll("button").forEach((b) => b.classList.toggle("active", b.dataset.steer === steerMode));
-          if (els.gyroCheck) els.gyroCheck.checked = steerMode === "tilt";
-        };
-        reflect();
-        window.Input.stickActive = steerMode === "stick";
-        if (mode === "playing" && window.Input.isTouchDevice()) {
-          els.steerPad.classList.add("hidden");
-          els.stick.classList.add("hidden");
-          els.recenter.classList.add("hidden");
-          if (steerMode === "tilt") {
-            const ok = await window.Input.enableGyro();
-            if (ok) els.recenter.classList.remove("hidden");
-            else {
-              steerMode = "arrows";
-              window.Input.stickActive = false;
-              reflect();
-            }
-          } else {
-            window.Input.disableGyro();
+      function init() {
+        window.Renderer.init(els.canvas);
+        window.Input.attach();
+        window.Assets.load();
+        window.Net.onKill = onKill;
+        window.Net.onPickup = onPickup;
+        window.Net.onDisconnect = onDisconnect;
+        els.bots.checked = botsEnabled;
+        els.bots.addEventListener("change", () => {
+          botsEnabled = els.bots.checked;
+          try {
+            localStorage.setItem("smashcart.bots", botsEnabled ? "1" : "0");
+          } catch {
           }
-          if (steerMode === "stick") els.stick.classList.remove("hidden");
-          if (steerMode === "arrows") els.steerPad.classList.remove("hidden");
+          window.SFX.uiClick();
+        });
+        buildPlanePicker();
+        fetchLeaderboard();
+        setupTouchButtons();
+        updateRotateOverlay();
+        if (window.SFX.startMenuAmbient) window.SFX.startMenuAmbient();
+        if (window.Input.isTouchDevice()) document.body.classList.add("touch-device");
+        const urlCode = roomFromUrl();
+        if (urlCode) {
+          els.status.textContent = `Room ${urlCode} ready`;
+          els.quick.textContent = `JOIN ${urlCode}`;
         }
-      }
-      function refreshQuality() {
-        els.qSeg.querySelectorAll("button").forEach((b) => b.classList.toggle("active", b.dataset.q === window.Quality.current));
+        els.quick.addEventListener("click", () => {
+          window.SFX.uiClick();
+          startGame(urlCode || "PUBLIC");
+        });
+        els.friends.addEventListener("click", () => {
+          window.SFX.uiClick();
+          startGame(genCode());
+        });
+        els.name.addEventListener("keydown", (e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            startGame(urlCode || "PUBLIC");
+          }
+        });
+        els.copy.addEventListener("click", () => {
+          els.shareLink.select();
+          navigator.clipboard && navigator.clipboard.writeText(els.shareLink.value);
+          els.copy.textContent = "Copied!";
+          setTimeout(() => els.copy.textContent = "Copy", 1200);
+        });
+        els.mute.addEventListener("click", () => toggleMute());
+        els.resume.addEventListener("click", () => togglePause());
+        els.pauseMenu.addEventListener("click", () => resetToMenu());
+        els.connMenu.addEventListener("click", () => resetToMenu());
+        els.connRetry.addEventListener("click", () => {
+          els.connMsg.textContent = "Reconnecting\u2026";
+          els.connRetry.classList.add("hidden");
+          window.Net.tryReconnect().then((ok) => {
+            if (ok) {
+              els.connLost.classList.add("hidden");
+              if (window.SFX.resume) window.SFX.resume();
+              mode = "playing";
+            } else {
+              els.connMsg.textContent = "Still down.";
+              els.connRetry.classList.remove("hidden");
+            }
+          });
+        });
+        window.Input.onPause = () => {
+          if (mode !== "menu") togglePause();
+        };
+        window.Input.onMute = () => toggleMute();
+        document.addEventListener("visibilitychange", () => {
+          if (document.hidden) {
+            if (window.Net.room) window.Net.sendInput(0, 0, false, false);
+            if (window.SFX.suspend) window.SFX.suspend();
+          } else if (mode === "playing" && window.SFX.resume) {
+            window.SFX.resume();
+          }
+        });
+        window.addEventListener("orientationchange", updateRotateOverlay);
+        window.addEventListener("resize", updateRotateOverlay);
+        requestAnimationFrame((t) => {
+          last = t;
+          loop(t);
+        });
       }
       window.addEventListener("DOMContentLoaded", init);
     }

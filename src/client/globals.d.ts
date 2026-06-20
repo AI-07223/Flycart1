@@ -1,5 +1,4 @@
 // Type declarations for window.* globals used by the SmashCart client.
-// These are loaded via <script> tags and expose themselves on `window`.
 
 interface Vec3 { x: number; y: number; z: number; }
 
@@ -12,15 +11,25 @@ interface SphereAPI {
   cross(a: Vec3, b: Vec3): Vec3;
   len(a: Vec3): number;
   normalize(a: Vec3): Vec3;
+  distance(a: Vec3, b: Vec3): number;
+  distanceSq(a: Vec3, b: Vec3): number;
+  clamp(v: number, min: number, max: number): number;
+  lerp(a: number, b: number, t: number): number;
+  lerpVec(a: Vec3, b: Vec3, t: number): Vec3;
+  flatten(a: Vec3): Vec3;
   rotateAxis(v: Vec3, k: Vec3, ang: number): Vec3;
   anyTangent(p: Vec3): Vec3;
   tangentize(p: Vec3, f: Vec3): Vec3;
-  advance(p: Vec3, f: Vec3, ang: number): { p: Vec3; f: Vec3 };
+  advance(p: Vec3, f: Vec3, dist: number): { p: Vec3; f: Vec3 };
   turn(p: Vec3, f: Vec3, ang: number): Vec3;
   angBetween(a: Vec3, b: Vec3): number;
   slerp(a: Vec3, b: Vec3, t: number): Vec3;
   signedAngle(normal: Vec3, from: Vec3, to: Vec3): number;
-  dirFrom(base: Vec3, ang: number, az: number): Vec3;
+  yawPitchForward(yaw: number, pitch: number): Vec3;
+  yawPitchFromForward(f: Vec3): { yaw: number; pitch: number };
+  withPitch(f: Vec3, pitch: number): Vec3;
+  segmentPointT(a: Vec3, b: Vec3, p: Vec3): number;
+  segmentPointDistance(a: Vec3, b: Vec3, p: Vec3): number;
   randomDir(rng?: () => number): Vec3;
 }
 
@@ -30,26 +39,14 @@ interface PowerupInfo {
   icon: string;
 }
 
-interface ObstacleBehavior {
-  solid: boolean;
-  blocksBullets: boolean;
-}
-
-interface ObstacleSpec {
-  ang: number;
-  az: number;
-  angRadius: number;
-  height: number;
+interface Landmark {
   kind: string;
-  landmark?: string;
-}
-
-interface Obstacle {
-  dir: Vec3;
-  angRadius: number;
+  x: number;
+  z: number;
+  radius: number;
   height: number;
-  kind: string;
-  landmark?: string;
+  color: number;
+  cover: boolean;
 }
 
 interface GameConstants {
@@ -57,9 +54,12 @@ interface GameConstants {
   BOOST_SPEED: number;
   ACCEL: number;
   TURN_RATE: number;
+  PITCH_RATE: number;
+  PITCH_MAX: number;
   PLANE_RADIUS: number;
   MAX_HP: number;
   BULLET_SPEED: number;
+  BULLET_DAMAGE: number;
   AFTERBURNER_FACTOR: number;
   RAPID_FACTOR: number;
   FIRE_COOLDOWN: number;
@@ -69,18 +69,18 @@ interface GameConstants {
   HOMING_TURN: number;
   TICK_RATE: number;
   SKIN_COUNT: number;
-  R_BASE: number;
-  R_MIN: number;
-  R_MAX: number;
-  N_BASE: number;
+  MAP_HALF: number;
+  MAP_EDGE_SOFT: number;
+  GROUND_Y: number;
+  MIN_ALT: number;
+  SPAWN_ALT: number;
+  MAX_ALT: number;
+  PICKUP_ALT_MIN: number;
+  PICKUP_ALT_MAX: number;
+  PICKUP_FIELD_RADIUS: number;
   POWERUP_DURATION: number;
-  ZONES: { centerAng: number; midAng: number };
-  OBSTACLE_BEHAVIOR: Record<string, ObstacleBehavior>;
-  SPAWN_REROLL: number;
   POWERUPS: Record<string, PowerupInfo>;
-  OB_SPECS: ObstacleSpec[];
-  HOTSPOT_DIR: Vec3;
-  OBSTACLES: Obstacle[];
+  LANDMARKS: Landmark[];
 }
 
 interface QualityTier {
@@ -139,42 +139,34 @@ interface AssetsAPI {
 interface TouchState {
   left: boolean;
   right: boolean;
+  climb: boolean;
+  dive: boolean;
   boost: boolean;
   fire: boolean;
-  stick: number;
-}
-
-interface GyroState {
-  enabled: boolean;
-  supported: boolean;
-  turn: number;
-  base: number | null;
-  sens: number;
 }
 
 interface InputAPI {
   turn: number;
+  climb: number;
   boost: boolean;
   fire: boolean;
   onPause: (() => void) | null;
   onMute: (() => void) | null;
   touch: TouchState;
-  stickActive: boolean;
-  gyro: GyroState;
   invertSteer: boolean;
   get(): InputAPI;
   attach(): void;
   isTouchDevice(): boolean;
-  enableGyro(): Promise<boolean>;
-  recalibrateGyro(): void;
-  setGyroSensitivity(s: number): void;
-  disableGyro(): void;
 }
 
 interface SnapshotPlayer {
   p: Vec3;
   f: Vec3;
   alive: boolean;
+  speed: number;
+  turn: number;
+  climb: number;
+  seq: number;
 }
 
 interface Snapshot {
@@ -186,7 +178,7 @@ interface NetAPI {
   client: any | null;
   room: any | null;
   sessionId: string | null;
-  lastSent: { turn: number; boost: boolean; fire: boolean };
+  lastSent: { seq: number; turn: number; climb: number; boost: boolean; fire: boolean };
   snaps: Snapshot[];
   onKill: ((msg: any) => void) | null;
   onPickup: ((msg: any) => void) | null;
@@ -196,7 +188,7 @@ interface NetAPI {
   connect(name: string, code: string, skin: number): Promise<any>;
   tryReconnect(): Promise<boolean>;
   sample(renderTime: number): Record<string, SnapshotPlayer>;
-  sendInput(turn: number, boost: boolean, fire: boolean): void;
+  sendInput(turn: number, climb: number, boost: boolean, fire: boolean): void;
   setName(name: string): void;
   leave(): void;
 }
@@ -212,9 +204,6 @@ interface RendererAPI {
   setMenuSection?(sec: string): void;
   showMenu?(): void;
   hideMenu?(): void;
-  menuClick?(x: number, y: number): string | null;
-  showPodium?(list: any[], myId: string): void;
-  hidePodium?(): void;
 }
 
 interface ColyseusClient {
@@ -234,7 +223,4 @@ declare interface Window {
   Net: NetAPI;
   Renderer: RendererAPI;
   Colyseus: { Client: ColyseusClient };
-  /** Called by render3d.js when a 3D structure is clicked (immersive menu). */
-  _menuNav?: (sec: string) => void;
 }
-

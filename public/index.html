@@ -3,13 +3,12 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-  <title>SmashCart — 3D Plane Combat</title>
+  <title>SmashCart — Flat-World Air Combat</title>
   <link rel="stylesheet" href="css/style.css" />
   <script type="importmap">
     {
       "imports": {
-        "three": "/vendor/three.module.min.js",
-        "three/addons/": "/vendor/jsm/"
+        "three": "/vendor/three.module.min.js"
       }
     }
   </script>
@@ -17,163 +16,102 @@
 <body>
   <div id="game-wrap">
     <canvas id="game"></canvas>
-
-    <!-- Damage flash / low-health pulse -->
     <div id="vignette"></div>
-
-    <!-- Big combo / streak callout -->
     <div id="callout"></div>
 
-    <!-- Rotate-to-landscape guard (mobile portrait) -->
     <div id="rotate-overlay">
-      <div class="rot-inner">📱 ↻<br />Rotate your device<br /><span>Landscape gives you the full cockpit view</span></div>
+      <div class="rot-inner">📱 ↻<br />Rotate your device<br /><span>Landscape works best for the flight deck</span></div>
     </div>
 
-    <!-- In-game HUD -->
     <div id="hud" class="hidden">
       <div class="hud-row">
         <div class="hud-item">SCORE <span id="hud-score">0</span></div>
         <div class="hud-item">TIME <span id="hud-time">--</span></div>
+        <div class="hud-item">ALT <span id="hud-alt">0</span></div>
+        <div class="hud-item">SPD <span id="hud-speed">0</span></div>
         <button id="mute-btn" class="icon-btn" title="Mute (M)">🔊</button>
       </div>
       <div id="leaderboard"></div>
       <div id="power-chip" class="hidden"></div>
     </div>
 
-    <!-- Health bar -->
     <div id="healthbar" class="hidden"><div id="healthfill"></div></div>
-
-    <!-- Kill feed -->
     <div id="killfeed"></div>
-
-    <!-- Respawn notice -->
     <div id="respawn" class="hidden">💥 Shot down — respawning…</div>
 
-    <!-- On-screen touch controls (mobile) -->
     <div id="touch-controls" class="hidden">
-      <div id="steer-pad" class="hidden">
-        <button class="tbtn arrow" id="left-btn" aria-label="left">◀</button>
-        <button class="tbtn arrow" id="right-btn" aria-label="right">▶</button>
+      <div class="touch-left">
+        <div class="touch-stack horizontal">
+          <button class="tbtn arrow" id="left-btn" aria-label="Turn left">◀</button>
+          <button class="tbtn arrow" id="right-btn" aria-label="Turn right">▶</button>
+        </div>
+        <div class="touch-stack vertical">
+          <button class="tbtn climb" id="climb-btn" aria-label="Climb">▲</button>
+          <button class="tbtn dive" id="dive-btn" aria-label="Dive">▼</button>
+        </div>
       </div>
-      <div id="thumbstick" class="hidden"><div class="knob"></div></div>
-      <button class="tbtn recenter hidden" id="recenter-btn" aria-label="recenter gyro">⟳</button>
-      <button class="tbtn boost" id="boost-btn">BOOST</button>
-      <button class="tbtn fire" id="fire-btn">FIRE</button>
+      <div class="touch-right">
+        <button class="tbtn boost" id="boost-btn">BOOST</button>
+        <button class="tbtn fire" id="fire-btn">FIRE</button>
+      </div>
     </div>
 
-    <!-- Share bar (private rooms) -->
     <div id="share-bar" class="hidden">
       <span>Invite friends:</span>
       <input id="share-link" readonly />
       <button id="copy-btn">Copy</button>
     </div>
 
-    <!-- Round intermission scoreboard -->
+    <div id="start-screen" class="overlay">
+      <div class="menu-shell">
+        <h1>SMASH<span>CART</span></h1>
+        <p class="tagline">Slow, readable 3D dogfights over a flat open battlefield. Climb, dive, line up your shot, and stay alive.</p>
+        <input id="name-input" maxlength="14" placeholder="Call sign" />
+        <label class="switch"><input type="checkbox" id="bots-check" checked /> 🤖 Fill with bots</label>
+        <div id="plane-picker">
+          <span class="picker-label">Choose your plane</span>
+          <div id="plane-swatches"></div>
+        </div>
+        <div class="btn-row">
+          <button id="quickplay-btn">QUICK PLAY</button>
+          <button id="friends-btn" class="secondary">PLAY WITH FRIENDS</button>
+        </div>
+        <div class="controls-card">
+          <div class="controls-block">
+            <h2>Desktop</h2>
+            <p><kbd>A</kbd><kbd>D</kbd> steer</p>
+            <p><kbd>W</kbd><kbd>S</kbd> climb / dive</p>
+            <p><kbd>Shift</kbd> boost · <kbd>Space</kbd> fire</p>
+            <p><kbd>P</kbd> pause · <kbd>M</kbd> mute</p>
+          </div>
+          <div class="controls-block touch-only">
+            <h2>Mobile</h2>
+            <p>Left / right to yaw</p>
+            <p>Up / down to climb and dive</p>
+            <p>BOOST for speed · FIRE to shoot</p>
+          </div>
+        </div>
+        <p id="status" class="muted"></p>
+      </div>
+    </div>
+
     <div id="intermission" class="overlay hidden">
       <h2>ROUND OVER</h2>
       <p id="winner-line" class="winner"></p>
       <ol id="final-board"></ol>
       <p id="your-place" class="muted"></p>
       <p class="muted">Next round in <span id="inter-time">--</span>s</p>
-      <div class="intermission-actions">
-        <button id="rematch-btn" class="nav-btn" onclick="location.reload()">🔄 REMATCH</button>
-      </div>
     </div>
 
-    <!-- Immersive menu: section panels (hosted as CSS3DObjects by render3d.js) -->
-    <!-- start-screen kept as compat wrapper; hidden when CSS3D takes over -->
-    <div id="start-screen" class="overlay hidden">
-    </div>
-
-    <!-- MAIN section: title, name, play buttons -->
-    <div id="menu-main" class="menu-panel">
-      <h1>SMASH<span>CART</span></h1>
-      <p class="tagline">Online 3D plane combat. Take to the skies, chase 'em down, smash everyone out of the air.</p>
-      <input id="name-input" maxlength="14" placeholder="Call sign" />
-      <label id="bots-opt" class="switch">
-        <input type="checkbox" id="bots-check" checked /> 🤖 Play with bots
-      </label>
-      <div class="btn-row">
-        <button id="quickplay-btn">QUICK PLAY</button>
-        <button id="friends-btn" class="secondary">PLAY WITH FRIENDS</button>
-      </div>
-      <p id="status" class="muted"></p>
-      <div class="menu-nav">
-        <button class="nav-btn" data-section="hangar">✈️ HANGAR</button>
-        <button class="nav-btn" data-section="tower">🏆 SCORES</button>
-        <button class="nav-btn" data-section="control">⚙️ SETTINGS</button>
-        <button class="nav-btn" data-section="howto">📖 HOW TO</button>
-      </div>
-    </div>
-
-    <!-- HANGAR section: plane picker -->
-    <div id="menu-hangar" class="menu-panel">
-      <h2>✈️ HANGAR</h2>
-      <div id="plane-picker">
-        <span class="picker-label">Choose your plane</span>
-        <div id="plane-swatches"></div>
-      </div>
-      <button class="nav-btn back-btn" data-section="main">← BACK</button>
-    </div>
-
-    <!-- TOWER section: leaderboard -->
-    <div id="menu-tower" class="menu-panel">
-      <h2>🏆 TOP PILOTS</h2>
-      <div id="menu-leaderboard">
-        <ol id="lb-list"><li class="muted">Loading…</li></ol>
-      </div>
-      <button class="nav-btn back-btn" data-section="main">← BACK</button>
-    </div>
-
-    <!-- CONTROL section: opens settings panel -->
-    <div id="menu-control" class="menu-panel">
-      <h2>⚙️ SETTINGS</h2>
-      <p class="muted">Audio, graphics, and control settings are accessible via the gear icon during gameplay, or tap below.</p>
-      <button id="menu-settings-open" class="nav-btn">OPEN SETTINGS ⚙</button>
-      <button class="nav-btn back-btn" data-section="main">← BACK</button>
-    </div>
-
-    <!-- COMMS section: friends (placeholder) -->
-    <div id="menu-comms" class="menu-panel">
-      <h2>📡 COMMS</h2>
-      <p class="muted">Friends features coming soon!</p>
-      <button class="nav-btn back-btn" data-section="main">← BACK</button>
-    </div>
-
-    <!-- HOWTO section: controls guide -->
-    <div id="menu-howto" class="menu-panel">
-      <h2>📖 HOW TO PLAY</h2>
-      <div class="controls" id="kbd-controls">
-        <span class="howto-row"><kbd>A</kbd><kbd>D</kbd> / <kbd>◀</kbd><kbd>▶</kbd> <em>Steer your plane</em></span>
-        <span class="howto-row"><kbd>W</kbd>/<kbd>Shift</kbd> <em>Boost speed</em></span>
-        <span class="howto-row"><kbd>Space</kbd> <em>Fire bullets</em></span>
-        <span class="howto-row"><kbd>P</kbd> Pause · <kbd>M</kbd> Mute</span>
-      </div>
-      <div class="controls hidden" id="touch-controls-hint">
-        <span class="howto-row">👈 👉 <em>Tap sides to steer</em></span>
-        <span class="howto-row">🚀 <em>Tap BOOST for speed</em></span>
-        <span class="howto-row">🔥 <em>Tap FIRE to shoot</em></span>
-        <span class="howto-row">📱 <em>Or tilt to steer</em></span>
-      </div>
-      <div class="howto-tips">
-        <p>⭐ Collect <strong>powerups</strong> on the planet surface</p>
-        <p>💥 Smash opponents to climb the scoreboard</p>
-        <p>🏆 Top scorer when time runs out wins the round</p>
-      </div>
-      <label id="gyro-opt" class="switch hidden">
-        <input type="checkbox" id="gyro-check" checked /> 📱 Tilt to steer (gyro)
-      </label>
-      <button class="nav-btn back-btn" data-section="main">← BACK</button>
-    </div>
-
-    <!-- Pause -->
     <div id="pause-screen" class="overlay hidden">
       <h2>PAUSED</h2>
-      <p class="muted">Heads up — your plane is still airborne out there.</p>
-      <button id="resume-btn">RESUME</button>
+      <p class="muted">Your plane keeps drifting forward. Resume or return to the menu.</p>
+      <div class="btn-row">
+        <button id="resume-btn">RESUME</button>
+        <button id="pause-menu-btn" class="secondary">MAIN MENU</button>
+      </div>
     </div>
 
-    <!-- Connection lost / reconnect -->
     <div id="conn-lost" class="overlay hidden">
       <h2>CONNECTION LOST</h2>
       <p id="conn-msg" class="muted">Reconnecting…</p>
@@ -182,101 +120,7 @@
         <button id="conn-menu" class="secondary">MAIN MENU</button>
       </div>
     </div>
-
-    <!-- Settings (audio + graphics) -->
-    <button id="settings-btn" class="icon-btn corner" title="Settings">⚙</button>
-    <div id="settings-panel" class="panel hidden">
-      <h3>SETTINGS</h3>
-      <div class="set-row"><label>Graphics</label>
-        <div class="seg" id="quality-seg">
-          <button data-q="low">Low</button><button data-q="med">Med</button><button data-q="high">High</button>
-        </div>
-      </div>
-      <div class="set-row" id="steer-row"><label>Steering</label>
-        <div class="seg" id="steer-seg">
-          <button data-steer="arrows">Arrows</button><button data-steer="stick">Stick</button><button data-steer="tilt">Tilt</button>
-        </div>
-      </div>
-      <div class="set-row"><label>Invert</label>
-        <label class="switch sm"><input type="checkbox" id="invert-check" /> Reverse L/R</label>
-      </div>
-      <div class="set-row" id="sens-row"><label>Sensitivity</label><input type="range" id="sens-range" min="50" max="200" /></div>
-      <div class="set-row"><label>Master</label><input type="range" id="vol-master" min="0" max="100" /></div>
-      <div class="set-row"><label>Music</label><input type="range" id="vol-music" min="0" max="100" /></div>
-      <div class="set-row"><label>SFX</label><input type="range" id="vol-sfx" min="0" max="100" /></div>
-      <button id="settings-close" class="secondary">CLOSE</button>
-    </div>
   </div>
-
-    <!-- ==================== CSS3D Immersive Menu Panels ==================== -->
-    <!-- These panels are wrapped as CSS3DObjects by render3d.js -->
-    <div id="menu-main" class="menu-panel">
-      <h1 class="menu-title">SMASH<span>CART</span></h1>
-      <p class="menu-tagline">3D Plane Combat Arena</p>
-      <input id="menu-name" type="text" placeholder="Enter callsign…" maxlength="16" autocomplete="off" />
-      <button id="menu-quickplay" class="menu-btn primary">▶ QUICK PLAY</button>
-      <button id="menu-friends" class="menu-btn secondary">👥 PLAY WITH FRIENDS</button>
-      <div class="menu-bottom-row">
-        <button class="menu-link" data-section="howto">HOW TO PLAY</button>
-        <button class="menu-link" data-section="control">⚙ SETTINGS</button>
-      </div>
-      <div id="menu-room" class="menu-room hidden">
-        Share this link: <input id="menu-share-link" type="text" readonly />
-        <button id="menu-copy-btn" class="menu-btn small">COPY</button>
-      </div>
-      <div id="menu-status" class="menu-status"></div>
-    </div>
-
-    <div id="menu-hangar" class="menu-panel hidden-panel">
-      <h2 class="panel-heading">✈ HANGAR</h2>
-      <p class="panel-sub">Choose your plane</p>
-      <div id="menu-swatches" class="menu-swatches"></div>
-      <button class="menu-link" data-section="main">← BACK TO BASE</button>
-    </div>
-
-    <div id="menu-tower" class="menu-panel hidden-panel">
-      <h2 class="panel-heading">🏆 SCOREBOARD</h2>
-      <p class="panel-sub">Top pilots worldwide</p>
-      <div id="menu-lb" class="menu-lb-list"></div>
-      <button class="menu-link" data-section="main">← BACK TO BASE</button>
-    </div>
-
-    <div id="menu-control" class="menu-panel hidden-panel">
-      <h2 class="panel-heading">⚙ CONTROL TOWER</h2>
-      <div class="set-row"><label>Graphics</label>
-        <div class="seg" id="menu-quality-seg">
-          <button data-q="low">Low</button><button data-q="med">Med</button><button data-q="high">High</button>
-        </div>
-      </div>
-      <div class="set-row"><label>Master</label><input type="range" id="menu-vol" min="0" max="100" /></div>
-      <div class="set-row"><label>Music</label><input type="range" id="menu-vol-music" min="0" max="100" /></div>
-      <div class="set-row"><label>SFX</label><input type="range" id="menu-vol-sfx" min="0" max="100" /></div>
-      <button class="menu-link" data-section="main">← BACK TO BASE</button>
-    </div>
-
-    <div id="menu-comms" class="menu-panel hidden-panel">
-      <h2 class="panel-heading">📡 COMMS PAD</h2>
-      <p class="panel-sub">Play with friends</p>
-      <button id="menu-create-room" class="menu-btn primary">CREATE ROOM</button>
-      <div id="menu-room-info" class="hidden">
-        <p>Room code: <strong id="menu-room-code"></strong></p>
-        <input id="menu-share-url" type="text" readonly />
-        <button id="menu-copy-url" class="menu-btn small">COPY LINK</button>
-      </div>
-      <button class="menu-link" data-section="main">← BACK TO BASE</button>
-    </div>
-
-    <div id="menu-howto" class="menu-panel hidden-panel">
-      <h2 class="panel-heading">📖 HOW TO PLAY</h2>
-      <div class="howto-grid">
-        <div class="howto-item"><span class="howto-key">← →</span> Steer</div>
-        <div class="howto-item"><span class="howto-key">↑</span> Boost</div>
-        <div class="howto-item"><span class="howto-key">Space</span> Fire</div>
-        <div class="howto-item"><span class="howto-key">M</span> Mute</div>
-      </div>
-      <p class="howto-tip">Collect powerups on the planet surface. Smash opponents to climb the scoreboard!</p>
-      <button class="menu-link" data-section="main">← BACK TO BASE</button>
-    </div>
 
   <script src="vendor/colyseus.js"></script>
   <script src="js/sphere.js"></script>
@@ -289,24 +133,23 @@
   <script type="module" src="js/render3d.js"></script>
   <script src="js/main.js"></script>
   <script>
-    // Client error reporting — sends uncaught errors to server for Sentry capture
-    window.addEventListener("error", function(e) {
+    window.addEventListener("error", function (e) {
       try {
         fetch("/api/errors", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ message: e.message, filename: e.filename, lineno: e.lineno, colno: e.colno, stack: e.error && e.error.stack }),
-          keepalive: true
+          keepalive: true,
         });
       } catch {}
     });
-    window.addEventListener("unhandledrejection", function(e) {
+    window.addEventListener("unhandledrejection", function (e) {
       try {
         fetch("/api/errors", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ message: "Unhandled: " + (e.reason && e.reason.message || e.reason), stack: e.reason && e.reason.stack }),
-          keepalive: true
+          body: JSON.stringify({ message: "Unhandled: " + ((e.reason && e.reason.message) || e.reason), stack: e.reason && e.reason.stack }),
+          keepalive: true,
         });
       } catch {}
     });

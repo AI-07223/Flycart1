@@ -1,39 +1,37 @@
 // Client constants: imports gameplay values from shared/constants.ts and builds window.GAME.
-// This replaces the old gen-constants.mjs script — the shared module is the source of truth.
+// Shared constants remain the source of truth for both the server and the browser.
 import {
-  CRUISE_SPEED, BOOST_SPEED, ACCEL, TURN_RATE,
-  PLANE_RADIUS, MAX_HP, BULLET_SPEED,
+  CRUISE_SPEED, BOOST_SPEED, ACCEL, TURN_RATE, PITCH_RATE, PITCH_MAX,
+  PLANE_RADIUS, MAX_HP, BULLET_SPEED, BULLET_DAMAGE,
   AFTERBURNER_FACTOR, RAPID_FACTOR, FIRE_COOLDOWN,
   BULLET_LIFE, BULLET_RADIUS, SPREAD_ANGLE, HOMING_TURN,
   TICK_RATE, SKIN_COUNT,
-  R_BASE, R_MIN, R_MAX, N_BASE,
+  MAP_HALF, MAP_EDGE_SOFT, GROUND_Y, MIN_ALT, SPAWN_ALT, MAX_ALT,
+  PICKUP_ALT_MIN, PICKUP_ALT_MAX, PICKUP_FIELD_RADIUS,
   POWERUP_DURATION,
-  ZONES, OBSTACLE_BEHAVIOR, SPAWN_REROLL,
-  HOTSPOT_DIR, OBSTACLES, OB_SPECS,
+  LANDMARKS,
 } from "../shared/constants";
 
 interface PowerupMeta { label: string; color: number; icon: string; }
 
 const POWERUPS: Record<string, PowerupMeta> = {
-  spread:      { label: "Spread",      color: 0x6bff8b, icon: "\u{1F531}" },
-  rapid:       { label: "Rapid Fire",  color: 0xffe14a, icon: "\u26A1" },
-  shield:      { label: "Shield",      color: 0x49c0ff, icon: "\u{1F6E1}\uFE0F" },
-  afterburner: { label: "Afterburner", color: 0xff8c42, icon: "\u{1F680}" },
-  repair:      { label: "Repair",      color: 0xff6b6b, icon: "\u2764\uFE0F" },
-  homing:      { label: "Homing",      color: 0xc07bff, icon: "\u{1F3AF}" },
+  spread:      { label: "Spread",      color: 0x6bff8b, icon: "🔱" },
+  rapid:       { label: "Rapid Fire",  color: 0xffe14a, icon: "⚡" },
+  shield:      { label: "Shield",      color: 0x49c0ff, icon: "🛡️" },
+  afterburner: { label: "Afterburner", color: 0xff8c42, icon: "🚀" },
+  repair:      { label: "Repair",      color: 0xff6b6b, icon: "❤️" },
+  homing:      { label: "Homing",      color: 0xc07bff, icon: "🎯" },
 };
 
 (window as any).GAME = {
-  CRUISE_SPEED, BOOST_SPEED, ACCEL, TURN_RATE,
-  PLANE_RADIUS, MAX_HP, BULLET_SPEED,
+  CRUISE_SPEED, BOOST_SPEED, ACCEL, TURN_RATE, PITCH_RATE, PITCH_MAX,
+  PLANE_RADIUS, MAX_HP, BULLET_SPEED, BULLET_DAMAGE,
   AFTERBURNER_FACTOR, RAPID_FACTOR, FIRE_COOLDOWN,
   BULLET_LIFE, BULLET_RADIUS, SPREAD_ANGLE, HOMING_TURN,
   TICK_RATE, SKIN_COUNT,
-  R_BASE, R_MIN, R_MAX, N_BASE,
+  MAP_HALF, MAP_EDGE_SOFT, GROUND_Y, MIN_ALT, SPAWN_ALT, MAX_ALT,
+  PICKUP_ALT_MIN, PICKUP_ALT_MAX, PICKUP_FIELD_RADIUS,
   POWERUP_DURATION,
-  ZONES, OBSTACLE_BEHAVIOR, SPAWN_REROLL,
   POWERUPS,
-  OB_SPECS,
-  HOTSPOT_DIR,
-  OBSTACLES,
+  LANDMARKS,
 };

@@ -1,13 +1,9 @@
-// Spherical (great-circle) math for the globe arena. Pure, framework-free, shared by the
-// authoritative server and mirrored on the client (public/js/sphere.js — keep in sync).
-//
-// Model: a position is a UNIT vector `p` (direction from the planet centre). A moving entity
-// (plane, bullet) also carries a FORWARD unit vector `f` that is tangent to the surface (f ⟂ p).
-// World render position = p · (RADIUS + altitude). This representation has NO pole singularities
-// and hands the renderer up = p and nose = f directly. Distances are angular (radians); speeds are
-// linear surface speeds converted to angle via /RADIUS by the caller.
+// Flat-world 3D vector math shared by the authoritative server and the browser client.
+// The filename stays the same to minimize import churn, but the globe-specific contract is gone.
 
 export interface Vec3 { x: number; y: number; z: number; }
+
+export const WORLD_UP: Vec3 = { x: 0, y: 1, z: 0 };
 
 export const vec = (x: number, y: number, z: number): Vec3 => ({ x, y, z });
 export const add = (a: Vec3, b: Vec3): Vec3 => ({ x: a.x + b.x, y: a.y + b.y, z: a.z + b.z });
@@ -19,105 +15,121 @@ export const cross = (a: Vec3, b: Vec3): Vec3 => ({
   y: a.z * b.x - a.x * b.z,
   z: a.x * b.y - a.y * b.x,
 });
-export const len = (a: Vec3): number => Math.sqrt(dot(a, a));
+export const lenSq = (a: Vec3): number => dot(a, a);
+export const len = (a: Vec3): number => Math.sqrt(lenSq(a));
+export const distanceSq = (a: Vec3, b: Vec3): number => lenSq(sub(a, b));
+export const distance = (a: Vec3, b: Vec3): number => Math.sqrt(distanceSq(a, b));
+export const clamp = (v: number, min: number, max: number): number => Math.max(min, Math.min(max, v));
+export const lerp = (a: number, b: number, t: number): number => a + (b - a) * t;
+export const lerpVec = (a: Vec3, b: Vec3, t: number): Vec3 => ({
+  x: lerp(a.x, b.x, t),
+  y: lerp(a.y, b.y, t),
+  z: lerp(a.z, b.z, t),
+});
+export const flatten = (a: Vec3): Vec3 => ({ x: a.x, y: 0, z: a.z });
 
 export function normalize(a: Vec3): Vec3 {
   const l = len(a);
-  return l > 1e-9 ? { x: a.x / l, y: a.y / l, z: a.z / l } : { x: 0, y: 1, z: 0 };
+  return l > 1e-9 ? { x: a.x / l, y: a.y / l, z: a.z / l } : { x: 1, y: 0, z: 0 };
 }
 
-// Rotate `v` about UNIT axis `k` by angle `ang` (Rodrigues' rotation formula).
 export function rotateAxis(v: Vec3, k: Vec3, ang: number): Vec3 {
-  const c = Math.cos(ang), s = Math.sin(ang);
-  const kv = cross(k, v);
-  const kd = dot(k, v) * (1 - c);
+  const axis = normalize(k);
+  const c = Math.cos(ang);
+  const s = Math.sin(ang);
+  const kv = cross(axis, v);
+  const kd = dot(axis, v) * (1 - c);
   return {
-    x: v.x * c + kv.x * s + k.x * kd,
-    y: v.y * c + kv.y * s + k.y * kd,
-    z: v.z * c + kv.z * s + k.z * kd,
+    x: v.x * c + kv.x * s + axis.x * kd,
+    y: v.y * c + kv.y * s + axis.y * kd,
+    z: v.z * c + kv.z * s + axis.z * kd,
   };
 }
 
-// Re-project `f` onto the tangent plane at `p` and renormalize (restore f ⟂ p, |f| = 1).
-// Used after interpolation/accumulated float drift.
-export function tangentize(p: Vec3, f: Vec3): Vec3 {
-  const d = dot(f, p);
-  const t = { x: f.x - d * p.x, y: f.y - d * p.y, z: f.z - d * p.z };
-  return len(t) > 1e-9 ? normalize(t) : anyTangent(p);
+export function anyTangent(dir: Vec3): Vec3 {
+  const base = Math.abs(dir.y) > 0.98 ? { x: 1, y: 0, z: 0 } : WORLD_UP;
+  return normalize(cross(base, normalize(dir)));
 }
 
-// Great-circle advance: move position `p` along forward `f` by angular distance `ang`.
-// Returns the new {p, f}; both are rotated about the geodesic axis (p × f), so f stays tangent.
-export function advance(p: Vec3, f: Vec3, ang: number): { p: Vec3; f: Vec3 } {
-  const axis = cross(p, f);
-  const al = len(axis);
-  if (al < 1e-9) return { p, f }; // degenerate (f ∥ p) — shouldn't happen if f is tangent
-  const k = { x: axis.x / al, y: axis.y / al, z: axis.z / al };
-  return { p: normalize(rotateAxis(p, k, ang)), f: tangentize(normalize(rotateAxis(p, k, ang)), rotateAxis(f, k, ang)) };
+export function tangentize(_pos: Vec3, f: Vec3): Vec3 {
+  return normalize(f);
 }
 
-// Turn: rotate forward `f` about the surface normal `p` by `ang` (keeps f tangent).
-export function turn(p: Vec3, f: Vec3, ang: number): Vec3 {
-  return tangentize(p, rotateAxis(f, p, ang));
+export function advance(p: Vec3, f: Vec3, dist: number): { p: Vec3; f: Vec3 } {
+  const dir = normalize(f);
+  return { p: add(p, scale(dir, dist)), f: dir };
 }
 
-// Angular distance (radians) between two unit vectors.
+export function turn(_pos: Vec3, f: Vec3, ang: number): Vec3 {
+  return normalize(rotateAxis(f, WORLD_UP, ang));
+}
+
 export function angBetween(a: Vec3, b: Vec3): number {
-  return Math.acos(Math.max(-1, Math.min(1, dot(a, b))));
+  const na = normalize(a);
+  const nb = normalize(b);
+  return Math.acos(clamp(dot(na, nb), -1, 1));
 }
 
-// Spherical linear interpolation between two unit vectors.
 export function slerp(a: Vec3, b: Vec3, t: number): Vec3 {
-  let d = Math.max(-1, Math.min(1, dot(a, b)));
+  const ta = normalize(a);
+  const tb = normalize(b);
+  const d = clamp(dot(ta, tb), -1, 1);
+  if (d > 0.9995 || d < -0.9995) return normalize(lerpVec(ta, tb, t));
   const th = Math.acos(d);
-  if (th < 1e-6) return normalize(a);
   const s = Math.sin(th);
-  const wa = Math.sin((1 - t) * th) / s, wb = Math.sin(t * th) / s;
-  return normalize({ x: a.x * wa + b.x * wb, y: a.y * wa + b.y * wb, z: a.z * wa + b.z * wb });
+  const wa = Math.sin((1 - t) * th) / s;
+  const wb = Math.sin(t * th) / s;
+  return normalize({
+    x: ta.x * wa + tb.x * wb,
+    y: ta.y * wa + tb.y * wb,
+    z: ta.z * wa + tb.z * wb,
+  });
 }
 
-// A unit tangent vector at `p` (arbitrary direction), robust at the poles.
-export function anyTangent(p: Vec3): Vec3 {
-  // cross with whichever world axis is least parallel to p
-  const ref = Math.abs(p.y) < 0.9 ? { x: 0, y: 1, z: 0 } : { x: 1, y: 0, z: 0 };
-  return normalize(cross(ref, p));
+export function signedAngle(normal: Vec3, from: Vec3, to: Vec3): number {
+  const n = normalize(normal);
+  const a = normalize(from);
+  const b = normalize(to);
+  return Math.atan2(dot(cross(a, b), n), dot(a, b));
 }
 
-// Uniform random point on the unit sphere (acos(2u-1) latitude → no pole clustering).
+export function yawPitchForward(yaw: number, pitch: number): Vec3 {
+  const cp = Math.cos(pitch);
+  return normalize({
+    x: Math.cos(yaw) * cp,
+    y: Math.sin(pitch),
+    z: Math.sin(yaw) * cp,
+  });
+}
+
+export function yawPitchFromForward(f: Vec3): { yaw: number; pitch: number } {
+  const dir = normalize(f);
+  return {
+    yaw: Math.atan2(dir.z, dir.x),
+    pitch: Math.asin(clamp(dir.y, -1, 1)),
+  };
+}
+
+export function withPitch(f: Vec3, pitch: number): Vec3 {
+  const { yaw } = yawPitchFromForward(f);
+  return yawPitchForward(yaw, pitch);
+}
+
+export function segmentPointT(a: Vec3, b: Vec3, p: Vec3): number {
+  const ab = sub(b, a);
+  const ll = lenSq(ab);
+  if (ll < 1e-9) return 0;
+  return clamp(dot(sub(p, a), ab) / ll, 0, 1);
+}
+
+export function segmentPointDistance(a: Vec3, b: Vec3, p: Vec3): number {
+  const t = segmentPointT(a, b, p);
+  return distance(add(a, scale(sub(b, a), t)), p);
+}
+
 export function randomDir(rng: () => number = Math.random): Vec3 {
-  const u = rng(), w = rng();
-  const z = 2 * u - 1;            // cosθ uniform in [-1,1]
+  const z = rng() * 2 - 1;
   const r = Math.sqrt(Math.max(0, 1 - z * z));
-  const phi = 2 * Math.PI * w;
+  const phi = rng() * Math.PI * 2;
   return { x: r * Math.cos(phi), y: z, z: r * Math.sin(phi) };
-}
-
-// Minimum angular distance from cap centre `c` to the geodesic arc a→b (both unit).
-// Tunnel-proof swept test: projects c onto the arc's great circle and clamps to the arc.
-export function arcDistToPoint(a: Vec3, b: Vec3, c: Vec3): number {
-  const n = cross(a, b);
-  const nl = len(n);
-  if (nl < 1e-9) return angBetween(a, c); // a≈b: zero-length arc
-  const nh = { x: n.x / nl, y: n.y / nl, z: n.z / nl };
-  // nearest point on the great circle = c projected off the plane normal, normalized
-  const d = dot(c, nh);
-  const proj = normalize({ x: c.x - d * nh.x, y: c.y - d * nh.y, z: c.z - d * nh.z });
-  // is proj within the arc a→b? (sum of sub-arcs ≈ whole arc)
-  const ab = angBetween(a, b);
-  if (angBetween(a, proj) + angBetween(proj, b) <= ab + 1e-6) return angBetween(c, proj);
-  return Math.min(angBetween(c, a), angBetween(c, b)); // clamp to nearest endpoint
-}
-
-// Arc parameter t∈[0,1] of the closest point on a→b to c (for earliest-hit ordering).
-export function arcClosestT(a: Vec3, b: Vec3, c: Vec3): number {
-  const ab = angBetween(a, b);
-  if (ab < 1e-9) return 0;
-  const n = cross(a, b);
-  const nl = len(n);
-  if (nl < 1e-9) return 0;
-  const nh = { x: n.x / nl, y: n.y / nl, z: n.z / nl };
-  const d = dot(c, nh);
-  const proj = normalize({ x: c.x - d * nh.x, y: c.y - d * nh.y, z: c.z - d * nh.z });
-  if (angBetween(a, proj) + angBetween(proj, b) <= ab + 1e-6) return angBetween(a, proj) / ab;
-  return angBetween(c, a) <= angBetween(c, b) ? 0 : 1;
 }

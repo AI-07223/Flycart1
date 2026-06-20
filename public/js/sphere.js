@@ -11,59 +11,100 @@
   // src/shared/sphere.ts
   function normalize(a) {
     const l = len(a);
-    return l > 1e-9 ? { x: a.x / l, y: a.y / l, z: a.z / l } : { x: 0, y: 1, z: 0 };
+    return l > 1e-9 ? { x: a.x / l, y: a.y / l, z: a.z / l } : { x: 1, y: 0, z: 0 };
   }
   function rotateAxis(v, k, ang) {
-    const c = Math.cos(ang), s = Math.sin(ang);
-    const kv = cross(k, v);
-    const kd = dot(k, v) * (1 - c);
+    const axis = normalize(k);
+    const c = Math.cos(ang);
+    const s = Math.sin(ang);
+    const kv = cross(axis, v);
+    const kd = dot(axis, v) * (1 - c);
     return {
-      x: v.x * c + kv.x * s + k.x * kd,
-      y: v.y * c + kv.y * s + k.y * kd,
-      z: v.z * c + kv.z * s + k.z * kd
+      x: v.x * c + kv.x * s + axis.x * kd,
+      y: v.y * c + kv.y * s + axis.y * kd,
+      z: v.z * c + kv.z * s + axis.z * kd
     };
   }
-  function tangentize(p, f) {
-    const d = dot(f, p);
-    const t = { x: f.x - d * p.x, y: f.y - d * p.y, z: f.z - d * p.z };
-    return len(t) > 1e-9 ? normalize(t) : anyTangent(p);
+  function anyTangent(dir) {
+    const base = Math.abs(dir.y) > 0.98 ? { x: 1, y: 0, z: 0 } : WORLD_UP;
+    return normalize(cross(base, normalize(dir)));
   }
-  function advance(p, f, ang) {
-    const axis = cross(p, f);
-    const al = len(axis);
-    if (al < 1e-9) return { p, f };
-    const k = { x: axis.x / al, y: axis.y / al, z: axis.z / al };
-    return { p: normalize(rotateAxis(p, k, ang)), f: tangentize(normalize(rotateAxis(p, k, ang)), rotateAxis(f, k, ang)) };
+  function tangentize(_pos, f) {
+    return normalize(f);
   }
-  function turn(p, f, ang) {
-    return tangentize(p, rotateAxis(f, p, ang));
+  function advance(p, f, dist) {
+    const dir = normalize(f);
+    return { p: add(p, scale(dir, dist)), f: dir };
+  }
+  function turn(_pos, f, ang) {
+    return normalize(rotateAxis(f, WORLD_UP, ang));
   }
   function angBetween(a, b) {
-    return Math.acos(Math.max(-1, Math.min(1, dot(a, b))));
+    const na = normalize(a);
+    const nb = normalize(b);
+    return Math.acos(clamp(dot(na, nb), -1, 1));
   }
   function slerp(a, b, t) {
-    let d = Math.max(-1, Math.min(1, dot(a, b)));
+    const ta = normalize(a);
+    const tb = normalize(b);
+    const d = clamp(dot(ta, tb), -1, 1);
+    if (d > 0.9995 || d < -0.9995) return normalize(lerpVec(ta, tb, t));
     const th = Math.acos(d);
-    if (th < 1e-6) return normalize(a);
     const s = Math.sin(th);
-    const wa = Math.sin((1 - t) * th) / s, wb = Math.sin(t * th) / s;
-    return normalize({ x: a.x * wa + b.x * wb, y: a.y * wa + b.y * wb, z: a.z * wa + b.z * wb });
+    const wa = Math.sin((1 - t) * th) / s;
+    const wb = Math.sin(t * th) / s;
+    return normalize({
+      x: ta.x * wa + tb.x * wb,
+      y: ta.y * wa + tb.y * wb,
+      z: ta.z * wa + tb.z * wb
+    });
   }
-  function anyTangent(p) {
-    const ref = Math.abs(p.y) < 0.9 ? { x: 0, y: 1, z: 0 } : { x: 1, y: 0, z: 0 };
-    return normalize(cross(ref, p));
+  function signedAngle(normal, from, to) {
+    const n = normalize(normal);
+    const a = normalize(from);
+    const b = normalize(to);
+    return Math.atan2(dot(cross(a, b), n), dot(a, b));
+  }
+  function yawPitchForward(yaw, pitch) {
+    const cp = Math.cos(pitch);
+    return normalize({
+      x: Math.cos(yaw) * cp,
+      y: Math.sin(pitch),
+      z: Math.sin(yaw) * cp
+    });
+  }
+  function yawPitchFromForward(f) {
+    const dir = normalize(f);
+    return {
+      yaw: Math.atan2(dir.z, dir.x),
+      pitch: Math.asin(clamp(dir.y, -1, 1))
+    };
+  }
+  function withPitch(f, pitch) {
+    const { yaw } = yawPitchFromForward(f);
+    return yawPitchForward(yaw, pitch);
+  }
+  function segmentPointT(a, b, p) {
+    const ab = sub(b, a);
+    const ll = lenSq(ab);
+    if (ll < 1e-9) return 0;
+    return clamp(dot(sub(p, a), ab) / ll, 0, 1);
+  }
+  function segmentPointDistance(a, b, p) {
+    const t = segmentPointT(a, b, p);
+    return distance(add(a, scale(sub(b, a), t)), p);
   }
   function randomDir(rng = Math.random) {
-    const u = rng(), w = rng();
-    const z = 2 * u - 1;
+    const z = rng() * 2 - 1;
     const r = Math.sqrt(Math.max(0, 1 - z * z));
-    const phi = 2 * Math.PI * w;
+    const phi = rng() * Math.PI * 2;
     return { x: r * Math.cos(phi), y: z, z: r * Math.sin(phi) };
   }
-  var vec, add, sub, scale, dot, cross, len;
+  var WORLD_UP, vec, add, sub, scale, dot, cross, lenSq, len, distanceSq, distance, clamp, lerp, lerpVec, flatten;
   var init_sphere = __esm({
     "src/shared/sphere.ts"() {
       "use strict";
+      WORLD_UP = { x: 0, y: 1, z: 0 };
       vec = (x, y, z) => ({ x, y, z });
       add = (a, b) => ({ x: a.x + b.x, y: a.y + b.y, z: a.z + b.z });
       sub = (a, b) => ({ x: a.x - b.x, y: a.y - b.y, z: a.z - b.z });
@@ -74,7 +115,18 @@
         y: a.z * b.x - a.x * b.z,
         z: a.x * b.y - a.y * b.x
       });
-      len = (a) => Math.sqrt(dot(a, a));
+      lenSq = (a) => dot(a, a);
+      len = (a) => Math.sqrt(lenSq(a));
+      distanceSq = (a, b) => lenSq(sub(a, b));
+      distance = (a, b) => Math.sqrt(distanceSq(a, b));
+      clamp = (v, min, max) => Math.max(min, Math.min(max, v));
+      lerp = (a, b, t) => a + (b - a) * t;
+      lerpVec = (a, b, t) => ({
+        x: lerp(a.x, b.x, t),
+        y: lerp(a.y, b.y, t),
+        z: lerp(a.z, b.z, t)
+      });
+      flatten = (a) => ({ x: a.x, y: 0, z: a.z });
     }
   });
 
@@ -82,17 +134,6 @@
   var require_sphere = __commonJS({
     "src/client/sphere.ts"() {
       init_sphere();
-      function signedAngle(normal, from, to) {
-        return Math.atan2(dot(cross(from, to), normal), dot(from, to));
-      }
-      function dirFrom(base, ang, az) {
-        const up = Math.abs(base.y) < 0.9 ? vec(0, 1, 0) : vec(1, 0, 0);
-        const east = normalize(cross(up, base));
-        const north = cross(base, east);
-        const tangent = add(scale(east, Math.cos(az)), scale(north, Math.sin(az)));
-        const axis = normalize(cross(base, tangent));
-        return normalize(rotateAxis(base, axis, ang));
-      }
       window.Sphere = {
         vec,
         add,
@@ -110,7 +151,17 @@
         angBetween,
         slerp,
         signedAngle,
-        dirFrom,
+        yawPitchForward,
+        yawPitchFromForward,
+        withPitch,
+        distance,
+        distanceSq,
+        clamp,
+        lerp,
+        lerpVec,
+        flatten,
+        segmentPointT,
+        segmentPointDistance,
         randomDir
       };
     }

@@ -8,109 +8,51 @@
     return mod || (0, cb[__getOwnPropNames(cb)[0]])((mod = { exports: {} }).exports, mod), mod.exports;
   };
 
-  // src/shared/sphere.ts
-  function normalize(a) {
-    const l = len(a);
-    return l > 1e-9 ? { x: a.x / l, y: a.y / l, z: a.z / l } : { x: 0, y: 1, z: 0 };
-  }
-  function rotateAxis(v, k, ang) {
-    const c = Math.cos(ang), s = Math.sin(ang);
-    const kv = cross(k, v);
-    const kd = dot(k, v) * (1 - c);
-    return {
-      x: v.x * c + kv.x * s + k.x * kd,
-      y: v.y * c + kv.y * s + k.y * kd,
-      z: v.z * c + kv.z * s + k.z * kd
-    };
-  }
-  var vec, add, scale, dot, cross, len;
-  var init_sphere = __esm({
-    "src/shared/sphere.ts"() {
-      "use strict";
-      vec = (x, y, z) => ({ x, y, z });
-      add = (a, b) => ({ x: a.x + b.x, y: a.y + b.y, z: a.z + b.z });
-      scale = (a, s) => ({ x: a.x * s, y: a.y * s, z: a.z * s });
-      dot = (a, b) => a.x * b.x + a.y * b.y + a.z * b.z;
-      cross = (a, b) => ({
-        x: a.y * b.z - a.z * b.y,
-        y: a.z * b.x - a.x * b.z,
-        z: a.x * b.y - a.y * b.x
-      });
-      len = (a) => Math.sqrt(dot(a, a));
-    }
-  });
-
   // src/shared/constants.ts
-  function dirFromHotspot(ang, az) {
-    const up = Math.abs(HOTSPOT_DIR.y) < 0.9 ? vec(0, 1, 0) : vec(1, 0, 0);
-    const east = normalize(cross(up, HOTSPOT_DIR));
-    const north = cross(HOTSPOT_DIR, east);
-    const tangent = add(scale(east, Math.cos(az)), scale(north, Math.sin(az)));
-    const axis = normalize(cross(HOTSPOT_DIR, tangent));
-    return normalize(rotateAxis(HOTSPOT_DIR, axis, ang));
-  }
-  var TICK_RATE, TICK_MS, CRUISE_SPEED, BOOST_SPEED, ACCEL, TURN_RATE, PLANE_RADIUS, MAX_HP, BULLET_SPEED, BULLET_LIFE, BULLET_RADIUS, FIRE_COOLDOWN, R_BASE, N_BASE, R_MIN, R_MAX, SKIN_COUNT, POWERUP_DURATION, RAPID_FACTOR, SPREAD_ANGLE, AFTERBURNER_FACTOR, HOMING_TURN, OBSTACLE_BEHAVIOR, HOTSPOT_DIR, ZONES, SPAWN_REROLL, T, OB_SPECS, OBSTACLES;
+  var TICK_RATE, TICK_MS, CRUISE_SPEED, BOOST_SPEED, ACCEL, TURN_RATE, PITCH_RATE, PITCH_MAX, PLANE_RADIUS, MAX_HP, BULLET_SPEED, BULLET_DAMAGE, BULLET_LIFE, BULLET_RADIUS, FIRE_COOLDOWN, MAP_HALF, MAP_EDGE_SOFT, GROUND_Y, MIN_ALT, SPAWN_ALT, MAX_ALT, PICKUP_ALT_MIN, PICKUP_ALT_MAX, PICKUP_FIELD_RADIUS, SKIN_COUNT, POWERUP_DURATION, RAPID_FACTOR, SPREAD_ANGLE, AFTERBURNER_FACTOR, HOMING_TURN, LANDMARKS;
   var init_constants = __esm({
     "src/shared/constants.ts"() {
       "use strict";
-      init_sphere();
       TICK_RATE = 30;
       TICK_MS = 1e3 / TICK_RATE;
-      CRUISE_SPEED = 185;
-      BOOST_SPEED = 320;
-      ACCEL = 900;
-      TURN_RATE = 3.2;
-      PLANE_RADIUS = 20;
+      CRUISE_SPEED = 92;
+      BOOST_SPEED = 138;
+      ACCEL = 260;
+      TURN_RATE = 1.5;
+      PITCH_RATE = 1.05;
+      PITCH_MAX = 0.5;
+      PLANE_RADIUS = 16;
       MAX_HP = 100;
-      BULLET_SPEED = 720;
-      BULLET_LIFE = 1.1;
-      BULLET_RADIUS = 6;
-      FIRE_COOLDOWN = 0.22;
-      R_BASE = 700;
-      N_BASE = 6;
-      R_MIN = 560;
-      R_MAX = 820;
+      BULLET_SPEED = 215;
+      BULLET_DAMAGE = 25;
+      BULLET_LIFE = 2.1;
+      BULLET_RADIUS = 4;
+      FIRE_COOLDOWN = 0.34;
+      MAP_HALF = 1800;
+      MAP_EDGE_SOFT = 260;
+      GROUND_Y = 0;
+      MIN_ALT = 18;
+      SPAWN_ALT = 58;
+      MAX_ALT = 320;
+      PICKUP_ALT_MIN = 28;
+      PICKUP_ALT_MAX = 170;
+      PICKUP_FIELD_RADIUS = 1120;
       SKIN_COUNT = 5;
       POWERUP_DURATION = 10;
-      RAPID_FACTOR = 0.45;
-      SPREAD_ANGLE = 0.18;
-      AFTERBURNER_FACTOR = 1.4;
-      HOMING_TURN = 2.6;
-      OBSTACLE_BEHAVIOR = {
-        spire: { solid: true, blocksBullets: true },
-        rock: { solid: true, blocksBullets: true },
-        tower: { solid: true, blocksBullets: true },
-        arch: { solid: true, blocksBullets: true },
-        ring: { solid: false, blocksBullets: false }
-      };
-      HOTSPOT_DIR = normalize(vec(0, 0.35, 1));
-      ZONES = { centerAng: 0.34, midAng: 0.7 };
-      SPAWN_REROLL = 8;
-      T = Math.PI / 3;
-      OB_SPECS = [
-        { ang: 0, az: 0, angRadius: 0.12, height: 240, kind: "tower", landmark: "volcano" },
-        // mid-ring cover (~0.55 rad from hotspot), three double as landmarks
-        { ang: 0.55, az: 0 * T, angRadius: 0.09, height: 170, kind: "spire", landmark: "lighthouse" },
-        { ang: 0.55, az: 1 * T, angRadius: 0.1, height: 95, kind: "rock", landmark: "shipwreck" },
-        { ang: 0.55, az: 2 * T, angRadius: 0.09, height: 165, kind: "arch" },
-        { ang: 0.55, az: 3 * T, angRadius: 0.1, height: 150, kind: "spire" },
-        { ang: 0.55, az: 4 * T, angRadius: 0.09, height: 95, kind: "rock", landmark: "forest" },
-        { ang: 0.55, az: 5 * T, angRadius: 0.09, height: 165, kind: "arch" },
-        // inner spires
-        { ang: 0.28, az: 0.5 * Math.PI, angRadius: 0.06, height: 130, kind: "spire" },
-        { ang: 0.28, az: 1.5 * Math.PI, angRadius: 0.06, height: 130, kind: "spire" },
-        // fly-through rings near the calmer edges
-        { ang: 0.95, az: 0.2 * Math.PI, angRadius: 0.1, height: 120, kind: "ring" },
-        { ang: 0.95, az: 1 * Math.PI, angRadius: 0.1, height: 120, kind: "ring" },
-        { ang: 0.95, az: 1.6 * Math.PI, angRadius: 0.1, height: 120, kind: "ring" }
+      RAPID_FACTOR = 0.55;
+      SPREAD_ANGLE = 0.12;
+      AFTERBURNER_FACTOR = 1.22;
+      HOMING_TURN = 1.45;
+      LANDMARKS = [
+        { kind: "tower", x: 0, z: 0, radius: 96, height: 170, color: 16747069, cover: true },
+        { kind: "mesa", x: -620, z: -340, radius: 90, height: 56, color: 11636066, cover: true },
+        { kind: "mesa", x: 720, z: -520, radius: 110, height: 62, color: 11636066, cover: true },
+        { kind: "mesa", x: -760, z: 610, radius: 120, height: 60, color: 11636066, cover: true },
+        { kind: "spire", x: 660, z: 660, radius: 54, height: 120, color: 9356031, cover: true },
+        { kind: "spire", x: -180, z: 860, radius: 48, height: 108, color: 9356031, cover: true },
+        { kind: "hangar", x: 940, z: 90, radius: 78, height: 36, color: 8293014, cover: true },
+        { kind: "hangar", x: -980, z: 80, radius: 78, height: 36, color: 8293014, cover: true }
       ];
-      OBSTACLES = OB_SPECS.map((s) => ({
-        dir: dirFromHotspot(s.ang, s.az),
-        angRadius: s.angRadius,
-        height: s.height,
-        kind: s.kind,
-        landmark: s.landmark
-      }));
     }
   });
 
@@ -131,9 +73,12 @@
         BOOST_SPEED,
         ACCEL,
         TURN_RATE,
+        PITCH_RATE,
+        PITCH_MAX,
         PLANE_RADIUS,
         MAX_HP,
         BULLET_SPEED,
+        BULLET_DAMAGE,
         AFTERBURNER_FACTOR,
         RAPID_FACTOR,
         FIRE_COOLDOWN,
@@ -143,18 +88,18 @@
         HOMING_TURN,
         TICK_RATE,
         SKIN_COUNT,
-        R_BASE,
-        R_MIN,
-        R_MAX,
-        N_BASE,
+        MAP_HALF,
+        MAP_EDGE_SOFT,
+        GROUND_Y,
+        MIN_ALT,
+        SPAWN_ALT,
+        MAX_ALT,
+        PICKUP_ALT_MIN,
+        PICKUP_ALT_MAX,
+        PICKUP_FIELD_RADIUS,
         POWERUP_DURATION,
-        ZONES,
-        OBSTACLE_BEHAVIOR,
-        SPAWN_REROLL,
         POWERUPS,
-        OB_SPECS,
-        HOTSPOT_DIR,
-        OBSTACLES
+        LANDMARKS
       };
     }
   });

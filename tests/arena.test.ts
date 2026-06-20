@@ -1,137 +1,123 @@
-// tests/arena.test.ts
-// Integration tests for ArenaRoom — tests core gameplay logic via direct room instantiation.
-
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { describe, it, expect } from "vitest";
 import { ArenaRoom } from "../src/rooms/ArenaRoom";
-import { ArenaState, Player, Bullet } from "../src/schema/ArenaState";
+import { ArenaState, Player, Pickup } from "../src/schema/ArenaState";
 import * as C from "../src/shared/constants";
 import * as S from "../src/shared/sphere";
 
-// Helper to create a room instance with mocked Colyseus internals
 function createRoom(): ArenaRoom {
   const room = new ArenaRoom();
-  // Mock the room state and clock that Colyseus normally provides
-  (room as any).state = new ArenaState();
-  (room as any).clock = {
-    setInterval: (_fn: Function, _ms: number) => {},
-  };
-  // Use defineProperty for read-only getters
-  Object.defineProperty(room, "roomId", { value: "test-room-1", writable: true });
-  Object.defineProperty(room, "maxClients", { value: C.MAX_CLIENTS, writable: true });
-  Object.defineProperty(room, "metadata", { value: { mode: "ffa" }, writable: true });
-  // Initialize internal maps that onCreate would set up
+  const state = new ArenaState();
+  state.timeLeft = C.ROUND_SECONDS;
+  state.phase = "playing";
+  state.arenaHalf = C.MAP_HALF;
+  state.floorY = C.GROUND_Y;
+  state.ceilingY = C.MAX_ALT;
+
+  (room as any).state = state;
+  Object.defineProperty(room, "roomId", { value: "test-room", writable: true });
   (room as any).inputs = new Map();
-  (room as any).speed = new Map();
-  (room as any).invulnUntil = new Map();
-  (room as any).bulletLife = new Map();
-  (room as any).msgTimes = new Map();
-  (room as any).bulletSeq = 0;
-  (room as any).pickupSeq = 0;
-  (room as any).roundEndsAt = Infinity;
-  (room as any).intermissionUntil = 0;
-  (room as any).botSeq = 0;
+  (room as any).lastShot = new Map();
+  (room as any).respawnAt = new Map();
   (room as any).bots = new Map();
-  (room as any).botsEnabled = false;
-  (room as any).mode = "ffa";
+  (room as any).bulletLife = new Map();
+  (room as any).powerUntil = new Map();
+  (room as any).shield = new Map();
+  (room as any).invulnUntil = new Map();
+  (room as any).msgTimes = new Map();
   (room as any).now = 0;
-  (room as any).prevRound = -1;
+  (room as any).bulletSeq = 0;
+  (room as any).botSeq = 0;
+  (room as any).pickupSeq = 0;
+  (room as any).pickupAt = 0;
+  (room as any).botsEnabled = false;
   return room;
 }
 
-// Helper to add a player directly to room state
-function addPlayer(room: ArenaRoom, id: string, name: string, bot = false): Player {
+function addPlayer(room: ArenaRoom, id: string, overrides: Partial<Player> = {}): Player {
   const p = new Player();
-  p.name = name;
-  p.bot = bot;
-  p.alive = true;
-  p.hp = C.MAX_HP;
-  p.score = 0;
-  p.pos = S.vec(0, 0, 1); // north pole
-  p.fwd = S.vec(1, 0, 0);
+  p.name = overrides.name || id;
+  p.bot = overrides.bot || false;
+  p.alive = overrides.alive ?? true;
+  p.hp = overrides.hp ?? C.MAX_HP;
+  p.score = overrides.score ?? 0;
+  p.skin = overrides.skin ?? 0;
+  p.speed = overrides.speed ?? C.CRUISE_SPEED;
+  p.px = overrides.px ?? 0;
+  p.py = overrides.py ?? C.SPAWN_ALT;
+  p.pz = overrides.pz ?? 0;
+  p.fx = overrides.fx ?? 1;
+  p.fy = overrides.fy ?? 0;
+  p.fz = overrides.fz ?? 0;
   (room as any).state.players.set(id, p);
-  (room as any).inputs.set(id, { turn: 0, fire: false, boost: false });
-  (room as any).speed.set(id, C.CRUISE_SPEED);
+  (room as any).inputs.set(id, { seq: 0, turn: 0, climb: 0, boost: false, fire: false });
   return p;
 }
 
-describe("ArenaRoom", () => {
-  it("room can be instantiated", () => {
+describe("ArenaRoom flat-world simulation", () => {
+  it("spawn places players inside map and altitude bounds", () => {
     const room = createRoom();
-    expect(room).toBeDefined();
+    const p = new Player();
+
+    (room as any).spawn("p1", p);
+
+    expect(Math.abs(p.px)).toBeLessThanOrEqual(C.MAP_HALF);
+    expect(Math.abs(p.pz)).toBeLessThanOrEqual(C.MAP_HALF);
+    expect(p.py).toBeGreaterThanOrEqual(C.MIN_ALT);
+    expect(p.py).toBeLessThanOrEqual(C.MAX_ALT);
+    expect(p.speed).toBe(C.CRUISE_SPEED);
   });
 
-  it("state has correct collections", () => {
+  it("climb input raises altitude and pitch", () => {
     const room = createRoom();
-    const state = (room as any).state as ArenaState;
-    expect(state.players).toBeDefined();
-    expect(state.bullets).toBeDefined();
-    expect(state.pickups).toBeDefined();
+    const p = addPlayer(room, "p1", { px: 0, py: C.SPAWN_ALT, pz: 0, fx: 1, fy: 0, fz: 0 });
+    const input = (room as any).inputs.get("p1");
+
+    input.climb = 1;
+    (room as any).stepPlane("p1", p, 0.5, true);
+
+    expect(p.py).toBeGreaterThan(C.SPAWN_ALT);
+    expect(p.fy).toBeGreaterThan(0);
   });
 
-  describe("player management", () => {
-    it("can add a player to state", () => {
-      const room = createRoom();
-      const p = addPlayer(room, "p1", "TestPlayer");
-      const state = (room as any).state as ArenaState;
-      expect(state.players.size).toBe(1);
-      expect(state.players.get("p1")?.name).toBe("TestPlayer");
-      expect(state.players.get("p1")?.alive).toBe(true);
-      expect(state.players.get("p1")?.hp).toBe(C.MAX_HP);
-    });
+  it("soft clamps outward flight at map edges", () => {
+    const room = createRoom();
+    const p = addPlayer(room, "p1", { px: C.MAP_HALF - 8, py: C.SPAWN_ALT, pz: 0, fx: 1, fy: 0, fz: 0 });
 
-    it("can add multiple players", () => {
-      const room = createRoom();
-      addPlayer(room, "p1", "Alice");
-      addPlayer(room, "p2", "Bob");
-      const state = (room as any).state as ArenaState;
-      expect(state.players.size).toBe(2);
-    });
+    (room as any).stepPlane("p1", p, 0.8, true);
+
+    expect(p.px).toBeLessThanOrEqual(C.MAP_HALF);
+    expect(p.fy).toBeGreaterThanOrEqual(-0.05);
   });
 
-  describe("bullet lifecycle", () => {
-    it("bulletLife map tracks bullet lifetime", () => {
-      const room = createRoom();
-      const life = (room as any).bulletLife as Map<string, number>;
-      life.set("b0", C.BULLET_LIFE);
-      expect(life.get("b0")).toBe(C.BULLET_LIFE);
-    });
+  it("projectiles hit targets in 3D space", () => {
+    const room = createRoom();
+    const shooter = addPlayer(room, "p1", { px: -420, py: 100, pz: -220, fx: 1, fy: 0, fz: 0 });
+    const victim = addPlayer(room, "p2", { px: -300, py: 100, pz: -220, fx: -1, fy: 0, fz: 0 });
 
-    it("bullets are added to state", () => {
-      const room = createRoom();
-      const state = (room as any).state as ArenaState;
-      // Manually add a bullet
-      const b = new Bullet();
-      b.owner = "p1";
-      b.pos = S.vec(1, 0, 0);
-      b.fwd = S.vec(0, 1, 0);
-      b.homing = false;
-      state.bullets.set("b0", b);
-      expect(state.bullets.size).toBe(1);
-      expect(state.bullets.get("b0")?.owner).toBe("p1");
-    });
+    (room as any).spawnBullet(
+      "p1",
+      S.vec(shooter.px, shooter.py, shooter.pz),
+      S.vec(shooter.fx, shooter.fy, shooter.fz),
+      false,
+    );
+    (room as any).stepBullets(0.6, true);
+
+    expect(victim.hp).toBe(C.MAX_HP - C.BULLET_DAMAGE);
   });
 
-  describe("constants integration", () => {
-    it("MAX_HP is consistent", () => {
-      expect(C.MAX_HP).toBeGreaterThan(0);
-      expect(C.MAX_HP).toBeLessThanOrEqual(1000);
-    });
+  it("pickups are collected using 3D distance", () => {
+    const room = createRoom();
+    const player = addPlayer(room, "p1", { px: 40, py: 90, pz: -10 });
+    const pickup = new Pickup();
 
-    it("BULLET_SPEED > CRUISE_SPEED", () => {
-      expect(C.BULLET_SPEED).toBeGreaterThan(C.CRUISE_SPEED);
-    });
+    pickup.type = "rapid";
+    pickup.px = 50;
+    pickup.py = 95;
+    pickup.pz = -8;
+    (room as any).state.pickups.set("pk0", pickup);
+    (room as any).collectPickups();
 
-    it("RESPAWN_DELAY is positive", () => {
-      expect(C.RESPAWN_DELAY).toBeGreaterThan(0);
-    });
-
-    it("MIN_PLAYERS <= MAX_CLIENTS", () => {
-      expect(C.MIN_PLAYERS).toBeLessThanOrEqual(C.MAX_CLIENTS);
-    });
-
-    it("R_MIN < R_BASE < R_MAX", () => {
-      expect(C.R_MIN).toBeLessThan(C.R_BASE);
-      expect(C.R_BASE).toBeLessThan(C.R_MAX);
-    });
+    expect((room as any).state.pickups.size).toBe(0);
+    expect(player.power).toBe("rapid");
   });
 });

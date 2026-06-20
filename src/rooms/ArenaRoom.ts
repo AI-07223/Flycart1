@@ -6,85 +6,103 @@ import * as leaderboard from "../leaderboard";
 import { log } from "../logger";
 
 interface Input {
-  turn: number; // -1, 0, 1
+  seq: number;
+  turn: number;
+  climb: number;
   boost: boolean;
   fire: boolean;
 }
 
-type BotTier = "rookie" | "veteran" | "ace";
-
 interface BotBrain {
   targetId: string | null;
   retargetAt: number;
-  wander: number;
-  react: number;
-  aimErr: number;
-  lead: number;
-  tier: BotTier;
-  evadeUntil: number;
-  powerupTarget: string | null;
-  weavePhase: number;
+  wanderYaw: number;
 }
 
-function pickTier(): BotTier {
-  const r = Math.random();
-  return r < 0.50 ? "rookie" : r < 0.85 ? "veteran" : "ace";
-}
+const ZERO_INPUT: Input = { seq: 0, turn: 0, climb: 0, boost: false, fire: false };
+const TAU = Math.PI * 2;
 
-function tierParams(tier: BotTier) {
-  switch (tier) {
-    case "rookie":  return { react: 2.0 + Math.random(), aimErr: 0.15 + Math.random() * 0.10, lead: 0.3 + Math.random() * 0.2, evade: false, seekPower: false, useCover: false };
-    case "veteran": return { react: 1.0 + Math.random() * 0.8, aimErr: 0.06 + Math.random() * 0.06, lead: 0.6 + Math.random() * 0.2, evade: true, seekPower: true, useCover: false };
-    case "ace":     return { react: 0.5 + Math.random() * 0.3, aimErr: 0.02 + Math.random() * 0.03, lead: 0.85 + Math.random() * 0.15, evade: true, seekPower: true, useCover: true };
-  }
-}
-
-const ZERO_INPUT: Input = { turn: 0, boost: false, fire: false };
-
-// ---- schema <-> Vec3 helpers ----
 const getP = (e: { px: number; py: number; pz: number }): S.Vec3 => ({ x: e.px, y: e.py, z: e.pz });
 const getF = (e: { fx: number; fy: number; fz: number }): S.Vec3 => ({ x: e.fx, y: e.fy, z: e.fz });
 const setP = (e: { px: number; py: number; pz: number }, v: S.Vec3) => { e.px = v.x; e.py = v.y; e.pz = v.z; };
 const setF = (e: { fx: number; fy: number; fz: number }, v: S.Vec3) => { e.fx = v.x; e.fy = v.y; e.fz = v.z; };
-// signed angle to rotate `from` onto `to` about unit `normal` (matches S.turn's right-hand sense)
-const signedAngle = (normal: S.Vec3, from: S.Vec3, to: S.Vec3): number =>
-  Math.atan2(S.dot(S.cross(from, to), normal), S.dot(from, to));
-// unit tangent at `fromPos` pointing along the geodesic toward `toPos`
-const bearingTo = (fromPos: S.Vec3, toPos: S.Vec3): S.Vec3 => S.tangentize(fromPos, S.sub(toPos, fromPos));
+
+function rand(min: number, max: number): number {
+  return min + Math.random() * (max - min);
+}
+
+function signWithDeadzone(v: number, deadzone: number): number {
+  return Math.abs(v) <= deadzone ? 0 : Math.sign(v);
+}
+
+function horizontal(v: S.Vec3): S.Vec3 {
+  return { x: v.x, y: 0, z: v.z };
+}
+
+function normalizeHorizontal(v: S.Vec3): S.Vec3 {
+  const h = horizontal(v);
+  return S.lenSq(h) > 1e-9 ? S.normalize(h) : { x: 1, y: 0, z: 0 };
+}
+
+function signedYaw(from: S.Vec3, to: S.Vec3): number {
+  return S.signedAngle(S.WORLD_UP, normalizeHorizontal(from), normalizeHorizontal(to));
+}
+
+function horizDistSq(a: S.Vec3, b: S.Vec3): number {
+  const dx = a.x - b.x;
+  const dz = a.z - b.z;
+  return dx * dx + dz * dz;
+}
+
+function pitchFor(fwd: S.Vec3): number {
+  return S.yawPitchFromForward(fwd).pitch;
+}
+
+function steerToward(from: S.Vec3, to: S.Vec3, maxTurn: number): S.Vec3 {
+  const angle = S.angBetween(from, to);
+  if (angle < 1e-5) return S.normalize(to);
+  const t = Math.min(1, maxTurn / angle);
+  return S.slerp(from, to, t);
+}
 
 export class ArenaRoom extends Room<ArenaState> {
   maxClients = C.MAX_CLIENTS;
 
   private inputs = new Map<string, Input>();
-  private speed = new Map<string, number>();
   private lastShot = new Map<string, number>();
   private respawnAt = new Map<string, number>();
   private bots = new Map<string, BotBrain>();
+  private bulletLife = new Map<string, number>();
+  private powerUntil = new Map<string, number>();
+  private shield = new Map<string, number>();
+  private invulnUntil = new Map<string, number>();
+  private msgTimes = new Map<string, number[]>();
 
   private now = 0;
   private bulletSeq = 0;
   private botSeq = 0;
   private pickupSeq = 0;
   private pickupAt = 0;
-  private powerUntil = new Map<string, number>();
-  private shield = new Map<string, number>();
-  private invulnUntil = new Map<string, number>();
-  private bulletLife = new Map<string, number>();
-  private msgTimes = new Map<string, number[]>();
-  private sized = false; // has the first round's radius been computed once bots filled?
-  private botsEnabled = true; // false in the no-bots matchmaking bucket (code "NOBOTS")
+  private botsEnabled = true;
 
   onCreate(options: { code?: string } = {}) {
     this.state = new ArenaState();
     this.state.timeLeft = C.ROUND_SECONDS;
-    this.state.radius = C.radiusForBodies(C.MIN_PLAYERS);
+    this.state.phase = "playing";
+    this.state.arenaHalf = C.MAP_HALF;
+    this.state.floorY = C.GROUND_Y;
+    this.state.ceilingY = C.MAX_ALT;
     this.botsEnabled = (options.code || "PUBLIC") !== "NOBOTS";
     this.setMetadata({ code: options.code || "PUBLIC" });
 
     this.onMessage("input", (client, data: Partial<Input>) => {
       if (!this.rateOk(client.sessionId, C.INPUT_RATE_MAX)) return;
       const cur = this.inputs.get(client.sessionId) ?? { ...ZERO_INPUT };
-      if (typeof data.turn === "number" && Number.isFinite(data.turn)) cur.turn = Math.max(-1, Math.min(1, data.turn));
+      const seq = typeof data.seq === "number" && Number.isFinite(data.seq) ? Math.floor(data.seq) : cur.seq;
+      if (seq < cur.seq) return;
+      cur.seq = seq;
+      if (typeof data.turn === "number" && Number.isFinite(data.turn)) cur.turn = S.clamp(data.turn, -1, 1);
+      if (typeof data.climb === "number" && Number.isFinite(data.climb)) cur.climb = S.clamp(data.climb, -1, 1);
       if (typeof data.boost === "boolean") cur.boost = data.boost;
       if (typeof data.fire === "boolean") cur.fire = data.fire;
       this.inputs.set(client.sessionId, cur);
@@ -111,9 +129,9 @@ export class ArenaRoom extends Room<ArenaState> {
   onJoin(client: Client, options: { name?: string; skin?: number } = {}) {
     const p = new Player();
     p.name = (options.name || "Pilot").trim().slice(0, 14) || "Pilot";
-    const s = options.skin;
-    p.skin = (typeof s === "number" && Number.isInteger(s) && s >= 0 && s < C.SKIN_COUNT)
-      ? s : Math.floor(Math.random() * C.SKIN_COUNT); // validate; random fallback
+    p.skin = typeof options.skin === "number" && Number.isInteger(options.skin) && options.skin >= 0 && options.skin < C.SKIN_COUNT
+      ? options.skin
+      : Math.floor(Math.random() * C.SKIN_COUNT);
     p.bot = false;
     this.spawn(client.sessionId, p);
     this.state.players.set(client.sessionId, p);
@@ -125,297 +143,295 @@ export class ArenaRoom extends Room<ArenaState> {
     this.inputs.set(client.sessionId, { ...ZERO_INPUT });
     try {
       await this.allowReconnection(client, C.RECONNECT_WINDOW);
-    } catch (e) {
+    } catch {
       this.removePlayer(client.sessionId);
     }
   }
 
-  // ---------- simulation ----------
-
   private update(dt: number) {
     this.now += dt;
     const playing = this.state.phase === "playing";
-    const R = this.state.radius;
+
     this.maintainBots();
-    // First-round sizing: once bots have filled to the floor, set the real radius once.
-    if (!this.sized && (this.state.players.size >= C.MIN_PLAYERS || !this.botsEnabled)) { this.resizePlanet(); this.sized = true; }
-    this.maintainPickups(R);
+    this.maintainPickups();
     this.updateTimer(dt);
 
-    for (const [id, brain] of this.bots) this.thinkBot(id, brain, R);
+    for (const [id, brain] of this.bots) this.thinkBot(id, brain);
 
     for (const [id, p] of this.state.players) {
       if (!p.alive) {
-        const t = this.respawnAt.get(id) ?? 0;
-        if (this.now >= t) this.spawn(id, p);
+        const at = this.respawnAt.get(id) ?? 0;
+        if (this.now >= at) this.spawn(id, p);
         continue;
       }
-      this.stepPlane(id, p, dt, playing, R);
+      this.stepPlane(id, p, dt, playing);
     }
 
-    this.stepBullets(dt, playing, R);
-    this.collectPickups(R);
+    this.stepBullets(dt, playing);
+    this.collectPickups();
     this.expirePowers();
-  }
-
-  private resizePlanet() {
-    // Recompute the planet radius from the number of bodies (humans + bots). Positions are
-    // directions and speeds are angular, so nothing teleports — only the rendered scale changes.
-    this.state.radius = C.radiusForBodies(this.state.players.size);
   }
 
   private updateTimer(dt: number) {
     if (this.state.phase === "playing") {
       this.state.timeLeft = Math.max(0, this.state.timeLeft - dt);
       if (this.state.timeLeft <= 0) {
-        // Round over: record each human's round score (best-kept) before scores reset next round.
         for (const [, p] of this.state.players) if (!p.bot && p.score > 0) leaderboard.record(p.name, p.score);
         this.state.phase = "intermission";
         this.state.timeLeft = C.ROUND_INTERMISSION;
       }
-    } else {
-      this.state.timeLeft = Math.max(0, this.state.timeLeft - dt);
-      if (this.state.timeLeft <= 0) {
-        // New round: resize the planet for the current lobby, wipe scores, respawn everyone.
-        this.resizePlanet();
-        for (const [id, p] of this.state.players) {
-          p.score = 0;
-          this.spawn(id, p);
-        }
-        this.state.phase = "playing";
-        this.state.timeLeft = C.ROUND_SECONDS;
-      }
+      return;
     }
+
+    this.state.timeLeft = Math.max(0, this.state.timeLeft - dt);
+    if (this.state.timeLeft > 0) return;
+
+    for (const [id, p] of this.state.players) {
+      p.score = 0;
+      this.spawn(id, p);
+    }
+    this.state.phase = "playing";
+    this.state.timeLeft = C.ROUND_SECONDS;
   }
 
-  private stepPlane(id: string, p: Player, dt: number, playing: boolean, R: number) {
+  private stepPlane(id: string, p: Player, dt: number, playing: boolean) {
     const input = this.inputs.get(id) ?? ZERO_INPUT;
-    let pos = getP(p), fwd = getF(p);
+    let pos = getP(p);
+    let fwd = S.normalize(getF(p));
 
-    // turn (rotate heading about the surface normal). Sign is correct for bots (which set
-    // input.turn = sign(bearing error)); human input handedness is fixed at the source in input.js.
-    fwd = S.turn(pos, fwd, input.turn * C.TURN_RATE * dt);
+    const angles = S.yawPitchFromForward(fwd);
+    const yaw = angles.yaw + input.turn * C.TURN_RATE * dt;
+    const pitch = S.clamp(angles.pitch + input.climb * C.PITCH_RATE * dt, -C.PITCH_MAX, C.PITCH_MAX);
+    fwd = S.yawPitchForward(yaw, pitch);
+
+    p.turn = input.turn;
+    p.climb = input.climb;
     p.boosting = input.boost;
+    p.seq = Math.max(p.seq, input.seq);
 
-    // speed easing (linear surface speed)
-    let target = input.boost ? C.BOOST_SPEED : C.CRUISE_SPEED;
-    if (p.power === "afterburner") target *= C.AFTERBURNER_FACTOR;
-    const before = this.speed.get(id) ?? C.CRUISE_SPEED;
-    let s = before + Math.sign(target - before) * C.ACCEL * dt;
-    if ((target - s) * (target - before) < 0) s = target;
-    this.speed.set(id, s);
+    let targetSpeed = input.boost ? C.BOOST_SPEED : C.CRUISE_SPEED;
+    if (p.power === "afterburner") targetSpeed *= C.AFTERBURNER_FACTOR;
+    const delta = targetSpeed - p.speed;
+    const step = Math.sign(delta) * C.ACCEL * dt;
+    p.speed = Math.abs(step) >= Math.abs(delta) ? targetSpeed : p.speed + step;
 
-    // great-circle advance by angular distance (linear speed / radius)
-    const adv = S.advance(pos, fwd, (s / R) * dt);
-    pos = adv.p; fwd = adv.f;
-
-    // solid obstacles: deflect/slide off (cover) — NEVER touches hp (no environment damage)
-    const planeAng = C.PLANE_RADIUS / R;
-    for (const o of C.OBSTACLES) {
-      if (!C.OBSTACLE_BEHAVIOR[o.kind].solid) continue;
-      const sep = S.angBetween(pos, o.dir);
-      const rr = o.angRadius + planeAng;
-      if (sep < rr) {
-        pos = sep > 1e-4 ? S.slerp(o.dir, pos, rr / sep) : S.advance(o.dir, S.anyTangent(o.dir), rr).p;
-        fwd = this.deflectSphere(pos, fwd, o.dir);
-      }
+    const edge = Math.max(Math.abs(pos.x), Math.abs(pos.z));
+    if (edge > C.MAP_HALF - C.MAP_EDGE_SOFT) {
+      const edgeT = S.clamp((edge - (C.MAP_HALF - C.MAP_EDGE_SOFT)) / C.MAP_EDGE_SOFT, 0, 1);
+      const home = normalizeHorizontal({ x: -pos.x, y: 0, z: -pos.z });
+      fwd = S.normalize({
+        x: S.lerp(fwd.x, home.x, edgeT * 0.25),
+        y: fwd.y * (1 - edgeT * 0.2),
+        z: S.lerp(fwd.z, home.z, edgeT * 0.25),
+      });
     }
 
-    setP(p, pos); setF(p, S.tangentize(pos, fwd));
-    if (input.fire && playing) this.tryFire(id, p, R);
+    pos = S.advance(pos, fwd, p.speed * dt).p;
+
+    for (const landmark of C.LANDMARKS) {
+      const dx = pos.x - landmark.x;
+      const dz = pos.z - landmark.z;
+      const rr = landmark.radius + C.PLANE_RADIUS;
+      if (dx * dx + dz * dz > rr * rr) continue;
+      const floor = landmark.height + C.PLANE_RADIUS;
+      if (pos.y > floor) continue;
+      const out = S.normalize({ x: dx || 1, y: 0, z: dz || 0 });
+      pos.x = landmark.x + out.x * rr;
+      pos.z = landmark.z + out.z * rr;
+      pos.y = Math.max(pos.y, floor);
+      fwd = S.normalize({ x: S.lerp(fwd.x, out.x, 0.35), y: Math.max(0.08, fwd.y), z: S.lerp(fwd.z, out.z, 0.35) });
+    }
+
+    pos.x = S.clamp(pos.x, -C.MAP_HALF, C.MAP_HALF);
+    pos.z = S.clamp(pos.z, -C.MAP_HALF, C.MAP_HALF);
+    pos.y = S.clamp(pos.y, C.MIN_ALT, C.MAX_ALT);
+
+    if (pos.y <= C.MIN_ALT + 0.01 && fwd.y < 0) fwd = S.withPitch(fwd, 0.02);
+    if (pos.y >= C.MAX_ALT - 0.01 && fwd.y > 0) fwd = S.withPitch(fwd, -0.02);
+
+    setP(p, pos);
+    setF(p, S.normalize(fwd));
+
+    if (input.fire && playing) this.tryFire(id, p);
   }
 
-  // Steer forward away from an obstacle by blending toward the outward tangent (reuses the 0.35 feel).
-  private deflectSphere(pos: S.Vec3, fwd: S.Vec3, oDir: S.Vec3): S.Vec3 {
-    const outward = S.tangentize(pos, S.sub(pos, oDir));
-    const a = signedAngle(pos, fwd, outward);
-    return S.turn(pos, fwd, a * 0.35);
-  }
-
-  private rateOk(id: string, max: number): boolean {
-    const now = Date.now();
-    let arr = this.msgTimes.get(id);
-    if (!arr) { arr = []; this.msgTimes.set(id, arr); }
-    while (arr.length && now - arr[0] > 1000) arr.shift();
-    if (arr.length >= max) return false;
-    arr.push(now);
-    return true;
-  }
-
-  private tryFire(id: string, p: Player, R: number) {
+  private tryFire(id: string, p: Player) {
     this.invulnUntil.delete(id);
     const last = this.lastShot.get(id) ?? -999;
-    const cd = C.FIRE_COOLDOWN * (p.power === "rapid" ? C.RAPID_FACTOR : 1);
-    if (this.now - last < cd) return;
+    const cooldown = C.FIRE_COOLDOWN * (p.power === "rapid" ? C.RAPID_FACTOR : 1);
+    if (this.now - last < cooldown) return;
     this.lastShot.set(id, this.now);
 
-    const pos = getP(p), fwd = getF(p);
+    const pos = getP(p);
+    const fwd = getF(p);
     if (p.power === "spread") {
-      this.spawnBullet(id, pos, S.turn(pos, fwd, -C.SPREAD_ANGLE), false, R);
-      this.spawnBullet(id, pos, fwd, false, R);
-      this.spawnBullet(id, pos, S.turn(pos, fwd, C.SPREAD_ANGLE), false, R);
+      this.spawnBullet(id, pos, S.turn(pos, fwd, -C.SPREAD_ANGLE), false);
+      this.spawnBullet(id, pos, fwd, false);
+      this.spawnBullet(id, pos, S.turn(pos, fwd, C.SPREAD_ANGLE), false);
     } else {
-      this.spawnBullet(id, pos, fwd, p.power === "homing", R);
+      this.spawnBullet(id, pos, fwd, p.power === "homing");
     }
   }
 
-  private spawnBullet(id: string, pos: S.Vec3, fwd: S.Vec3, homing: boolean, R: number) {
+  private spawnBullet(owner: string, pos: S.Vec3, fwd: S.Vec3, homing: boolean) {
     const b = new Bullet();
-    const start = S.advance(pos, fwd, (C.PLANE_RADIUS + 6) / R); // emit just ahead of the nose
-    setP(b, start.p); setF(b, start.f);
-    b.owner = id;
+    const start = S.add(pos, S.scale(S.normalize(fwd), C.PLANE_RADIUS + 10));
+    setP(b, start);
+    setF(b, S.normalize(fwd));
+    b.owner = owner;
     b.homing = homing;
-    const key = "b" + this.bulletSeq++;
+    const key = `b${this.bulletSeq++}`;
     this.bulletLife.set(key, C.BULLET_LIFE);
     this.state.bullets.set(key, b);
   }
 
-  private stepBullets(dt: number, playing: boolean, R: number) {
-    const hitAng = (C.PLANE_RADIUS + C.BULLET_RADIUS) / R;
-    const bulletThin = C.BULLET_RADIUS / R;
+  private stepBullets(dt: number, playing: boolean) {
     for (const [key, b] of this.state.bullets) {
       const life = (this.bulletLife.get(key) ?? C.BULLET_LIFE) - dt;
-      if (life <= 0) { this.state.bullets.delete(key); this.bulletLife.delete(key); continue; }
-      this.bulletLife.set(key, life);
-
-      let pos = getP(b), fwd = getF(b);
-
-      if (b.homing) {
-        let best: Player | undefined; let bestD = Infinity;
-        for (const [pid, tp] of this.state.players) {
-          if (!tp.alive || pid === b.owner) continue;
-          const d = S.angBetween(pos, getP(tp));
-          if (d < bestD) { bestD = d; best = tp; }
-        }
-        if (best) {
-          const desired = bearingTo(pos, getP(best));
-          const a = signedAngle(pos, fwd, desired);
-          const max = C.HOMING_TURN * dt;
-          fwd = S.turn(pos, fwd, Math.max(-max, Math.min(max, a)));
-        }
-      }
-
-      const oldPos = pos;
-      const adv = S.advance(pos, fwd, (C.BULLET_SPEED / R) * dt);
-      pos = adv.p; fwd = adv.f;
-
-      // earliest hit along the geodesic arc: bullet-blocking obstacle (no damage) vs enemy plane
-      let bestT = Infinity, victim: Player | null = null, victimId = "", hit = false;
-      if (playing) {
-        for (const [pid, pl] of this.state.players) {
-          if (!pl.alive || pid === b.owner) continue;
-          if (S.arcDistToPoint(oldPos, pos, getP(pl)) <= hitAng) {
-            const t = S.arcClosestT(oldPos, pos, getP(pl));
-            if (t < bestT) { bestT = t; victim = pl; victimId = pid; hit = true; }
-          }
-        }
-      }
-      for (const o of C.OBSTACLES) {
-        if (!C.OBSTACLE_BEHAVIOR[o.kind].blocksBullets) continue;
-        if (S.arcDistToPoint(oldPos, pos, o.dir) <= o.angRadius + bulletThin) {
-          const t = S.arcClosestT(oldPos, pos, o.dir);
-          if (t < bestT) { bestT = t; victim = null; hit = true; }
-        }
-      }
-      if (hit) {
-        if (victim) this.damage(victim, victimId, b.owner); // obstacle (victim===null) deals no damage
+      if (life <= 0) {
         this.state.bullets.delete(key);
         this.bulletLife.delete(key);
-      } else {
-        setP(b, pos); setF(b, fwd);
+        continue;
       }
+      this.bulletLife.set(key, life);
+
+      let pos = getP(b);
+      let fwd = S.normalize(getF(b));
+
+      if (b.homing) {
+        const target = this.closestTarget(b.owner, pos);
+        if (target) {
+          const desired = S.normalize(S.sub(getP(target.player), pos));
+          fwd = steerToward(fwd, desired, C.HOMING_TURN * dt);
+        }
+      }
+
+      const prev = pos;
+      pos = S.advance(pos, fwd, C.BULLET_SPEED * dt).p;
+
+      let bestT = Infinity;
+      let victim: Player | null = null;
+      let victimId = "";
+      let blocked = false;
+
+      if (playing) {
+        for (const [pid, p] of this.state.players) {
+          if (!p.alive || pid === b.owner) continue;
+          const targetPos = getP(p);
+          const hitDist = C.PLANE_RADIUS + C.BULLET_RADIUS;
+          if (S.segmentPointDistance(prev, pos, targetPos) > hitDist) continue;
+          const t = S.segmentPointT(prev, pos, targetPos);
+          if (t < bestT) { bestT = t; victim = p; victimId = pid; blocked = false; }
+        }
+      }
+
+      for (const landmark of C.LANDMARKS) {
+        if (!landmark.cover) continue;
+        const cylPoint = { x: landmark.x, y: 0, z: landmark.z };
+        const flatA = { x: prev.x, y: 0, z: prev.z };
+        const flatB = { x: pos.x, y: 0, z: pos.z };
+        if (S.segmentPointDistance(flatA, flatB, cylPoint) > landmark.radius + C.BULLET_RADIUS) continue;
+        const t = S.segmentPointT(flatA, flatB, cylPoint);
+        const y = S.lerp(prev.y, pos.y, t);
+        if (y > landmark.height + C.BULLET_RADIUS) continue;
+        if (t < bestT) { bestT = t; victim = null; blocked = true; }
+      }
+
+      if (victim || blocked) {
+        if (victim) this.damage(victim, victimId, b.owner);
+        this.state.bullets.delete(key);
+        this.bulletLife.delete(key);
+        continue;
+      }
+
+      if (Math.abs(pos.x) > C.MAP_HALF || Math.abs(pos.z) > C.MAP_HALF || pos.y < C.GROUND_Y || pos.y > C.MAX_ALT + 40) {
+        this.state.bullets.delete(key);
+        this.bulletLife.delete(key);
+        continue;
+      }
+
+      setP(b, pos);
+      setF(b, fwd);
     }
   }
 
   private damage(p: Player, victimId: string, killerId: string) {
     if (this.now < (this.invulnUntil.get(victimId) ?? 0)) return;
-    const sh = this.shield.get(victimId) ?? 0;
-    if (sh > 0) {
-      this.shield.set(victimId, sh - 1);
-      if (sh - 1 <= 0) { this.shield.delete(victimId); if (p.power === "shield") this.clearPower(victimId, p); }
+    const shield = this.shield.get(victimId) ?? 0;
+    if (shield > 0) {
+      this.shield.set(victimId, shield - 1);
+      if (shield - 1 <= 0) {
+        this.shield.delete(victimId);
+        if (p.power === "shield") this.clearPower(victimId, p);
+      }
       return;
     }
+
     p.hp -= C.BULLET_DAMAGE;
-    if (p.hp <= 0) {
-      p.hp = 0;
-      p.alive = false;
-      this.clearPower(victimId, p);
-      this.respawnAt.set(victimId, this.now + C.RESPAWN_DELAY);
-      const killer = this.state.players.get(killerId);
-      if (killer && killerId !== victimId) killer.score += 1;
-      this.broadcast("kill", {
-        killer: killerId,
-        victim: victimId,
-        killerName: killer ? killer.name : "?",
-        victimName: p.name,
-      });
-    }
+    if (p.hp > 0) return;
+
+    p.hp = 0;
+    p.alive = false;
+    p.boosting = false;
+    p.turn = 0;
+    p.climb = 0;
+    this.clearPower(victimId, p);
+    this.respawnAt.set(victimId, this.now + C.RESPAWN_DELAY);
+
+    const killer = this.state.players.get(killerId);
+    if (killer && killerId !== victimId) killer.score += 1;
+    this.broadcast("kill", {
+      killer: killerId,
+      victim: victimId,
+      killerName: killer ? killer.name : "?",
+      victimName: p.name,
+    });
   }
 
-  // ---------- powerups ----------
-
-  private maintainPickups(R: number) {
+  private maintainPickups() {
     if (this.state.pickups.size >= C.PICKUP_MAX || this.now < this.pickupAt) return;
     this.pickupAt = this.now + C.PICKUP_INTERVAL;
     const pk = new Pickup();
     pk.type = this.weightedPowerup();
-    const dir = this.pickPickupDir(R);
-    setP(pk, dir);
-    this.state.pickups.set("pk" + this.pickupSeq++, pk);
+    setP(pk, this.pickPickupPosition());
+    this.state.pickups.set(`pk${this.pickupSeq++}`, pk);
   }
 
-  // Weighted toward the hotspot (angular power law), never inside solid cover.
-  private pickPickupDir(R: number): S.Vec3 {
-    const pad = C.PICKUP_RADIUS / R;
-    let last = C.HOTSPOT_DIR;
+  private pickPickupPosition(): S.Vec3 {
+    let best = S.vec(0, C.SPAWN_ALT, 0);
     for (let i = 0; i < C.SPAWN_REROLL; i++) {
-      const ang = Math.PI * Math.pow(Math.random(), C.HOTSPOT_BIAS); // small angle from hotspot more likely
-      const az = Math.random() * Math.PI * 2;
-      const dir = C.dirFromHotspot(ang, az);
-      last = dir;
-      if (!this.insideSolidAng(dir, pad)) return last;
+      const r = Math.pow(Math.random(), 1.35) * C.PICKUP_FIELD_RADIUS;
+      const ang = Math.random() * TAU;
+      const pos = S.vec(Math.cos(ang) * r, rand(C.PICKUP_ALT_MIN, C.PICKUP_ALT_MAX), Math.sin(ang) * r);
+      if (this.insideLandmark(pos, C.PICKUP_RADIUS)) continue;
+      best = pos;
+      break;
     }
-    for (let pass = 0; pass < 3; pass++) { // guarantee clear of cover
-      let moved = false;
-      for (const o of C.OBSTACLES) {
-        if (!C.OBSTACLE_BEHAVIOR[o.kind].solid) continue;
-        const rr = o.angRadius + pad + 0.01;
-        if (S.angBetween(last, o.dir) < rr) { last = S.slerp(o.dir, last, rr / Math.max(1e-4, S.angBetween(last, o.dir))); moved = true; }
-      }
-      if (!moved) break;
-    }
-    return last;
-  }
-
-  private insideSolidAng(dir: S.Vec3, pad: number): boolean {
-    for (const o of C.OBSTACLES) {
-      if (!C.OBSTACLE_BEHAVIOR[o.kind].solid) continue;
-      if (S.angBetween(dir, o.dir) <= o.angRadius + pad) return true;
-    }
-    return false;
+    return best;
   }
 
   private weightedPowerup(): string {
     let total = 0;
-    for (const t of C.POWERUP_TYPES) total += C.POWERUP_WEIGHTS[t] ?? 1;
-    let r = Math.random() * total;
-    for (const t of C.POWERUP_TYPES) { r -= C.POWERUP_WEIGHTS[t] ?? 1; if (r <= 0) return t; }
+    for (const type of C.POWERUP_TYPES) total += C.POWERUP_WEIGHTS[type] ?? 1;
+    let roll = Math.random() * total;
+    for (const type of C.POWERUP_TYPES) {
+      roll -= C.POWERUP_WEIGHTS[type] ?? 1;
+      if (roll <= 0) return type;
+    }
     return C.POWERUP_TYPES[0];
   }
 
-  private collectPickups(R: number) {
-    const hitAng = (C.PICKUP_RADIUS + C.PLANE_RADIUS) / R;
+  private collectPickups() {
     for (const [key, pk] of this.state.pickups) {
       const pkPos = getP(pk);
       for (const [pid, p] of this.state.players) {
         if (!p.alive) continue;
-        if (S.angBetween(getP(p), pkPos) <= hitAng) {
-          if (pk.type === "repair" && p.hp >= C.MAX_HP) continue;
-          this.applyPowerup(pid, p, pk.type);
-          this.state.pickups.delete(key);
-          this.broadcast("pickup", { by: pid, type: pk.type });
-          break;
-        }
+        if (S.distance(pkPos, getP(p)) > C.PICKUP_RADIUS + C.PLANE_RADIUS) continue;
+        if (pk.type === "repair" && p.hp >= C.MAX_HP) continue;
+        this.applyPowerup(pid, p, pk.type);
+        this.state.pickups.delete(key);
+        this.broadcast("pickup", { by: pid, type: pk.type });
+        break;
       }
     }
   }
@@ -429,7 +445,7 @@ export class ArenaRoom extends Room<ArenaState> {
     if (type === "shield") this.shield.set(id, C.SHIELD_CHARGES);
   }
 
-  private clearPower(id: string, p: Player | undefined) {
+  private clearPower(id: string, p?: Player) {
     this.powerUntil.delete(id);
     this.shield.delete(id);
     if (p) { p.power = ""; p.powerLeft = 0; }
@@ -437,81 +453,110 @@ export class ArenaRoom extends Room<ArenaState> {
 
   private expirePowers() {
     for (const [id, until] of this.powerUntil) {
-      if (this.now >= until) {
-        this.clearPower(id, this.state.players.get(id));
-      } else {
-        const p = this.state.players.get(id);
-        if (p) p.powerLeft = Math.max(0, until - this.now);
-      }
+      const p = this.state.players.get(id);
+      if (!p) { this.powerUntil.delete(id); continue; }
+      if (this.now >= until) this.clearPower(id, p);
+      else p.powerLeft = Math.max(0, until - this.now);
     }
   }
 
-  // ---------- spawning / lifecycle ----------
-
   private spawn(id: string, p: Player) {
-    const pos = this.pickSpawnDir();
+    const pos = this.pickSpawnPoint();
+    const center = normalizeHorizontal({ x: -pos.x, y: 0, z: -pos.z });
+    const yaw = Math.atan2(center.z, center.x) + rand(-0.4, 0.4);
+    const pitch = rand(-0.06, 0.08);
+    const fwd = S.yawPitchForward(yaw, pitch);
+
     setP(p, pos);
-    setF(p, S.turn(pos, S.anyTangent(pos), Math.random() * Math.PI * 2));
+    setF(p, fwd);
+    p.seq = this.inputs.get(id)?.seq ?? 0;
+    p.speed = C.CRUISE_SPEED;
+    p.turn = 0;
+    p.climb = 0;
     p.hp = C.MAX_HP;
     p.alive = true;
     p.boosting = false;
     this.clearPower(id, p);
-    this.speed.set(id, C.CRUISE_SPEED);
     this.lastShot.delete(id);
     this.invulnUntil.set(id, this.now + C.SPAWN_INVULN);
   }
 
-  // Random surface point, biased away from the nearest alive enemy and clear of solid cover.
-  private pickSpawnDir(): S.Vec3 {
-    const pad = C.PLANE_RADIUS / this.state.radius + 0.02;
-    let best: S.Vec3 | null = null, bestD = -1;
-    let fallback = S.randomDir();
+  private pickSpawnPoint(): S.Vec3 {
+    let best = S.vec(0, C.SPAWN_ALT, 0);
+    let bestScore = -Infinity;
+
     for (let i = 0; i < C.SPAWN_REROLL; i++) {
-      const d = S.randomDir();
-      fallback = d;
-      if (this.insideSolidAng(d, pad)) continue;
-      let near = Infinity;
-      for (const [, p] of this.state.players) {
-        if (!p.alive) continue;
-        const ad = S.angBetween(getP(p), d);
-        if (ad < near) near = ad;
+      const ang = Math.random() * TAU;
+      const r = rand(C.MAP_HALF * 0.45, C.MAP_HALF * 0.8);
+      const pos = S.vec(Math.cos(ang) * r, rand(C.SPAWN_ALT - 18, C.SPAWN_ALT + 42), Math.sin(ang) * r);
+      if (this.insideLandmark(pos, C.PLANE_RADIUS)) continue;
+
+      let nearest = Infinity;
+      for (const [, other] of this.state.players) {
+        if (!other.alive) continue;
+        nearest = Math.min(nearest, S.distance(pos, getP(other)));
       }
-      if (near > bestD) { bestD = near; best = d; }
+      const centerPull = Math.sqrt(pos.x * pos.x + pos.z * pos.z);
+      const score = (nearest === Infinity ? 1200 : nearest) + centerPull * 0.12;
+      if (score > bestScore) {
+        bestScore = score;
+        best = pos;
+      }
     }
-    return best ?? fallback;
+
+    return best;
+  }
+
+  private insideLandmark(pos: S.Vec3, radius: number): boolean {
+    for (const landmark of C.LANDMARKS) {
+      if (!landmark.cover) continue;
+      const rr = landmark.radius + radius;
+      const dx = pos.x - landmark.x;
+      const dz = pos.z - landmark.z;
+      if (dx * dx + dz * dz <= rr * rr && pos.y <= landmark.height + radius) return true;
+    }
+    return false;
   }
 
   private removePlayer(id: string) {
     this.state.players.delete(id);
     this.inputs.delete(id);
-    this.speed.delete(id);
     this.lastShot.delete(id);
     this.respawnAt.delete(id);
     this.bots.delete(id);
+    this.bulletLife.forEach((_value, key) => {
+      const bullet = this.state.bullets.get(key);
+      if (bullet && bullet.owner === id) {
+        this.state.bullets.delete(key);
+        this.bulletLife.delete(key);
+      }
+    });
     this.powerUntil.delete(id);
     this.shield.delete(id);
     this.invulnUntil.delete(id);
     this.msgTimes.delete(id);
   }
 
-  // ---------- bots ----------
-
   private maintainBots() {
-    if (!this.botsEnabled) { // no-bots bucket: drop any bots, never fill
-      if (this.bots.size) for (const id of [...this.bots.keys()]) this.removePlayer(id);
+    if (!this.botsEnabled) {
+      for (const id of [...this.bots.keys()]) this.removePlayer(id);
       return;
     }
+
     const total = this.state.players.size;
     if (total < C.MIN_PLAYERS) {
       this.addBot();
-    } else if (this.bots.size > 0 && total > C.MIN_PLAYERS) {
+      return;
+    }
+
+    if (this.bots.size > 0 && total > C.MIN_PLAYERS) {
       const firstBot = this.bots.keys().next().value as string | undefined;
       if (firstBot) this.removePlayer(firstBot);
     }
   }
 
   private addBot() {
-    const id = "bot_" + this.botSeq++;
+    const id = `bot_${this.botSeq++}`;
     const p = new Player();
     p.name = C.BOT_NAMES[Math.floor(Math.random() * C.BOT_NAMES.length)];
     p.skin = Math.floor(Math.random() * C.SKIN_COUNT);
@@ -519,163 +564,122 @@ export class ArenaRoom extends Room<ArenaState> {
     this.spawn(id, p);
     this.state.players.set(id, p);
     this.inputs.set(id, { ...ZERO_INPUT });
-    const tier = pickTier();
-    const params = tierParams(tier);
-    this.bots.set(id, {
-      targetId: null, retargetAt: 0, wander: Math.random() * Math.PI * 2,
-      react: params.react, aimErr: params.aimErr, lead: params.lead,
-      tier, evadeUntil: 0, powerupTarget: null, weavePhase: Math.random() * Math.PI * 2,
-    });
+    this.bots.set(id, { targetId: null, retargetAt: 0, wanderYaw: rand(-1, 1) });
   }
 
-  private thinkBot(id: string, brain: BotBrain, R: number) {
+  private thinkBot(id: string, brain: BotBrain) {
     const me = this.state.players.get(id);
     const input = this.inputs.get(id);
     if (!me || !input) return;
-    if (!me.alive) { input.turn = 0; input.fire = false; input.boost = false; return; }
-
-    const params = tierParams(brain.tier);
-    const myPos = getP(me), myFwd = getF(me);
-    let target = brain.targetId ? this.state.players.get(brain.targetId) : undefined;
-    if (this.now >= brain.retargetAt || !target || !target.alive || brain.targetId === id) {
-      target = this.pickTarget(id, myPos);
-      brain.targetId = target ? this.idOf(target) : null;
-      brain.retargetAt = this.now + brain.react + Math.random() * brain.react;
+    if (!me.alive) {
+      input.turn = 0;
+      input.climb = 0;
+      input.boost = false;
+      input.fire = false;
+      return;
     }
 
-    let desiredBearing: S.Vec3;
-    let wantFire = false, wantBoost = false;
-
-    // --- Obstacle avoidance (veteran+ only) ---
-    let avoidance: S.Vec3 | null = null;
-    if (params.seekPower || params.useCover) {
-      for (const ob of C.OBSTACLES) {
-        if (!C.OBSTACLE_BEHAVIOR[ob.kind].solid) continue;
-        const d = S.angBetween(myPos, ob.dir);
-        if (d < ob.angRadius * 1.5) {
-          const away = S.normalize(S.sub(myPos, ob.dir));
-          avoidance = avoidance ? S.add(avoidance, away) : away;
-        }
-      }
+    if (this.now >= brain.retargetAt) {
+      brain.targetId = this.pickBotTarget(id, getP(me));
+      brain.retargetAt = this.now + rand(0.6, 1.2);
     }
 
-    // --- Powerup seeking (veteran+ only, not in close combat) ---
-    let powerupDir: S.Vec3 | null = null;
-    if (params.seekPower && this.state.pickups.size > 0) {
-      let bestScore = 0;
-      for (const [pk, pickup] of this.state.pickups) {
-        const pPos = S.vec(pickup.px, pickup.py, pickup.pz);
-        const d = S.angBetween(myPos, pPos) * R;
-        if (d > 400) continue;
-        if (me.power === pickup.type) continue;
-        // Priority: shield (when low HP) > afterburner > spread > rapid > homing > repair
-        const priority = pickup.type === "shield" && me.hp < 50 ? 6 :
-          pickup.type === "afterburner" ? 5 : pickup.type === "spread" ? 4 :
-          pickup.type === "rapid" ? 3 : pickup.type === "homing" ? 2 : 1;
-        const score = priority / (d + 1);
-        if (score > bestScore) { bestScore = score; powerupDir = bearingTo(myPos, pPos); }
-      }
+    const myPos = getP(me);
+    const myFwd = getF(me);
+    const target = brain.targetId ? this.state.players.get(brain.targetId) : undefined;
+    let desired = S.normalize({ x: Math.cos(brain.wanderYaw), y: 0, z: Math.sin(brain.wanderYaw) });
+    let fire = false;
+    let boost = false;
+
+    const pickup = this.bestPickupForBot(me);
+    if (pickup && (!target || me.hp < 45 || me.power === "")) {
+      desired = S.normalize(S.sub(pickup, myPos));
     }
 
-    if (target) {
-      const tPos = getP(target);
-      const distWorld = S.angBetween(myPos, tPos) * R;
-      const fleeing = me.hp <= 35 && distWorld < 520;
-
-      if (fleeing && params.useCover) {
-        // Ace: flee toward nearest solid obstacle for cover
-        let nearestOb: S.Vec3 | null = null;
-        let nearestD = Infinity;
-        for (const ob of C.OBSTACLES) {
-          if (!C.OBSTACLE_BEHAVIOR[ob.kind].solid) continue;
-          const d = S.angBetween(myPos, ob.dir);
-          if (d < nearestD) { nearestD = d; nearestOb = ob.dir; }
-        }
-        if (nearestOb && nearestD < 1.2) {
-          desiredBearing = bearingTo(myPos, nearestOb);
-        } else {
-          desiredBearing = bearingTo(myPos, S.scale(tPos, -1));
-        }
-        wantBoost = true;
-      } else if (fleeing) {
-        desiredBearing = bearingTo(myPos, S.scale(tPos, -1));
-        wantBoost = true;
-      } else {
-        // Engage with predictive lead
-        const tid = brain.targetId as string;
-        const tSpeed = this.speed.get(tid) ?? C.CRUISE_SPEED;
-        const leadT = (distWorld / C.BULLET_SPEED) * brain.lead;
-        const leadPos = S.advance(tPos, getF(target), (tSpeed / R) * leadT).p;
-        desiredBearing = S.turn(myPos, bearingTo(myPos, leadPos), brain.aimErr * (Math.random() * 2 - 1));
-        const aim = Math.abs(signedAngle(myPos, myFwd, bearingTo(myPos, leadPos)));
-        wantFire = aim < 0.16 && distWorld < 640;
-        wantBoost = distWorld > 720 && Math.random() < 0.4;
+    if (target && target.alive) {
+      const targetPos = getP(target);
+      const leadTime = S.distance(myPos, targetPos) / Math.max(C.BULLET_SPEED, 1) * 0.8;
+      const leadPos = S.add(targetPos, S.scale(getF(target), target.speed * leadTime));
+      desired = S.normalize(S.sub(leadPos, myPos));
+      if (me.hp < 35 && S.distance(myPos, targetPos) < 340) {
+        desired = S.normalize(S.add(S.sub(myPos, targetPos), S.scale(normalizeHorizontal({ x: -myPos.x, y: 0, z: -myPos.z }), 0.6)));
+        boost = true;
       }
-
-      // --- Evasion weaving (veteran+ only) ---
-      if (params.evade) {
-        let threatCount = 0;
-        for (const [, b] of this.state.bullets) {
-          if (b.owner === id) continue;
-          const bPos = getP(b);
-          const bToMe = S.normalize(S.sub(myPos, bPos));
-          const dot = S.dot(bToMe, getF(b));
-          if (dot > 0.7) threatCount++; // bullet heading toward us
-        }
-        if (threatCount > 0) {
-          brain.weavePhase += 0.3;
-          const weave = Math.sin(brain.weavePhase) * 0.4;
-          const perp = S.normalize(S.cross(myPos, desiredBearing));
-          desiredBearing = S.normalize(S.add(desiredBearing, S.scale(perp, weave)));
-        }
-      }
+      const aim = Math.abs(signedYaw(myFwd, desired));
+      const altDelta = targetPos.y - myPos.y;
+      fire = aim < 0.15 && Math.abs(altDelta) < 70 && S.distance(myPos, targetPos) < 560;
+      boost = boost || S.distance(myPos, targetPos) > 520;
     } else {
-      // No target: wander or seek powerup
-      if (powerupDir) {
-        desiredBearing = powerupDir;
-      } else {
-        brain.wander += (Math.random() - 0.5) * 0.6;
-        desiredBearing = S.turn(myPos, myFwd, brain.wander * 0.02);
-      }
+      brain.wanderYaw += rand(-0.25, 0.25);
+      desired = S.normalize({ x: Math.cos(brain.wanderYaw), y: signWithDeadzone(C.SPAWN_ALT - myPos.y, 18) * 0.18, z: Math.sin(brain.wanderYaw) });
     }
 
-    // --- Blend avoidance into heading ---
-    if (avoidance && !target) {
-      desiredBearing = S.normalize(S.add(desiredBearing, S.scale(avoidance, 0.5)));
+    const edge = Math.max(Math.abs(myPos.x), Math.abs(myPos.z));
+    if (edge > C.MAP_HALF - C.MAP_EDGE_SOFT * 1.1) {
+      desired = S.normalize(S.add(desired, S.scale(normalizeHorizontal({ x: -myPos.x, y: 0, z: -myPos.z }), 0.8)));
+      boost = true;
     }
 
-    // --- Seek powerup if in range and not in close combat ---
-    if (powerupDir && target) {
-      const tPos = getP(target);
-      const distWorld = S.angBetween(myPos, tPos) * R;
-      if (distWorld > 500) desiredBearing = powerupDir; // divert only if not in close combat
-    }
-
-    const diff = signedAngle(myPos, myFwd, desiredBearing);
-    input.turn = Math.abs(diff) < 0.04 ? 0 : Math.sign(diff);
-    input.fire = wantFire;
-    input.boost = wantBoost;
+    input.turn = signWithDeadzone(signedYaw(myFwd, desired), 0.06);
+    input.climb = signWithDeadzone(desired.y, 0.08);
+    input.boost = boost;
+    input.fire = fire;
+    input.seq += 1;
   }
 
-  private pickTarget(selfId: string, myPos: S.Vec3): Player | undefined {
-    let best: Player | undefined;
+  private pickBotTarget(selfId: string, myPos: S.Vec3): string | null {
+    let bestId: string | null = null;
     let bestScore = -Infinity;
     for (const [pid, p] of this.state.players) {
       if (pid === selfId || !p.alive) continue;
-      const d = S.angBetween(getP(p), myPos);
-      let score = 1 / (d + 0.1); // closer = higher priority
-      // Threats aiming at us get priority
-      const pFwd = getF(p);
-      const toMe = S.normalize(S.sub(myPos, getP(p)));
-      if (S.dot(pFwd, toMe) > 0.7) score *= 2; // target is facing us
-      if (p.hp < 30) score *= 1.5; // finish off weak targets
-      if (score > bestScore) { bestScore = score; best = p; }
+      const pos = getP(p);
+      const dist = S.distance(myPos, pos);
+      const centerBias = 1 - Math.min(1, Math.sqrt(pos.x * pos.x + pos.z * pos.z) / C.MAP_HALF);
+      let score = 1 / Math.max(1, dist);
+      score += centerBias * 0.004;
+      score += (C.MAX_HP - p.hp) * 0.0008;
+      if (score > bestScore) { bestScore = score; bestId = pid; }
+    }
+    return bestId;
+  }
+
+  private bestPickupForBot(me: Player): S.Vec3 | null {
+    let best: S.Vec3 | null = null;
+    let bestScore = -Infinity;
+    for (const [, pickup] of this.state.pickups) {
+      if (pickup.type === "repair" && me.hp >= C.MAX_HP) continue;
+      if (pickup.type === me.power) continue;
+      const pos = getP(pickup);
+      const dist = S.distance(getP(me), pos);
+      if (dist > 500) continue;
+      const weight = pickup.type === "shield" && me.hp < 50 ? 4 : pickup.type === "afterburner" ? 2.6 : 1.8;
+      const score = weight / Math.max(1, dist);
+      if (score > bestScore) { bestScore = score; best = pos; }
     }
     return best;
   }
 
-  private idOf(target: Player): string | null {
-    for (const [pid, p] of this.state.players) if (p === target) return pid;
-    return null;
+  private closestTarget(owner: string, pos: S.Vec3): { id: string; player: Player } | null {
+    let best: { id: string; player: Player } | null = null;
+    let bestDist = Infinity;
+    for (const [id, p] of this.state.players) {
+      if (id === owner || !p.alive) continue;
+      const dist = S.distance(pos, getP(p));
+      if (dist < bestDist) {
+        bestDist = dist;
+        best = { id, player: p };
+      }
+    }
+    return best;
+  }
+
+  private rateOk(id: string, max: number): boolean {
+    const now = Date.now();
+    let arr = this.msgTimes.get(id);
+    if (!arr) { arr = []; this.msgTimes.set(id, arr); }
+    while (arr.length && now - arr[0] > 1000) arr.shift();
+    if (arr.length >= max) return false;
+    arr.push(now);
+    return true;
   }
 }
