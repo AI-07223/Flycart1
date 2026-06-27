@@ -338,6 +338,45 @@
             this.timeLeft = 0;
             this.lobbyElapsed = 0;
           }
+          if (opts.initialState) {
+            this._restoreFromSnapshot(opts.initialState);
+          }
+        }
+        /**
+         * Restore all simulation state from a snapshot (used during P2P host migration).
+         * Bullets are skipped (acceptable in-flight loss per design).
+         * Side-channel maps that are not in the snapshot (powerUntil, invulnUntil, etc.)
+         * are left empty — a tolerable loss for a single migration event.
+         */
+        _restoreFromSnapshot(snap) {
+          this.phase = snap.phase ?? this.phase;
+          this.timeLeft = snap.timeLeft ?? this.timeLeft;
+          this.hostId = snap.hostId ?? this.hostId;
+          this.roundLength = snap.roundLength ?? this.roundLength;
+          this.roomName = snap.roomName ?? this.roomName;
+          this.botsInRoom = snap.botsInRoom ?? this.botsInRoom;
+          this.mode = snap.mode ?? this.mode;
+          this.teamScore0 = snap.teamScore0 ?? this.teamScore0;
+          this.teamScore1 = snap.teamScore1 ?? this.teamScore1;
+          this.players.clear();
+          this.inputs.clear();
+          const ZERO = { seq: 0, turn: 0, climb: 0, boost: false, fire: false };
+          if (Array.isArray(snap.players)) {
+            for (const [id, p] of snap.players) {
+              this.players.set(id, { ...p });
+              this.inputs.set(id, { ...ZERO, seq: p.seq ?? 0 });
+            }
+          }
+          this.pickups.clear();
+          if (Array.isArray(snap.pickups)) {
+            for (const [id, pk] of snap.pickups) {
+              this.pickups.set(id, { ...pk });
+            }
+          }
+          this.bullets.clear();
+          this.bulletLife.clear();
+          this.bulletSeq = 0;
+          this.now = 0;
         }
         // ---------------------------------------------------------------------------
         // Public API
@@ -1328,6 +1367,12 @@
           this.onClose = null;
         }
         open(room, role, peerId) {
+          if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+            try {
+              this.ws.close();
+            } catch {
+            }
+          }
           return new Promise((resolve, reject) => {
             const proto = location.protocol === "https:" ? "wss" : "ws";
             const url = `${proto}://${location.host}/signal`;
@@ -1418,6 +1463,16 @@
           this._guestEventCh = null;
           this._snaps = [];
           this._lastSentAt = 0;
+          // Migration state (guest and elected-new-host paths)
+          this._peerId = "";
+          this._savedName = "";
+          this._savedCosmetics = { color: 0, bodyShape: 0, accent: 0, trail: 0, livery: 0 };
+          this._migrationState = "none";
+          this._migrationTimeout = null;
+          // When true, the next guest state message should fire migration-complete
+          this._awaitingPostMigrationState = false;
+          // Offline QR flag — migration is no-op for offline sessions (no broker socket)
+          this._isOfflineQr = false;
         }
         // ── Shared ─────────────────────────────────────────────────────────────────
         get state() {
@@ -1576,6 +1631,7 @@
           }
         }
         async _onSignalHost(msg) {
+          if (!this._sim) return;
           const sig = this._signal;
           if (msg.type === "peer-joined") {
             const peerId = msg.peerId;
@@ -1638,7 +1694,12 @@
             const text = typeof data === "string" ? data : new TextDecoder().decode(data);
             const msg = JSON.parse(text);
             if (msg.type === "join") {
-              if (!this._sim.players.has(peerId)) {
+              const peer = this._peers.get(peerId);
+              if (this._sim.players.has(peerId)) {
+                if (peer?.events?.readyState === "open") {
+                  peer.events.send(JSON.stringify({ type: "session", sessionId: peerId }));
+                }
+              } else {
                 this._sim.addPlayer(peerId, {
                   name: msg.name || "Pilot",
                   skin: msg.skin || 0,
@@ -1647,7 +1708,6 @@
                   trail: msg.trail || 0,
                   livery: msg.livery || 0
                 });
-                const peer = this._peers.get(peerId);
                 if (peer?.events?.readyState === "open") {
                   peer.events.send(JSON.stringify({ type: "session", sessionId: peerId }));
                 }
@@ -1707,10 +1767,23 @@
           this._guestState = new GuestTransportState();
           this.sessionId = null;
           const peerId = "g-" + Math.random().toString(36).slice(2, 10);
+          this._peerId = peerId;
+          this._savedName = name;
+          this._savedCosmetics = { ...cosmetics };
           const sig = new SignalSocket();
           this._signal = sig;
           const pc = makePeerConnection([{ urls: ICE_SERVER }]);
           this._guestPc = pc;
+          this._wireGuestPc(pc, peerId, code, sig);
+          sig.onMessage = async (msg) => {
+            await this._onSignalGuest(msg, peerId, code, sig, pc);
+          };
+          await sig.open(code, "join", peerId);
+          await this._waitForGuestChannels();
+          this._sendGuestJoin();
+        }
+        /** Wire the standard guest-side PC event handlers. */
+        _wireGuestPc(pc, peerId, code, sig) {
           pc.onicecandidate = (ev) => {
             if (ev.candidate) sig.send({ type: "ice", room: code, to: "host", candidate: ev.candidate.toJSON() });
           };
@@ -1730,24 +1803,51 @@
           };
           pc.onconnectionstatechange = () => {
             if (pc.connectionState === "failed" || pc.connectionState === "disconnected" || pc.connectionState === "closed") {
-              if (this.onDisconnect) this.onDisconnect({ type: "leave", code: 1001 });
+              if (this._migrationState !== "none") return;
+              setTimeout(() => {
+                if (this._migrationState !== "none") return;
+                if (this.onDisconnect) this.onDisconnect({ type: "leave", code: 1001 });
+              }, 400);
             }
           };
-          sig.onMessage = async (msg) => {
-            if (msg.type === "offer" && msg.to === peerId) {
-              await pc.setRemoteDescription(new RTCSessionDescription(msg.sdp));
-              const answer = await pc.createAnswer();
-              await pc.setLocalDescription(answer);
-              sig.send({ type: "answer", room: code, to: "host", sdp: pc.localDescription.toJSON() });
-            } else if (msg.type === "ice" && msg.to === peerId) {
-              try {
-                await pc.addIceCandidate(new RTCIceCandidate(msg.candidate));
-              } catch {
+        }
+        /** Route guest-side signaling messages, including migration control messages. */
+        async _onSignalGuest(msg, peerId, code, sig, pc) {
+          if (msg.type === "offer" && msg.to === peerId) {
+            await pc.setRemoteDescription(new RTCSessionDescription(msg.sdp));
+            const answer = await pc.createAnswer();
+            await pc.setLocalDescription(answer);
+            sig.send({ type: "answer", room: code, to: "host", sdp: pc.localDescription.toJSON() });
+          } else if (msg.type === "ice" && msg.to === peerId) {
+            try {
+              await pc.addIceCandidate(new RTCIceCandidate(msg.candidate));
+            } catch {
+            }
+          } else if (msg.type === "host-migrating") {
+            if (this._isOfflineQr) return;
+            const migMsg = msg;
+            if (migMsg.nextHost === this._peerId) {
+              this._startMigrationAsElected();
+            } else {
+              this._startMigrationAsGuest();
+            }
+          } else if (msg.type === "host-arrived") {
+            if (this._migrationState === "guest-wait") {
+              this._reconnectGuestToNewHost();
+            }
+          } else if (msg.type === "host-left") {
+            if (this._migrationState !== "none") {
+              if (this._migrationTimeout !== null) {
+                clearTimeout(this._migrationTimeout);
+                this._migrationTimeout = null;
               }
             }
-          };
-          await sig.open(code, "join", peerId);
-          await new Promise((resolve, reject) => {
+            if (this.onDisconnect) this.onDisconnect({ type: "host-left" });
+          }
+        }
+        /** Wait for both guest data channels to open (up to 15 s). */
+        _waitForGuestChannels() {
+          return new Promise((resolve, reject) => {
             const timeout = setTimeout(() => reject(new Error("P2P connection timeout")), 15e3);
             const check = () => {
               if (this._guestInputCh?.readyState === "open" && this._guestEventCh?.readyState === "open") {
@@ -1764,17 +1864,189 @@
               }
             }, 100);
           });
+        }
+        /** Send the initial join announcement to the host over the events channel. */
+        _sendGuestJoin() {
           if (this._guestEventCh?.readyState === "open") {
             this._guestEventCh.send(JSON.stringify({
               type: "join",
-              name,
-              skin: cosmetics.color,
-              bodyShape: cosmetics.bodyShape,
-              accent: cosmetics.accent,
-              trail: cosmetics.trail,
-              livery: cosmetics.livery
+              name: this._savedName,
+              skin: this._savedCosmetics.color,
+              bodyShape: this._savedCosmetics.bodyShape,
+              accent: this._savedCosmetics.accent,
+              trail: this._savedCosmetics.trail,
+              livery: this._savedCosmetics.livery
             }));
           }
+        }
+        // ── MIGRATION STATE MACHINE ───────────────────────────────────────────────────
+        /**
+         * Build a SimStateSnapshot from the current guest state (used as the seed
+         * for the new host's GameSim when this guest is elected as the new host).
+         */
+        _buildMigrationSnapshot() {
+          const gs = this._guestState;
+          const players = [];
+          gs.players.forEach((v, k) => players.push([k, { ...v }]));
+          const bullets = [];
+          gs.bullets.forEach((v, k) => bullets.push([k, { ...v }]));
+          const pickups = [];
+          gs.pickups.forEach((v, k) => pickups.push([k, { ...v }]));
+          return {
+            players,
+            bullets,
+            pickups,
+            phase: gs.phase,
+            timeLeft: gs.timeLeft,
+            hostId: this._peerId,
+            // this guest becomes the new host
+            roundLength: gs.roundLength,
+            roomName: gs.roomName,
+            botsInRoom: gs.botsInRoom,
+            mode: gs.mode,
+            teamScore0: gs.teamScore0,
+            teamScore1: gs.teamScore1
+          };
+        }
+        /**
+         * Called when this guest has been elected as the new host.
+         * Tears down the guest WebRTC path, claims the host slot on the broker,
+         * and starts a new GameSim seeded from the last known state.
+         */
+        _startMigrationAsElected() {
+          if (this._migrationState !== "none") return;
+          this._migrationState = "electing";
+          const snap = this._buildMigrationSnapshot();
+          if (this._guestPc) {
+            try {
+              this._guestPc.close();
+            } catch {
+            }
+            this._guestPc = null;
+            this._guestInputCh = null;
+            this._guestEventCh = null;
+          }
+          const room = this._room;
+          const peerId = this._peerId;
+          const sig = this._signal ?? new SignalSocket();
+          this._signal = sig;
+          sig.open(room, "host").then(() => {
+            const origOnMessage = sig.onMessage;
+            sig.onMessage = (msg) => {
+              if (msg.type === "hosted") {
+                sig.onMessage = origOnMessage;
+                this._onElectedHosted(msg, snap, peerId);
+              } else if (msg.type === "peer-joined") {
+                if (origOnMessage) origOnMessage(msg);
+              }
+            };
+          }).catch(() => {
+            this._migrationState = "none";
+            if (this.onDisconnect) this.onDisconnect({ type: "host-left" });
+          });
+        }
+        /** After broker confirms hosted, set up the new GameSim and host loop. */
+        _onElectedHosted(hostedMsg, snap, peerId) {
+          const sim = new GameSim({
+            botsEnabled: false,
+            isPublic: false,
+            onEvent: (e) => this._onSimEvent(e),
+            initialState: snap
+          });
+          sim.hostId = peerId;
+          this._isHost = true;
+          this._sim = sim;
+          this._hostState = new HostTransportState(sim);
+          this.sessionId = peerId;
+          const sig = this._signal;
+          sig.onMessage = (msg) => this._onSignalHost(msg);
+          this._startHostLoop();
+          const existingPeers = hostedMsg.peers ?? [];
+          for (const gPeerId of existingPeers) {
+            if (gPeerId !== peerId) {
+              this._onSignalHost({ type: "peer-joined", peerId: gPeerId });
+            }
+          }
+          this._migrationState = "none";
+          if (this.onStateChange) this.onStateChange();
+          if (this.onDisconnect) this.onDisconnect({ type: "migration-complete" });
+        }
+        /**
+         * Called when another guest was elected host. Show the "reconnecting" overlay
+         * and wait for 'host-arrived' from the broker, then re-establish WebRTC.
+         */
+        _startMigrationAsGuest() {
+          if (this._migrationState !== "none") return;
+          this._migrationState = "guest-wait";
+          if (this.onDisconnect) this.onDisconnect({ type: "host-migrating" });
+          if (this._guestPc) {
+            try {
+              this._guestPc.close();
+            } catch {
+            }
+            this._guestPc = null;
+            this._guestInputCh = null;
+            this._guestEventCh = null;
+          }
+          this._migrationTimeout = setTimeout(() => {
+            if (this._migrationState !== "guest-wait") return;
+            this._migrationState = "none";
+            if (this.onDisconnect) this.onDisconnect({ type: "host-left" });
+          }, 5e3);
+        }
+        /**
+         * Guest reconnect: called when broker sends 'host-arrived'.
+         * Creates a fresh WebRTC peer connection to the new host.
+         */
+        _reconnectGuestToNewHost() {
+          if (this._migrationTimeout !== null) {
+            clearTimeout(this._migrationTimeout);
+            this._migrationTimeout = null;
+          }
+          const room = this._room;
+          const peerId = this._peerId;
+          const sig = this._signal;
+          const pc = makePeerConnection([{ urls: ICE_SERVER }]);
+          this._guestPc = pc;
+          this._guestInputCh = null;
+          this._guestEventCh = null;
+          this._wireGuestPc(pc, peerId, room, sig);
+          sig.onMessage = async (msg) => {
+            if (msg.type === "offer" && msg.to === peerId) {
+              await pc.setRemoteDescription(new RTCSessionDescription(msg.sdp));
+              const answer = await pc.createAnswer();
+              await pc.setLocalDescription(answer);
+              sig.send({ type: "answer", room, to: "host", sdp: pc.localDescription.toJSON() });
+            } else if (msg.type === "ice" && msg.to === peerId) {
+              try {
+                await pc.addIceCandidate(new RTCIceCandidate(msg.candidate));
+              } catch {
+              }
+            } else if (msg.type === "host-migrating") {
+              if (this._isOfflineQr) return;
+              const migMsg = msg;
+              this._migrationState = "none";
+              this._awaitingPostMigrationState = false;
+              if (migMsg.nextHost === this._peerId) {
+                this._startMigrationAsElected();
+              } else {
+                this._startMigrationAsGuest();
+              }
+            } else if (msg.type === "host-left") {
+              this._migrationState = "none";
+              this._awaitingPostMigrationState = false;
+              if (this.onDisconnect) this.onDisconnect({ type: "host-left" });
+            }
+          };
+          sig.send({ type: "join", room, peerId });
+          this._awaitingPostMigrationState = true;
+          this._waitForGuestChannels().then(() => {
+            this._sendGuestJoin();
+          }).catch(() => {
+            this._migrationState = "none";
+            this._awaitingPostMigrationState = false;
+            if (this.onDisconnect) this.onDisconnect({ type: "host-left" });
+          });
         }
         _onGuestStateMsg(data) {
           try {
@@ -1795,6 +2067,11 @@
             gs.players.mergeFrom(snap.players);
             gs.bullets.mergeFrom(snap.bullets);
             gs.pickups.mergeFrom(snap.pickups);
+            if (this._awaitingPostMigrationState) {
+              this._awaitingPostMigrationState = false;
+              this._migrationState = "none";
+              if (this.onDisconnect) this.onDisconnect({ type: "migration-complete" });
+            }
             this._snapFromState(gs);
             if (this.onStateChange) this.onStateChange();
           } catch {
@@ -2088,6 +2365,7 @@
          * Returned promise resolves with the encoded payload string (for debugging).
          */
         async startOfflineQrOffer(canvas) {
+          this._isOfflineQr = true;
           const pc = makePeerConnection([]);
           this._guestPc = pc;
           const stateCh = pc.createDataChannel("state", { ordered: true, maxRetransmits: 0 });
@@ -2129,6 +2407,7 @@
          * Guest: decode offer QR payload, create answer, encode answer, render QR.
          */
         async startOfflineQrAnswer(encoded, answerCanvas) {
+          this._isOfflineQr = true;
           const payload = await decompressB64(encoded);
           const { sdp: offerSdp } = JSON.parse(payload);
           const pc = makePeerConnection([]);
@@ -2282,6 +2561,7 @@
         p2pOfflineSection: dollar("p2p-offline-section"),
         hostLeftOverlay: dollar("host-left-overlay"),
         hostLeftMenuBtn: dollar("host-left-menu-btn"),
+        p2pMigratingOverlay: dollar("p2p-migrating-overlay"),
         // Slice 1 additions
         bootOverlay: dollar("boot-overlay"),
         fatalOverlay: dollar("fatal-overlay"),
@@ -2786,6 +3066,7 @@
         els.crosshair.classList.toggle("hidden", mode !== "playing");
         if (mode !== "playing") els.oobWarning.classList.add("hidden");
         els.hostLeftOverlay.classList.add("hidden");
+        els.p2pMigratingOverlay.classList.add("hidden");
       }
       function showHostLeftOverlay() {
         els.hostLeftOverlay.classList.remove("hidden");
@@ -3276,7 +3557,18 @@
         }
       }
       function onP2PDisconnect(info) {
+        if (info && info.type === "host-migrating") {
+          if (window.SFX.suspend) window.SFX.suspend();
+          els.p2pMigratingOverlay.classList.remove("hidden");
+          return;
+        }
+        if (info && info.type === "migration-complete") {
+          els.p2pMigratingOverlay.classList.add("hidden");
+          if (window.SFX.resume) window.SFX.resume();
+          return;
+        }
         if (info && (info.type === "host-left" || info.type === "kicked")) {
+          els.p2pMigratingOverlay.classList.add("hidden");
           if (window.SFX.suspend) window.SFX.suspend();
           showHostLeftOverlay();
           return;
@@ -3581,6 +3873,7 @@
         window.Net.onStateChange = null;
         currentLobbyCode = null;
         currentLobbyServer = null;
+        els.p2pMigratingOverlay.classList.add("hidden");
         try {
           window.Net.leave();
         } catch {

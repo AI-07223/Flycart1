@@ -117,6 +117,60 @@ export class GameSim {
       this.timeLeft = 0;
       this.lobbyElapsed = 0;
     }
+
+    // Host migration: restore state from a prior host's snapshot.
+    if (opts.initialState) {
+      this._restoreFromSnapshot(opts.initialState);
+    }
+  }
+
+  /**
+   * Restore all simulation state from a snapshot (used during P2P host migration).
+   * Bullets are skipped (acceptable in-flight loss per design).
+   * Side-channel maps that are not in the snapshot (powerUntil, invulnUntil, etc.)
+   * are left empty — a tolerable loss for a single migration event.
+   */
+  private _restoreFromSnapshot(snap: SimStateSnapshot): void {
+    // Scalars
+    this.phase        = snap.phase        ?? this.phase;
+    this.timeLeft     = snap.timeLeft     ?? this.timeLeft;
+    this.hostId       = snap.hostId       ?? this.hostId;
+    this.roundLength  = snap.roundLength  ?? this.roundLength;
+    this.roomName     = snap.roomName     ?? this.roomName;
+    this.botsInRoom   = snap.botsInRoom   ?? this.botsInRoom;
+    this.mode         = snap.mode         ?? this.mode;
+    this.teamScore0   = snap.teamScore0   ?? this.teamScore0;
+    this.teamScore1   = snap.teamScore1   ?? this.teamScore1;
+
+    // Players — restore without calling addPlayer (which would overwrite stats)
+    this.players.clear();
+    this.inputs.clear();
+    const ZERO: Input = { seq: 0, turn: 0, climb: 0, boost: false, fire: false };
+    if (Array.isArray(snap.players)) {
+      for (const [id, p] of snap.players) {
+        this.players.set(id, { ...p });
+        // Zero input with the player's last known seq so applyInputPatch won't reject future inputs
+        this.inputs.set(id, { ...ZERO, seq: p.seq ?? 0 });
+      }
+    }
+
+    // Pickups
+    this.pickups.clear();
+    if (Array.isArray(snap.pickups)) {
+      for (const [id, pk] of snap.pickups) {
+        this.pickups.set(id, { ...pk });
+      }
+    }
+
+    // Bullets: skip (in-flight loss is acceptable per design spec)
+    this.bullets.clear();
+    this.bulletLife.clear();
+
+    // Ensure bulletSeq won't collide with any future bullets
+    this.bulletSeq = 0;
+
+    // Reset sim clock; host loop starts fresh from 0
+    this.now = 0;
   }
 
   // ---------------------------------------------------------------------------

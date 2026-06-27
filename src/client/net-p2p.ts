@@ -124,9 +124,13 @@ class HostTransportState implements TransportState {
 // ---------------------------------------------------------------------------
 
 type SignalMsg =
-  | { type: "host";        room: string }
-  | { type: "join";        room: string; peerId: string }
-  | { type: "peer-joined"; peerId: string }
+  | { type: "host";           room: string }
+  | { type: "join";           room: string; peerId: string }
+  | { type: "peer-joined";    peerId: string }
+  | { type: "hosted";         room: string; peers?: string[] }
+  | { type: "host-migrating"; room: string; nextHost: string }
+  | { type: "host-arrived";   room: string }
+  | { type: "host-left";      room: string }
   | { type: "offer";  room: string; to: string; sdp: RTCSessionDescriptionInit }
   | { type: "answer"; room: string; to: string; sdp: RTCSessionDescriptionInit }
   | { type: "ice";    room: string; to: string; candidate: RTCIceCandidateInit };
@@ -138,6 +142,10 @@ class SignalSocket {
   onClose: (() => void) | null = null;
 
   open(room: string, role: "host" | "join", peerId?: string): Promise<void> {
+    // Close any existing socket before re-opening (migration re-connect path)
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      try { this.ws.close(); } catch {}
+    }
     return new Promise((resolve, reject) => {
       const proto = location.protocol === "https:" ? "wss" : "ws";
       const url   = `${proto}://${location.host}/signal`;
@@ -353,6 +361,17 @@ export class WebRtcTransport implements ITransport {
   private _snaps:       Snapshot[] = [];
   private _lastSentAt:  number = 0;
 
+  // Migration state (guest and elected-new-host paths)
+  private _peerId:          string = "";
+  private _savedName:       string = "";
+  private _savedCosmetics:  { color: number; bodyShape: number; accent: number; trail: number; livery: number } = { color: 0, bodyShape: 0, accent: 0, trail: 0, livery: 0 };
+  private _migrationState:  "none" | "electing" | "guest-wait" = "none";
+  private _migrationTimeout: ReturnType<typeof setTimeout> | null = null;
+  // When true, the next guest state message should fire migration-complete
+  private _awaitingPostMigrationState: boolean = false;
+  // Offline QR flag — migration is no-op for offline sessions (no broker socket)
+  private _isOfflineQr:     boolean = false;
+
   // ── Shared ─────────────────────────────────────────────────────────────────
 
   get state(): TransportState | null {
@@ -523,6 +542,7 @@ export class WebRtcTransport implements ITransport {
   }
 
   private async _onSignalHost(msg: any): Promise<void> {
+    if (!this._sim) return; // guard: sim must exist for all host-side processing
     const sig = this._signal!;
 
     if (msg.type === "peer-joined") {
@@ -598,8 +618,16 @@ export class WebRtcTransport implements ITransport {
       const msg  = JSON.parse(text);
 
       if (msg.type === "join") {
-        // Guest sent join metadata (name + cosmetics)
-        if (!this._sim.players.has(peerId)) {
+        // Guest sent join metadata (name + cosmetics).
+        // If this is a migration re-join, the player is already in the sim — just
+        // resend the session assignment without calling addPlayer again.
+        const peer = this._peers.get(peerId);
+        if (this._sim.players.has(peerId)) {
+          // Migration re-join: just resend session id
+          if (peer?.events?.readyState === "open") {
+            peer.events.send(JSON.stringify({ type: "session", sessionId: peerId }));
+          }
+        } else {
           this._sim.addPlayer(peerId, {
             name:      msg.name      || "Pilot",
             skin:      msg.skin      || 0,
@@ -609,7 +637,6 @@ export class WebRtcTransport implements ITransport {
             livery:    msg.livery    || 0,
           });
           // Send the guest their assigned peerId and current roster via the events channel
-          const peer = this._peers.get(peerId);
           if (peer?.events?.readyState === "open") {
             peer.events.send(JSON.stringify({ type: "session", sessionId: peerId }));
           }
@@ -673,12 +700,39 @@ export class WebRtcTransport implements ITransport {
 
     const peerId = "g-" + Math.random().toString(36).slice(2, 10);
 
+    // Save for migration re-use
+    this._peerId         = peerId;
+    this._savedName      = name;
+    this._savedCosmetics = { ...cosmetics };
+
     const sig = new SignalSocket();
     this._signal = sig;
 
     const pc = makePeerConnection([{ urls: ICE_SERVER }]);
     this._guestPc = pc;
 
+    this._wireGuestPc(pc, peerId, code, sig);
+
+    sig.onMessage = async (msg) => {
+      await this._onSignalGuest(msg, peerId, code, sig, pc);
+    };
+
+    await sig.open(code, "join", peerId);
+
+    // Wait for data channels to open (up to 15s)
+    await this._waitForGuestChannels();
+
+    // Announce self to host
+    this._sendGuestJoin();
+  }
+
+  /** Wire the standard guest-side PC event handlers. */
+  private _wireGuestPc(
+    pc: RTCPeerConnection,
+    peerId: string,
+    code: string,
+    sig: SignalSocket,
+  ): void {
     pc.onicecandidate = (ev) => {
       if (ev.candidate) sig.send({ type: "ice", room: code, to: "host", candidate: ev.candidate.toJSON() });
     };
@@ -699,26 +753,65 @@ export class WebRtcTransport implements ITransport {
     };
 
     pc.onconnectionstatechange = () => {
-      if (pc.connectionState === "failed" || pc.connectionState === "disconnected" || pc.connectionState === "closed") {
-        if (this.onDisconnect) this.onDisconnect({ type: "leave", code: 1001 });
+      if (
+        pc.connectionState === "failed" ||
+        pc.connectionState === "disconnected" ||
+        pc.connectionState === "closed"
+      ) {
+        // DC-death debounce: wait 400ms to let a broker 'host-migrating' arrive first.
+        // If migration is already underway, suppress this disconnect entirely.
+        if (this._migrationState !== "none") return;
+        setTimeout(() => {
+          // Re-check after 400ms — migration may have started in the meantime.
+          if (this._migrationState !== "none") return;
+          if (this.onDisconnect) this.onDisconnect({ type: "leave", code: 1001 });
+        }, 400);
       }
     };
+  }
 
-    sig.onMessage = async (msg) => {
-      if (msg.type === "offer" && msg.to === peerId) {
-        await pc.setRemoteDescription(new RTCSessionDescription(msg.sdp));
-        const answer = await pc.createAnswer();
-        await pc.setLocalDescription(answer);
-        sig.send({ type: "answer", room: code, to: "host", sdp: pc.localDescription!.toJSON() });
-      } else if (msg.type === "ice" && msg.to === peerId) {
-        try { await pc.addIceCandidate(new RTCIceCandidate(msg.candidate)); } catch {}
+  /** Route guest-side signaling messages, including migration control messages. */
+  private async _onSignalGuest(
+    msg: SignalMsg,
+    peerId: string,
+    code: string,
+    sig: SignalSocket,
+    pc: RTCPeerConnection,
+  ): Promise<void> {
+    if (msg.type === "offer" && (msg as any).to === peerId) {
+      await pc.setRemoteDescription(new RTCSessionDescription(msg.sdp));
+      const answer = await pc.createAnswer();
+      await pc.setLocalDescription(answer);
+      sig.send({ type: "answer", room: code, to: "host", sdp: pc.localDescription!.toJSON() });
+    } else if (msg.type === "ice" && (msg as any).to === peerId) {
+      try { await pc.addIceCandidate(new RTCIceCandidate(msg.candidate)); } catch {}
+    } else if (msg.type === "host-migrating") {
+      // Offline QR sessions have no broker — guard just in case.
+      if (this._isOfflineQr) return;
+      const migMsg = msg as { type: "host-migrating"; room: string; nextHost: string };
+      if (migMsg.nextHost === this._peerId) {
+        this._startMigrationAsElected();
+      } else {
+        this._startMigrationAsGuest();
       }
-    };
+    } else if (msg.type === "host-arrived") {
+      if (this._migrationState === "guest-wait") {
+        // New host is ready — reconnect the guest WebRTC path.
+        this._reconnectGuestToNewHost();
+      }
+    } else if (msg.type === "host-left") {
+      // No migration possible — end match.
+      if (this._migrationState !== "none") {
+        // Clear any pending timeout
+        if (this._migrationTimeout !== null) { clearTimeout(this._migrationTimeout); this._migrationTimeout = null; }
+      }
+      if (this.onDisconnect) this.onDisconnect({ type: "host-left" });
+    }
+  }
 
-    await sig.open(code, "join", peerId);
-
-    // Wait for data channels to open (up to 15s)
-    await new Promise<void>((resolve, reject) => {
+  /** Wait for both guest data channels to open (up to 15 s). */
+  private _waitForGuestChannels(): Promise<void> {
+    return new Promise<void>((resolve, reject) => {
       const timeout = setTimeout(() => reject(new Error("P2P connection timeout")), 15000);
       const check = (): void => {
         if (
@@ -729,7 +822,6 @@ export class WebRtcTransport implements ITransport {
           resolve();
         }
       };
-
       // The ondatachannel callback sets these; poll until they appear
       const poll = setInterval(() => {
         if (this._guestInputCh && this._guestEventCh) {
@@ -740,19 +832,237 @@ export class WebRtcTransport implements ITransport {
         }
       }, 100);
     });
+  }
 
-    // Announce self to host
+  /** Send the initial join announcement to the host over the events channel. */
+  private _sendGuestJoin(): void {
     if (this._guestEventCh?.readyState === "open") {
       this._guestEventCh.send(JSON.stringify({
         type:      "join",
-        name,
-        skin:      cosmetics.color,
-        bodyShape: cosmetics.bodyShape,
-        accent:    cosmetics.accent,
-        trail:     cosmetics.trail,
-        livery:    cosmetics.livery,
+        name:      this._savedName,
+        skin:      this._savedCosmetics.color,
+        bodyShape: this._savedCosmetics.bodyShape,
+        accent:    this._savedCosmetics.accent,
+        trail:     this._savedCosmetics.trail,
+        livery:    this._savedCosmetics.livery,
       }));
     }
+  }
+
+  // ── MIGRATION STATE MACHINE ───────────────────────────────────────────────────
+
+  /**
+   * Build a SimStateSnapshot from the current guest state (used as the seed
+   * for the new host's GameSim when this guest is elected as the new host).
+   */
+  private _buildMigrationSnapshot(): import("../sim/types").SimStateSnapshot {
+    const gs = this._guestState!;
+    const players: Array<[string, any]> = [];
+    gs.players.forEach((v, k) => players.push([k, { ...v }]));
+    const bullets: Array<[string, any]> = [];
+    gs.bullets.forEach((v, k) => bullets.push([k, { ...v }]));
+    const pickups: Array<[string, any]> = [];
+    gs.pickups.forEach((v, k) => pickups.push([k, { ...v }]));
+
+    return {
+      players,
+      bullets,
+      pickups,
+      phase:       gs.phase,
+      timeLeft:    gs.timeLeft,
+      hostId:      this._peerId,   // this guest becomes the new host
+      roundLength: gs.roundLength,
+      roomName:    gs.roomName,
+      botsInRoom:  gs.botsInRoom,
+      mode:        gs.mode,
+      teamScore0:  gs.teamScore0,
+      teamScore1:  gs.teamScore1,
+    };
+  }
+
+  /**
+   * Called when this guest has been elected as the new host.
+   * Tears down the guest WebRTC path, claims the host slot on the broker,
+   * and starts a new GameSim seeded from the last known state.
+   */
+  private _startMigrationAsElected(): void {
+    if (this._migrationState !== "none") return;
+    this._migrationState = "electing";
+
+    // Snapshot last known state BEFORE closing the guest connection.
+    const snap = this._buildMigrationSnapshot();
+
+    // Close old guest PC (no longer needed)
+    if (this._guestPc) {
+      try { this._guestPc.close(); } catch {}
+      this._guestPc    = null;
+      this._guestInputCh = null;
+      this._guestEventCh = null;
+    }
+
+    const room = this._room;
+    const peerId = this._peerId;
+    const sig = this._signal ?? new SignalSocket();
+    this._signal = sig;
+
+    // Re-open signaling as host (handles already-open socket by closing+re-opening)
+    sig.open(room, "host").then(() => {
+      // Wait for 'hosted' reply which now carries a peers list
+      const origOnMessage = sig.onMessage;
+      sig.onMessage = (msg) => {
+        if (msg.type === "hosted") {
+          sig.onMessage = origOnMessage;
+          this._onElectedHosted(msg as any, snap, peerId);
+        } else if (msg.type === "peer-joined") {
+          // Also handle peer-joined while setting up (normal host path)
+          if (origOnMessage) origOnMessage(msg);
+        }
+      };
+    }).catch(() => {
+      // Signaling failed — fall back gracefully by telling main.ts host-left
+      this._migrationState = "none";
+      if (this.onDisconnect) this.onDisconnect({ type: "host-left" });
+    });
+  }
+
+  /** After broker confirms hosted, set up the new GameSim and host loop. */
+  private _onElectedHosted(
+    hostedMsg: { type: "hosted"; room: string; peers?: string[] },
+    snap: import("../sim/types").SimStateSnapshot,
+    peerId: string,
+  ): void {
+    // Create new sim seeded from the migrated snapshot
+    const sim = new GameSim({
+      botsEnabled: false,
+      isPublic: false,
+      onEvent: (e) => this._onSimEvent(e),
+      initialState: snap,
+    });
+    // Ensure the sim knows this guest's peerId is now the host
+    sim.hostId = peerId;
+
+    this._isHost    = true;
+    this._sim       = sim;
+    this._hostState = new HostTransportState(sim);
+    // Keep sessionId === peerId so the render loop finds our player
+    this.sessionId  = peerId;
+
+    // Wire host signaling for future peer-joins
+    const sig = this._signal!;
+    sig.onMessage = (msg) => this._onSignalHost(msg);
+
+    // Start the host simulation loop
+    this._startHostLoop();
+
+    // Proactively offer to all guests that were already in the room
+    const existingPeers = hostedMsg.peers ?? [];
+    for (const gPeerId of existingPeers) {
+      if (gPeerId !== peerId) {
+        // Trigger the same flow as peer-joined
+        this._onSignalHost({ type: "peer-joined", peerId: gPeerId } as any);
+      }
+    }
+
+    this._migrationState = "none";
+
+    // Notify main.ts that migration is complete — hide the overlay
+    if (this.onStateChange) this.onStateChange();
+    if (this.onDisconnect) this.onDisconnect({ type: "migration-complete" });
+  }
+
+  /**
+   * Called when another guest was elected host. Show the "reconnecting" overlay
+   * and wait for 'host-arrived' from the broker, then re-establish WebRTC.
+   */
+  private _startMigrationAsGuest(): void {
+    if (this._migrationState !== "none") return;
+    this._migrationState = "guest-wait";
+
+    // Tell main.ts to show the migrating overlay
+    if (this.onDisconnect) this.onDisconnect({ type: "host-migrating" });
+
+    // Close the old guest PC — the connection to the old host is dead
+    if (this._guestPc) {
+      try { this._guestPc.close(); } catch {}
+      this._guestPc    = null;
+      this._guestInputCh = null;
+      this._guestEventCh = null;
+    }
+
+    // 5 s timeout: if no new host arrives, treat as host-left
+    this._migrationTimeout = setTimeout(() => {
+      if (this._migrationState !== "guest-wait") return;
+      this._migrationState = "none";
+      if (this.onDisconnect) this.onDisconnect({ type: "host-left" });
+    }, 5000);
+
+    // _reconnectGuestToNewHost() will be called when 'host-arrived' arrives
+    // via _onSignalGuest → msg.type === "host-arrived"
+  }
+
+  /**
+   * Guest reconnect: called when broker sends 'host-arrived'.
+   * Creates a fresh WebRTC peer connection to the new host.
+   */
+  private _reconnectGuestToNewHost(): void {
+    if (this._migrationTimeout !== null) {
+      clearTimeout(this._migrationTimeout);
+      this._migrationTimeout = null;
+    }
+
+    const room    = this._room;
+    const peerId  = this._peerId;
+    const sig     = this._signal!;
+
+    const pc = makePeerConnection([{ urls: ICE_SERVER }]);
+    this._guestPc      = pc;
+    this._guestInputCh = null;
+    this._guestEventCh = null;
+
+    this._wireGuestPc(pc, peerId, room, sig);
+
+    // Re-wire signaling messages on the existing socket for the reconnect phase
+    sig.onMessage = async (msg) => {
+      if (msg.type === "offer" && (msg as any).to === peerId) {
+        await pc.setRemoteDescription(new RTCSessionDescription(msg.sdp));
+        const answer = await pc.createAnswer();
+        await pc.setLocalDescription(answer);
+        sig.send({ type: "answer", room, to: "host", sdp: pc.localDescription!.toJSON() });
+      } else if (msg.type === "ice" && (msg as any).to === peerId) {
+        try { await pc.addIceCandidate(new RTCIceCandidate(msg.candidate)); } catch {}
+      } else if (msg.type === "host-migrating") {
+        // Another migration while we're reconnecting — reset and restart
+        if (this._isOfflineQr) return;
+        const migMsg = msg as { type: "host-migrating"; room: string; nextHost: string };
+        this._migrationState = "none";
+        this._awaitingPostMigrationState = false;
+        if (migMsg.nextHost === this._peerId) {
+          this._startMigrationAsElected();
+        } else {
+          this._startMigrationAsGuest();
+        }
+      } else if (msg.type === "host-left") {
+        this._migrationState = "none";
+        this._awaitingPostMigrationState = false;
+        if (this.onDisconnect) this.onDisconnect({ type: "host-left" });
+      }
+    };
+
+    // Tell broker we're (re-)joining so the new host gets a peer-joined notification
+    sig.send({ type: "join", room, peerId });
+
+    // Set the flag so the first state message from the new host triggers migration-complete
+    this._awaitingPostMigrationState = true;
+
+    // Wait for channels to open, then announce ourselves to the new host
+    this._waitForGuestChannels().then(() => {
+      this._sendGuestJoin();
+    }).catch(() => {
+      // Channel open timed out — fall back to host-left
+      this._migrationState = "none";
+      this._awaitingPostMigrationState = false;
+      if (this.onDisconnect) this.onDisconnect({ type: "host-left" });
+    });
   }
 
   private _onGuestStateMsg(data: string | ArrayBuffer): void {
@@ -775,6 +1085,13 @@ export class WebRtcTransport implements ITransport {
       gs.players.mergeFrom(snap.players as Array<[string, any]>);
       gs.bullets.mergeFrom(snap.bullets as Array<[string, any]>);
       gs.pickups.mergeFrom(snap.pickups as Array<[string, any]>);
+
+      // First state message after a guest migration: clear waiting state and notify main.ts
+      if (this._awaitingPostMigrationState) {
+        this._awaitingPostMigrationState = false;
+        this._migrationState = "none";
+        if (this.onDisconnect) this.onDisconnect({ type: "migration-complete" });
+      }
 
       // Push snapshot for prediction
       this._snapFromState(gs);
@@ -1076,6 +1393,8 @@ export class WebRtcTransport implements ITransport {
    * Returned promise resolves with the encoded payload string (for debugging).
    */
   async startOfflineQrOffer(canvas: HTMLCanvasElement): Promise<string> {
+    // Mark as offline: migration handlers are no-ops in offline-QR sessions.
+    this._isOfflineQr = true;
     const pc = makePeerConnection([]);
     this._guestPc = pc; // reuse field to close later
 
@@ -1124,6 +1443,8 @@ export class WebRtcTransport implements ITransport {
    * Guest: decode offer QR payload, create answer, encode answer, render QR.
    */
   async startOfflineQrAnswer(encoded: string, answerCanvas: HTMLCanvasElement): Promise<void> {
+    // Offline QR guest path: migration is not available (no broker socket).
+    this._isOfflineQr = true;
     const payload = await decompressB64(encoded);
     const { sdp: offerSdp } = JSON.parse(payload);
 

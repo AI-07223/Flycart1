@@ -97,4 +97,6 @@ export interface GameSimOpts {
   botsEnabled: boolean;
   isPublic: boolean;
   onEvent: (e: SimEvent) => void;
+  /** Optional: restore this snapshot immediately after construction (host migration). */
+  initialState?: SimStateSnapshot;
 }

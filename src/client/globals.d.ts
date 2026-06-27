@@ -269,6 +269,17 @@ interface WebRtcNetAPI extends NetAPI {
   finishOfflineQrOffer(answerEncoded: string): Promise<void>;
 }
 
+/**
+ * Disconnect/event info types emitted by WebRtcTransport via onDisconnect.
+ * Used by onP2PDisconnect in main.ts.
+ */
+type P2PDisconnectInfo =
+  | { type: "leave";              code?: number }
+  | { type: "host-left" }
+  | { type: "kicked" }
+  | { type: "host-migrating" }
+  | { type: "migration-complete" };
+
 interface QRRenderOptions {
   size?: number;
   margin?: number;

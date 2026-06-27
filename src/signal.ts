@@ -42,6 +42,8 @@ interface RoomState {
   host: WebSocket | null;
   guests: Map<string, WebSocket>;  // peerId → socket
   lastActivity: number;
+  /** True while we are mid-migration: host slot is vacant but room is not pruned yet. */
+  migrating?: boolean;
 }
 
 // ─── In-memory state ─────────────────────────────────────────────────────────
@@ -113,15 +115,27 @@ function handleMessage(ws: WebSocket, rawData: Buffer | string): void {
     case "host": {
       // Register this socket as the host of the room.
       if (r.host && r.host.readyState === WebSocket.OPEN) {
-        // Already has a live host — replace only if the existing one closed.
+        // Already has a live host — reject.
         send(ws, { type: "error", reason: "room already has a host" });
         return;
       }
+      const wasMigrating = !!r.migrating;
       r.host = ws;
+      r.migrating = false;
       (ws as any)._signalRole = "host";
       (ws as any)._signalRoom = roomCode;
-      send(ws, { type: "hosted", room: roomCode });
-      log("info", "signal host registered", { room: roomCode });
+      // Include current peer list so the new host can proactively offer to everyone.
+      const peers = [...r.guests.keys()];
+      send(ws, { type: "hosted", room: roomCode, peers });
+      if (wasMigrating) {
+        // Notify all guests that a new host has arrived.
+        for (const [, g] of r.guests) {
+          send(g, { type: "host-arrived", room: roomCode });
+        }
+        log("info", "signal host arrived (migration complete)", { room: roomCode });
+      } else {
+        log("info", "signal host registered", { room: roomCode });
+      }
       break;
     }
 
@@ -177,6 +191,16 @@ function handleMessage(ws: WebSocket, rawData: Buffer | string): void {
   }
 }
 
+/**
+ * Run host-election from the current guest list.
+ * Returns the elected peerId (lowest sorted) or null if no guests remain.
+ */
+function electNextHost(r: RoomState): string | null {
+  if (r.guests.size === 0) return null;
+  const sorted = [...r.guests.keys()].sort();
+  return sorted[0];
+}
+
 /** Clean up when a socket closes, removing it from whichever room it was in. */
 function handleClose(ws: WebSocket): void {
   const roomCode: string | undefined = (ws as any)._signalRoom;
@@ -188,15 +212,40 @@ function handleClose(ws: WebSocket): void {
 
   if (role === "host") {
     r.host = null;
-    // Notify all guests that the host left.
-    for (const [pid, g] of r.guests) {
-      send(g, { type: "host-left", room: roomCode });
+    const nextHost = electNextHost(r);
+    if (nextHost) {
+      // Begin broker-side migration: keep room alive, tell everyone who the new host will be.
+      r.migrating = true;
+      for (const [, g] of r.guests) {
+        send(g, { type: "host-migrating", room: roomCode, nextHost });
+      }
+      log("info", "signal host migrating", { room: roomCode, nextHost });
+    } else {
+      // No guests — room is truly over.
+      deleteRoom(roomCode);
     }
   } else {
+    // A guest socket closed.
     r.guests.delete(role);
-    // Notify host that a guest left.
-    if (r.host && r.host.readyState === WebSocket.OPEN) {
-      send(r.host, { type: "peer-left", peerId: role, room: roomCode });
+
+    if (r.migrating) {
+      // Re-run election from remaining guests in case the elected guest also dropped.
+      const nextHost = electNextHost(r);
+      if (nextHost) {
+        for (const [, g] of r.guests) {
+          send(g, { type: "host-migrating", room: roomCode, nextHost });
+        }
+        log("info", "signal re-elected during migration", { room: roomCode, nextHost });
+      } else {
+        // Nobody left — end match.
+        deleteRoom(roomCode);
+        return;
+      }
+    } else {
+      // Normal guest leave — notify current host.
+      if (r.host && r.host.readyState === WebSocket.OPEN) {
+        send(r.host, { type: "peer-left", peerId: role, room: roomCode });
+      }
     }
   }
 

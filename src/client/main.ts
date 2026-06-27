@@ -88,6 +88,7 @@ const els = {
   p2pOfflineSection: dollar("p2p-offline-section"),
   hostLeftOverlay: dollar("host-left-overlay"),
   hostLeftMenuBtn: dollar("host-left-menu-btn") as HTMLButtonElement,
+  p2pMigratingOverlay: dollar("p2p-migrating-overlay"),
   // Slice 1 additions
   bootOverlay: dollar("boot-overlay"),
   fatalOverlay: dollar("fatal-overlay"),
@@ -651,6 +652,8 @@ function applyMode(nextMode: typeof mode): void {
   if (mode !== "playing") els.oobWarning.classList.add("hidden");
   // P2P host-left overlay: always hide on any mode transition (reset path shows it explicitly)
   els.hostLeftOverlay.classList.add("hidden");
+  // P2P migrating overlay: always hide on mode transitions
+  els.p2pMigratingOverlay.classList.add("hidden");
 }
 
 function showHostLeftOverlay(): void {
@@ -1237,8 +1240,22 @@ async function joinP2PAsGuest(code: string): Promise<void> {
 
 // ─── P2P DISCONNECT HANDLER ───────────────────────────────────────────────────
 function onP2PDisconnect(info: any): void {
+  if (info && info.type === "host-migrating") {
+    // A new host is being elected — show the reconnecting overlay and wait.
+    if (window.SFX.suspend) window.SFX.suspend();
+    els.p2pMigratingOverlay.classList.remove("hidden");
+    return;
+  }
+  if (info && info.type === "migration-complete") {
+    // Migration succeeded — hide the overlay and resume.
+    els.p2pMigratingOverlay.classList.add("hidden");
+    if (window.SFX.resume) window.SFX.resume();
+    return;
+  }
   if (info && (info.type === "host-left" || info.type === "kicked")) {
-    // Show the host-left overlay rather than the generic conn-lost screen
+    // Show the host-left overlay rather than the generic conn-lost screen.
+    // Also ensure the migrating overlay is hidden (covers timeout fallback path).
+    els.p2pMigratingOverlay.classList.add("hidden");
     if (window.SFX.suspend) window.SFX.suspend();
     showHostLeftOverlay();
     return;
@@ -1598,6 +1615,8 @@ function resetToMenu(): void {
   window.Net.onStateChange = null;
   currentLobbyCode = null;
   currentLobbyServer = null;
+  // Hide migration overlay if visible (covers the "main menu" path from host-left overlay)
+  els.p2pMigratingOverlay.classList.add("hidden");
   try { window.Net.leave(); } catch {}
 
   // P2P teardown: restore the original Colyseus Net

@@ -518,6 +518,14 @@
         <button id="host-left-menu-btn">Main Menu</button>
       </div>
     </div>
+
+    <!-- P2P MIGRATING OVERLAY: shown while electing a new host during migration -->
+    <div id="p2p-migrating-overlay" class="overlay hidden" role="status" aria-live="polite">
+      <div class="migrating-card">
+        <div class="migrating-spinner" aria-hidden="true"></div>
+        <p class="migrating-label">Reconnecting to new host…</p>
+      </div>
+    </div>
   </div>
 
   <script src="vendor/jsqr.min.js"></script>
