@@ -1,5 +1,23 @@
 // Type declarations for window.* globals used by the SmashCart client.
 
+// Inlined subset of TransportState for NetAPI — kept in sync with transport.ts.
+// (Cannot import from transport.ts here without converting this file to a module,
+// which would break the global Window augmentation.)
+interface MapLike<K, V> {
+  forEach(cb: (v: V, k: K) => void): void;
+  get(k: K): V | undefined;
+  readonly size: number;
+}
+
+interface TransportState {
+  players: MapLike<string, any>;
+  bullets: MapLike<string, any>;
+  pickups: MapLike<string, any>;
+  phase: string;
+  timeLeft: number;
+  hostId: string;
+}
+
 interface Vec3 { x: number; y: number; z: number; }
 
 interface SphereAPI {
@@ -196,6 +214,8 @@ interface Snapshot {
 interface NetAPI {
   client: any | null;
   room: any | null;
+  /** Slice 2: abstracted state getter — use this instead of room.state in new code. */
+  readonly state: TransportState | null;
   sessionId: string | null;
   serverOrigin: string | null;
   lastSent: { seq: number; turn: number; climb: number; boost: boolean; fire: boolean };
@@ -205,10 +225,12 @@ interface NetAPI {
   onDisconnect: ((info: any) => void) | null;
   onStateChange: (() => void) | null;
   reconnectToken: string | null;
+  localPose: any;
   endpoint(origin?: string | null): string;
   connect(name: string, code: string, cosmetics: PlayerCosmetics, serverOrigin?: string | null): Promise<any>;
   tryReconnect(): Promise<boolean>;
   sample(renderTime: number): Record<string, SnapshotPlayer>;
+  stepLocal(dt: number): void;
   sendInput(turn: number, climb: number, boost: boolean, fire: boolean): void;
   setName(name: string): void;
   // Slice 6 lobby methods
@@ -217,8 +239,19 @@ interface NetAPI {
   sendHostKick(targetId: string): void;
   getPhase(): string | null;
   getHostId(): string | null;
-  getRosterSnapshot(): Array<{ id: string; name: string; ready: boolean; bot: boolean; score: number }>;
+  getRosterSnapshot(): Array<{ id: string; name: string; ready: boolean; bot: boolean; score: number; color: number }>;
   leave(): void;
+}
+
+/**
+ * Extended API available only on a WebRtcTransport instance.
+ * Access via `(window.Net as WebRtcNetAPI)` after a P2P session starts.
+ */
+interface WebRtcNetAPI extends NetAPI {
+  startHost(name: string, code: string, cosmetics: PlayerCosmetics): Promise<void>;
+  startOfflineQrOffer(canvas: HTMLCanvasElement): Promise<string>;
+  startOfflineQrAnswer(encoded: string, answerCanvas: HTMLCanvasElement): Promise<void>;
+  finishOfflineQrOffer(answerEncoded: string): Promise<void>;
 }
 
 interface QRRenderOptions {

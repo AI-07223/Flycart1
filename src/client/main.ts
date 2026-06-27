@@ -1,4 +1,5 @@
 // Orchestration: menu, HUD, connection, and render loop for the flat-world reboot.
+import { WebRtcTransport } from "./host-sim";
 
 const dollar = (id: string) => document.getElementById(id)!;
 const G = window.GAME;
@@ -78,6 +79,15 @@ const els = {
   bots: dollar("bots-check") as HTMLInputElement,
   countdown: dollar("countdown"),
   interLeave: dollar("intermission-leave") as HTMLButtonElement,
+  // P2P additions
+  p2pHostBtn: dollar("p2p-host-btn") as HTMLButtonElement,
+  p2pOfflineBtn: dollar("p2p-offline-btn") as HTMLButtonElement,
+  p2pOfflineCanvas: dollar("p2p-offline-canvas") as HTMLCanvasElement,
+  p2pAnswerInput: dollar("p2p-answer-input") as HTMLInputElement,
+  p2pAnswerSubmit: dollar("p2p-answer-submit") as HTMLButtonElement,
+  p2pOfflineSection: dollar("p2p-offline-section"),
+  hostLeftOverlay: dollar("host-left-overlay"),
+  hostLeftMenuBtn: dollar("host-left-menu-btn") as HTMLButtonElement,
   // Slice 1 additions
   bootOverlay: dollar("boot-overlay"),
   fatalOverlay: dollar("fatal-overlay"),
@@ -132,6 +142,10 @@ let countdownActive = false;
 // Slice 6: tracks the code + origin for the active private lobby
 let currentLobbyCode: string | null = null;
 let currentLobbyServer: string | null = null;
+// P2P: reference to the original Colyseus Net so we can restore it on leave
+let _colyseusNet: any = null;
+// Whether the current session is P2P (host or guest)
+let _isP2PSession = false;
 // Scanner state
 let scannerOpen = false;
 let scanRafId: number | null = null;
@@ -269,6 +283,17 @@ function readInviteFromUrl(): void {
   const room = params.get("room");
   inviteRoom = room ? room.toUpperCase().slice(0, 6) : null;
   inviteServer = normalizeServerOrigin(params.get("server"));
+
+  // P2P invite: ?p2p=P-XXXXXX
+  const p2pParam = params.get("p2p");
+  if (p2pParam) {
+    const p2pCode = p2pParam.trim().toUpperCase().slice(0, 8); // "P-" + 6 chars
+    if (p2pCode.startsWith("P-")) {
+      // Override inviteRoom with the P2P code so Quick Play routes through P2P
+      inviteRoom = p2pCode;
+      inviteServer = null;
+    }
+  }
 }
 
 function loadSavedLanOrigin(): string {
@@ -582,6 +607,12 @@ function applyMode(nextMode: typeof mode): void {
   els.crosshair.classList.toggle("hidden", mode !== "playing");
   // OOB warning: always off on mode transitions; updateHud re-enables if needed
   if (mode !== "playing") els.oobWarning.classList.add("hidden");
+  // P2P host-left overlay: always hide on any mode transition (reset path shows it explicitly)
+  els.hostLeftOverlay.classList.add("hidden");
+}
+
+function showHostLeftOverlay(): void {
+  els.hostLeftOverlay.classList.remove("hidden");
 }
 
 // ─── FATAL ERROR ─────────────────────────────────────────────────────────────
@@ -890,6 +921,11 @@ async function startGame(code: string, serverOrigin: string | null = null): Prom
   let roomCode = code;
   if (roomCode === "PUBLIC" && !botsEnabled) roomCode = "NOBOTS";
 
+  // P2P guest join: codes starting with "P-" go through the WebRTC path
+  if (roomCode.startsWith("P-")) {
+    return joinP2PAsGuest(roomCode);
+  }
+
   // Only PUBLIC and NOBOTS go through the instant-playing path.
   // Private codes (anything else) go through the lobby.
   if (roomCode !== "PUBLIC" && roomCode !== "NOBOTS") {
@@ -1014,6 +1050,153 @@ async function joinLobby(code: string, serverOrigin: string | null = null): Prom
   }
 }
 
+// ─── P2P HOST PATH ────────────────────────────────────────────────────────────
+async function startP2PHost(): Promise<void> {
+  window.SFX.unlock();
+  enterImmersive();
+
+  const name   = (els.name.value || "Pilot").slice(0, 14);
+  const code   = "P-" + genCode();          // e.g. "P-ABCDEF"
+
+  // Save Colyseus Net before swapping
+  if (!_isP2PSession) {
+    _colyseusNet = (window as any).Net;
+  }
+
+  const transport = new WebRtcTransport();
+  (window as any).Net = transport;
+  _isP2PSession = true;
+
+  // Wire callbacks
+  transport.onKill       = onKill;
+  transport.onPickup     = onPickup;
+  transport.onDisconnect = onP2PDisconnect;
+
+  setStatus("Starting P2P host…");
+  setBusy(true);
+
+  try {
+    await (transport as any).startHost(name, code, selectedCosmetics);
+  } catch (e: any) {
+    setStatus("Could not start P2P host: " + (e && e.message ? e.message : e));
+    setBusy(false);
+    // Restore Colyseus on failure
+    (window as any).Net = _colyseusNet;
+    _colyseusNet  = null;
+    _isP2PSession = false;
+    return;
+  }
+
+  setStatus("");
+  setBusy(false);
+
+  currentLobbyCode   = code;
+  currentLobbyServer = null;
+
+  // Show share overlay with P2P join URL (?p2p=P-XXXXXX)
+  const p2pUrl = buildP2PShareUrl(code);
+  activeShareUrl = p2pUrl;
+  els.shareLink.value         = p2pUrl;
+  els.shareQrLink.value       = p2pUrl;
+  els.shareQrRoom.textContent = `Room ${code}`;
+  els.shareQrCode.textContent = code;
+  els.shareQrNote.textContent = `Scan on the same Wi-Fi to join P2P room ${code}.`;
+  els.copy.disabled           = false;
+  els.shareQrCopy.disabled    = false;
+  try {
+    window.QR.render(els.shareQrCanvas, p2pUrl, {
+      size: window.Input.isTouchDevice() ? 220 : 256,
+      errorCorrectionLevel: "M",
+    });
+    els.qrBtn.disabled = false;
+  } catch {
+    els.qrBtn.disabled = true;
+    els.shareQrCanvas.width = 0;
+  }
+  els.share.classList.remove("hidden");
+
+  transport.onStateChange = onLobbyStateChange;
+  els.lobbyTitle.textContent = `P2P Room ${code}`;
+  renderLobbyRoster();
+  applyMode("lobby");
+}
+
+function buildP2PShareUrl(code: string): string {
+  const url = new URL(location.pathname, location.origin);
+  url.searchParams.set("p2p", code);
+  return url.toString();
+}
+
+// ─── P2P GUEST PATH ──────────────────────────────────────────────────────────
+async function joinP2PAsGuest(code: string): Promise<void> {
+  window.SFX.unlock();
+  enterImmersive();
+
+  const name = (els.name.value || "Pilot").slice(0, 14);
+
+  // Save Colyseus Net before swapping
+  if (!_isP2PSession) {
+    _colyseusNet = (window as any).Net;
+  }
+
+  const transport = new WebRtcTransport();
+  (window as any).Net = transport;
+  _isP2PSession = true;
+
+  transport.onKill       = onKill;
+  transport.onPickup     = onPickup;
+  transport.onDisconnect = onP2PDisconnect;
+
+  setStatus("Connecting via P2P…");
+  setBusy(true);
+
+  try {
+    await transport.connect(name, code, selectedCosmetics, null);
+  } catch (e: any) {
+    setStatus("Could not connect (P2P): " + (e && e.message ? e.message : e));
+    setBusy(false);
+    (window as any).Net = _colyseusNet;
+    _colyseusNet  = null;
+    _isP2PSession = false;
+    return;
+  }
+
+  setStatus("");
+  setBusy(false);
+
+  currentLobbyCode   = code;
+  currentLobbyServer = null;
+
+  // Share bar shows the invite URL (guest can also share it)
+  const p2pUrl = buildP2PShareUrl(code);
+  activeShareUrl = p2pUrl;
+  els.shareLink.value = p2pUrl;
+  els.share.classList.remove("hidden");
+
+  transport.onStateChange = onLobbyStateChange;
+  els.lobbyTitle.textContent = `P2P Room ${code}`;
+  renderLobbyRoster();
+  applyMode("lobby");
+
+  const phase = transport.getPhase();
+  if (phase === "playing") {
+    transport.onStateChange = null;
+    enterPlayingFromLobby();
+  }
+}
+
+// ─── P2P DISCONNECT HANDLER ───────────────────────────────────────────────────
+function onP2PDisconnect(info: any): void {
+  if (info && (info.type === "host-left" || info.type === "kicked")) {
+    // Show the host-left overlay rather than the generic conn-lost screen
+    if (window.SFX.suspend) window.SFX.suspend();
+    showHostLeftOverlay();
+    return;
+  }
+  // Fall through to generic disconnect for other failures
+  onDisconnect(info);
+}
+
 // Called every time the Colyseus state changes while in the lobby
 function onLobbyStateChange(): void {
   const phase = window.Net.getPhase();
@@ -1038,13 +1221,12 @@ function loop(ts: number): void {
   if (!isFinite(dt) || dt <= 0) return;
   dt = Math.min(dt, 0.05);
 
-  const room = window.Net.room;
-  if (mode === "playing" && room && room.state) {
-    const state = room.state;
+  const state = window.Net.state;
+  if (mode === "playing" && state) {
     const myId = window.Net.sessionId;
     const input = window.Input.get();
     window.Net.sendInput(input.turn, input.climb, input.boost, input.fire);
-    (window.Net as any).stepLocal && (window.Net as any).stepLocal(dt);
+    window.Net.stepLocal(dt);
     // Adaptive quality watchdog — only runs when tier is 'auto' (Quality._auto)
     window.Quality.sample(dt);
 
@@ -1061,13 +1243,13 @@ function loop(ts: number): void {
         lastFireSnd = ts / 1000;
       }
     }
-  } else if (mode === "lobby" && room && room.state) {
+  } else if (mode === "lobby" && state) {
     // Draw the 3D scene behind the lobby card; no input sent in lobby
-    window.Renderer.draw(room.state, window.Net.sessionId);
+    window.Renderer.draw(state, window.Net.sessionId);
   } else if (mode === "menu") {
     window.Renderer.drawMenu(dt, selectedCosmetics);
-  } else if (room && room.state) {
-    window.Renderer.draw(room.state, window.Net.sessionId);
+  } else if (state) {
+    window.Renderer.draw(state, window.Net.sessionId);
   }
 }
 
@@ -1301,6 +1483,18 @@ function resetToMenu(): void {
   currentLobbyCode = null;
   currentLobbyServer = null;
   try { window.Net.leave(); } catch {}
+
+  // P2P teardown: restore the original Colyseus Net
+  if (_isP2PSession && _colyseusNet !== null) {
+    (window as any).Net = _colyseusNet;
+    _colyseusNet = null;
+    _isP2PSession = false;
+    // Re-wire callbacks to the restored Colyseus transport
+    window.Net.onKill = onKill;
+    window.Net.onPickup = onPickup;
+    window.Net.onDisconnect = onDisconnect;
+  }
+
   if (window.SFX.stopLoops) window.SFX.stopLoops();
   if (window.SFX.startMenuAmbient) window.SFX.startMenuAmbient();
   engineStarted = false;
@@ -1333,7 +1527,7 @@ function resetToMenu(): void {
   updateRotateOverlay();
 }
 
-function onDisconnect(): void {
+function onDisconnect(_info?: any): void {
   if (mode === "menu" || mode === "lost") return;
   if (window.SFX.suspend) window.SFX.suspend();
   els.connMsg.textContent = "Reconnecting…";
@@ -1408,6 +1602,53 @@ function init(): void {
 
   if (window.SFX.startMenuAmbient) window.SFX.startMenuAmbient();
   if (window.Input.isTouchDevice()) document.body.classList.add("touch-device");
+
+  // P2P host button
+  els.p2pHostBtn.addEventListener("click", () => {
+    window.SFX.uiClick();
+    startP2PHost();
+  });
+
+  // P2P offline QR button — starts host AND renders offer QR in one click
+  els.p2pOfflineBtn.addEventListener("click", async () => {
+    window.SFX.uiClick();
+    // If we don't already have a P2P host running, start one first
+    if (!_isP2PSession) {
+      await startP2PHost();
+    }
+    // Reveal the offline QR section
+    els.p2pOfflineSection.classList.remove("hidden");
+    const transport = (window as any).Net;
+    if (typeof transport.startOfflineQrOffer === "function") {
+      try {
+        await transport.startOfflineQrOffer(els.p2pOfflineCanvas);
+      } catch (e: any) {
+        setStatus(e && e.message ? e.message : "Offline QR error");
+      }
+    }
+  });
+
+  // P2P offline answer paste/submit — host accepts guest answer QR
+  els.p2pAnswerSubmit.addEventListener("click", async () => {
+    const val = els.p2pAnswerInput.value.trim();
+    if (!val) return;
+    window.SFX.uiClick();
+    const transport = (window as any).Net;
+    if (typeof transport.finishOfflineQrOffer === "function") {
+      try {
+        await transport.finishOfflineQrOffer(val);
+        setStatus("Offline P2P connected!");
+      } catch (e: any) {
+        setStatus("Offline answer error: " + (e && e.message ? e.message : e));
+      }
+    }
+  });
+
+  // Host-left overlay — main menu button
+  els.hostLeftMenuBtn.addEventListener("click", () => {
+    window.SFX.uiClick();
+    resetToMenu();
+  });
 
   els.quick.addEventListener("click", () => {
     window.SFX.uiClick();
@@ -1694,7 +1935,7 @@ function init(): void {
 
   document.addEventListener("visibilitychange", () => {
     if (document.hidden) {
-      if (window.Net.room) window.Net.sendInput(0, 0, false, false);
+      if (window.Net.state) window.Net.sendInput(0, 0, false, false);
       if (window.SFX.suspend) window.SFX.suspend();
       closeScanner();
       hideShareQr();
@@ -1717,6 +1958,32 @@ function init(): void {
   // Fade out the boot overlay now that init is complete
   els.bootOverlay.classList.add("fade-out");
   setTimeout(() => els.bootOverlay.classList.add("hidden"), 450);
+
+  // Check for offline-answer QR param — guest decodes host offer and shows answer QR
+  const _offlineAnswerParam = new URLSearchParams(location.search).get("offline-answer");
+  if (_offlineAnswerParam) {
+    // Guest offline flow: decode offer → create answer → render answer QR in p2pOfflineCanvas
+    (async () => {
+      // Start a bare guest transport (no signaling)
+      if (!_isP2PSession) {
+        _colyseusNet = (window as any).Net;
+      }
+      const transport = new WebRtcTransport();
+      (window as any).Net = transport;
+      _isP2PSession = true;
+      transport.onKill       = onKill;
+      transport.onPickup     = onPickup;
+      transport.onDisconnect = onP2PDisconnect;
+      // Show the offline section and render answer QR
+      els.p2pOfflineSection.classList.remove("hidden");
+      try {
+        await (transport as any).startOfflineQrAnswer(_offlineAnswerParam, els.p2pOfflineCanvas);
+        setStatus("Scan the QR with the host's phone, or paste the text to the host.");
+      } catch (e: any) {
+        setStatus("Offline QR guest error: " + (e && e.message ? e.message : e));
+      }
+    })();
+  }
 
   requestAnimationFrame((t) => { last = t; loop(t); });
 }

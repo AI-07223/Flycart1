@@ -256,6 +256,24 @@ kbd {
   grid-column: span 6;
 }
 
+/* P2P section inside LAN panel */
+.panel-divider {
+  border: none;
+  border-top: 1px solid rgba(255,255,255,0.1);
+  margin: 16px 0 12px;
+}
+.panel-subhead {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.55);
+  margin: 0 0 6px;
+}
+#host-left-overlay .fatal-card {
+  text-align: center;
+}
+
 .controls-panel {
   grid-column: 1 / -1;
 }

@@ -1,6 +1,8 @@
 import { resolveLandmarkCollisions } from "../shared/flight";
+import type { ITransport, TransportState } from "./transport";
 
 // Thin Colyseus wrapper with flat-world local prediction and bounded remote interpolation.
+// Net implements ITransport — the Colyseus path. WebRTC transports will implement ITransport too.
 
 const BUFFER_MS = 1400;
 const MAX_EXTRAP_MS = 120;
@@ -66,6 +68,11 @@ const Net = {
     ackSeq: 0,
   } as LocalPose,
 
+  /** ITransport: expose room.state through the abstracted TransportState type. */
+  get state(): TransportState | null {
+    return (this.room && this.room.state) ? this.room.state : null;
+  },
+
   endpoint(origin: string | null = this.serverOrigin): string {
     if (origin) {
       const url = new URL(origin);
@@ -119,8 +126,8 @@ const Net = {
   },
 
   _authoritativeSelf(): any | null {
-    if (!this.room || !this.room.state || !this.sessionId) return null;
-    return this.room.state.players.get(this.sessionId) || null;
+    if (!this.state || !this.sessionId) return null;
+    return this.state.players.get(this.sessionId) || null;
   },
 
   _setLocalFromAuth(me: any): void {
@@ -137,10 +144,10 @@ const Net = {
     this.localPose.ackSeq = me.seq || 0;
   },
 
-  _snap(): void {
-    if (!this.room || !this.room.state) return;
+  /** Build a snapshot record from an abstract TransportState and push it into the buffer. */
+  _snapFromState(ts: TransportState): void {
     const players: Record<string, SnapshotPlayer> = {};
-    this.room.state.players.forEach((p: any, id: string) => {
+    ts.players.forEach((p: any, id: string) => {
       players[id] = {
         p: { x: p.px, y: p.py, z: p.pz },
         f: { x: p.fx, y: p.fy, z: p.fz },
@@ -153,6 +160,9 @@ const Net = {
     });
     const t = performance.now();
     this.snaps.push({ t, players });
+    // Sort by timestamp — harmless for Colyseus ordered delivery; required for
+    // WebRTC out-of-order packets in future slices.
+    this.snaps.sort((a, b) => a.t - b.t);
     const cut = t - BUFFER_MS;
     while (this.snaps.length > 2 && this.snaps[0].t < cut) this.snaps.shift();
 
@@ -178,6 +188,10 @@ const Net = {
     this.localPose.seq = Math.max(this.localPose.seq, me.seq || 0);
     this.localPose.ackSeq = me.seq || this.localPose.ackSeq;
     this.localPose.alive = !!me.alive;
+  },
+
+  _snap(): void {
+    if (this.state) this._snapFromState(this.state);
   },
 
   stepLocal(dt: number): void {

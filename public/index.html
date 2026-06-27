@@ -172,6 +172,23 @@
               <button id="lan-friends-btn" class="secondary">LAN ROOM</button>
             </div>
             <p id="lan-hint" class="muted"></p>
+
+            <hr class="panel-divider" />
+            <h3 class="panel-subhead">P2P (No Server)</h3>
+            <p class="muted">Host the game right in your browser — no server needed. Guests connect via peer-to-peer on the same Wi-Fi.</p>
+            <div class="btn-row btn-row-tight">
+              <button id="p2p-host-btn">PLAY LOCAL (P2P)</button>
+              <button id="p2p-offline-btn" class="secondary">Offline QR</button>
+            </div>
+            <div id="p2p-offline-section" class="hidden">
+              <p class="muted" style="margin-top:8px">Host: scan the QR below on the guest's phone.<br/>Guest: paste your answer QR payload here.</p>
+              <canvas id="p2p-offline-canvas" style="display:block;margin:10px auto;border-radius:6px;"></canvas>
+              <label class="field-label" for="p2p-answer-input">Guest answer (paste base64)</label>
+              <div class="btn-row btn-row-tight">
+                <input id="p2p-answer-input" placeholder="Paste guest answer…" style="flex:1" />
+                <button id="p2p-answer-submit" class="secondary">Connect</button>
+              </div>
+            </div>
           </section>
 
           <section class="menu-panel menu-lb-panel">
@@ -424,6 +441,15 @@
           <div class="scan-reticle" aria-hidden="true"></div>
         </div>
         <p id="scan-status" class="muted scan-status">Starting camera…</p>
+      </div>
+    </div>
+
+    <!-- HOST-LEFT OVERLAY: shown when the P2P host disconnects or a guest is kicked -->
+    <div id="host-left-overlay" class="overlay hidden" role="alertdialog" aria-labelledby="host-left-msg">
+      <div class="fatal-card">
+        <h2>Match Ended</h2>
+        <p id="host-left-msg" class="muted">The host left — the match has ended.</p>
+        <button id="host-left-menu-btn">Main Menu</button>
       </div>
     </div>
   </div>
