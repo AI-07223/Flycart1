@@ -1295,3 +1295,143 @@ body.touch-device #share-bar {
   .hangar-livery-grid { grid-template-columns: repeat(2, 1fr); }
   .hangar-card { padding: 16px 14px; }
 }
+
+/* ─── SHARE QR CODE (big room code displayed in the QR overlay) ─────────────── */
+.share-qr-code {
+  font-size: clamp(32px, 10vmin, 52px);
+  font-weight: 900;
+  letter-spacing: 0.22em;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  color: var(--accent);
+  text-shadow: 0 2px 12px rgba(255, 203, 5, 0.35);
+  text-align: center;
+  user-select: all;
+  cursor: text;
+  padding: 4px 0;
+  min-height: 1.1em;
+}
+
+.share-qr-caption {
+  font-size: 12px;
+  letter-spacing: 0.5px;
+  text-align: center;
+  opacity: 0.85;
+}
+
+/* ─── JOIN-CODE INPUT: wider to accept pasted URLs ──────────────────────────── */
+#join-code-input {
+  max-width: 320px;
+  font-size: 20px;
+  letter-spacing: 4px;
+}
+
+/* ─── SCAN OVERLAY ───────────────────────────────────────────────────────────── */
+#scan-overlay {
+  z-index: 40;
+  background: rgba(4, 8, 16, 0.97);
+}
+
+.scan-card {
+  width: min(92vw, 420px);
+  padding: 22px 20px;
+  border-radius: 20px;
+  background: rgba(8, 14, 24, 0.96);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  align-items: center;
+}
+
+.scan-viewport {
+  position: relative;
+  width: min(70vmin, 320px);
+  height: min(70vmin, 320px);
+  border-radius: 18px;
+  overflow: hidden;
+  background: #000;
+  flex-shrink: 0;
+}
+
+#scan-video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  border-radius: 18px;
+}
+
+#scan-canvas {
+  display: none;
+}
+
+/* Scan reticle: four corner brackets overlaid on the video */
+.scan-reticle {
+  position: absolute;
+  inset: 12%;
+  pointer-events: none;
+  border-radius: 4px;
+}
+.scan-reticle::before,
+.scan-reticle::after {
+  content: "";
+  position: absolute;
+  width: 28px;
+  height: 28px;
+  border-color: var(--accent);
+  border-style: solid;
+}
+.scan-reticle::before {
+  top: 0;
+  left: 0;
+  border-width: 3px 0 0 3px;
+  border-radius: 4px 0 0 0;
+}
+.scan-reticle::after {
+  bottom: 0;
+  right: 0;
+  border-width: 0 3px 3px 0;
+  border-radius: 0 0 4px 0;
+}
+/* Extra two corners via a pseudo-wrapper */
+.scan-viewport::before,
+.scan-viewport::after {
+  content: "";
+  position: absolute;
+  width: 28px;
+  height: 28px;
+  border-color: var(--accent);
+  border-style: solid;
+  z-index: 2;
+  pointer-events: none;
+}
+.scan-viewport::before {
+  top: calc(12% + 0px);
+  right: calc(12% + 0px);
+  border-width: 3px 3px 0 0;
+  border-radius: 0 4px 0 0;
+}
+.scan-viewport::after {
+  bottom: calc(12% + 0px);
+  left: calc(12% + 0px);
+  border-width: 0 0 3px 3px;
+  border-radius: 0 0 0 4px;
+}
+
+.scan-status {
+  text-align: center;
+  max-width: 320px;
+  line-height: 1.6;
+  min-height: 3em;
+  font-size: 14px;
+}
+
+/* Landscape: shrink the video to fit alongside the card header */
+@media (max-height: 500px) {
+  .scan-viewport {
+    width: min(50vmin, 220px);
+    height: min(50vmin, 220px);
+  }
+  .scan-card { padding: 14px 16px; gap: 10px; }
+}

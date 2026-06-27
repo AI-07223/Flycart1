@@ -102,7 +102,9 @@
           </div>
           <button id="share-qr-close" class="secondary">Close</button>
         </div>
+        <div id="share-qr-code" class="share-qr-code" aria-label="Room code"></div>
         <canvas id="share-qr-canvas" aria-label="Room invite QR code"></canvas>
+        <p class="muted share-qr-caption">Players scan this QR, or enter the code</p>
         <p id="share-qr-note" class="muted">Scan to join this room.</p>
         <input id="share-qr-link" readonly />
         <button id="share-qr-copy">Copy Link</button>
@@ -399,16 +401,34 @@
     <div id="join-code-modal" class="overlay hidden" role="dialog" aria-labelledby="join-code-title">
       <div class="join-code-card">
         <h2 id="join-code-title">Join by Code</h2>
-        <p class="muted">Enter the 6-character room code shared with you.</p>
-        <input id="join-code-input" maxlength="6" placeholder="ABCDEF" autocomplete="off" spellcheck="false" />
+        <p class="muted">Enter the 6-character room code, paste the invite link, or scan the QR.</p>
+        <input id="join-code-input" maxlength="200" placeholder="ABCDEF or paste link" autocomplete="off" spellcheck="false" />
         <div class="btn-row">
           <button id="join-code-submit">JOIN</button>
+          <button id="scan-open-btn" class="secondary">SCAN QR</button>
           <button id="join-code-cancel" class="secondary">Cancel</button>
         </div>
       </div>
     </div>
+
+    <!-- SCAN OVERLAY: camera QR scanner -->
+    <div id="scan-overlay" class="overlay hidden" role="dialog" aria-labelledby="scan-title">
+      <div class="scan-card">
+        <div class="panel-head">
+          <h2 id="scan-title">Scan QR Code</h2>
+          <button id="scan-close-btn" class="secondary">Close</button>
+        </div>
+        <div class="scan-viewport">
+          <video id="scan-video" playsinline muted></video>
+          <canvas id="scan-canvas" aria-hidden="true"></canvas>
+          <div class="scan-reticle" aria-hidden="true"></div>
+        </div>
+        <p id="scan-status" class="muted scan-status">Starting camera…</p>
+      </div>
+    </div>
   </div>
 
+  <script src="vendor/jsqr.min.js"></script>
   <script src="vendor/colyseus.js"></script>
   <script src="js/sphere.js"></script>
   <script src="js/constants.js"></script>

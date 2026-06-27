@@ -55,10 +55,17 @@
         shareQrOverlay: dollar("share-qr-overlay"),
         shareQrCanvas: dollar("share-qr-canvas"),
         shareQrRoom: dollar("share-qr-room"),
+        shareQrCode: dollar("share-qr-code"),
         shareQrNote: dollar("share-qr-note"),
         shareQrLink: dollar("share-qr-link"),
         shareQrCopy: dollar("share-qr-copy"),
         shareQrClose: dollar("share-qr-close"),
+        scanOverlay: dollar("scan-overlay"),
+        scanVideo: dollar("scan-video"),
+        scanCanvas: dollar("scan-canvas"),
+        scanStatus: dollar("scan-status"),
+        scanCloseBtn: dollar("scan-close-btn"),
+        scanOpenBtn: dollar("scan-open-btn"),
         inter: dollar("intermission"),
         finalBoard: dollar("final-board"),
         interTime: dollar("inter-time"),
@@ -131,6 +138,8 @@
       var countdownActive = false;
       var currentLobbyCode = null;
       var currentLobbyServer = null;
+      var scannerOpen = false;
+      var scanRafId = null;
       var COLORS_HEX = [
         "#ff6b6b",
         // 0 Scarlet
@@ -345,6 +354,7 @@
         els.shareLink.value = shareUrl;
         els.shareQrLink.value = shareUrl;
         els.shareQrRoom.textContent = `Room ${code}`;
+        els.shareQrCode.textContent = code;
         els.shareQrNote.textContent = isPrivateHost(shareHostname) ? `Scan on the same hotspot to join ${code} at ${shareHost}.` : `Scan to open room ${code} on ${shareHost}.`;
         els.copy.disabled = false;
         els.shareQrCopy.disabled = false;
@@ -366,6 +376,7 @@
         els.shareLink.value = "";
         els.shareQrLink.value = "";
         els.shareQrRoom.textContent = "Room";
+        els.shareQrCode.textContent = "";
         els.shareQrNote.textContent = "Scan to join this room.";
         els.shareQrCanvas.width = 0;
         els.shareQrCanvas.height = 0;
@@ -581,6 +592,105 @@
       function closeJoinCode() {
         joinCodeOpen = false;
         els.joinCodeModal.classList.add("hidden");
+      }
+      function stopScanCamera() {
+        if (scanRafId !== null) {
+          cancelAnimationFrame(scanRafId);
+          scanRafId = null;
+        }
+        const vid = els.scanVideo;
+        const s = vid.srcObject;
+        if (s) {
+          s.getTracks().forEach((t) => t.stop());
+          vid.srcObject = null;
+        }
+      }
+      function extractCodeFromScanResult(raw) {
+        const trimmed = raw.trim();
+        if (!trimmed) return null;
+        try {
+          const url = new URL(trimmed);
+          const p2p = url.searchParams.get("p2p");
+          if (p2p) return p2p.trim().toUpperCase().slice(0, 6);
+          const room = url.searchParams.get("room");
+          if (room) return room.trim().toUpperCase().slice(0, 6);
+          const code = url.searchParams.get("code");
+          if (code) return code.trim().toUpperCase().slice(0, 6);
+        } catch {
+        }
+        const bare = trimmed.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6);
+        return bare || null;
+      }
+      function openScanner() {
+        scannerOpen = true;
+        els.scanOverlay.classList.remove("hidden");
+        els.scanStatus.textContent = "Starting camera\u2026";
+        if (!window.isSecureContext || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+          els.scanStatus.textContent = "Camera needs a secure (HTTPS) connection. On a local Wi-Fi host this isn't available \u2014 type the code instead, or scan the host's QR with your phone's normal camera app.";
+          return;
+        }
+        navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" }, audio: false }).then((stream) => {
+          if (!scannerOpen) {
+            stream.getTracks().forEach((t) => t.stop());
+            return;
+          }
+          els.scanVideo.srcObject = stream;
+          els.scanStatus.textContent = "Point at a SmashCart QR code\u2026";
+          els.scanVideo.play().catch(() => {
+          });
+          function tick() {
+            if (!scannerOpen) return;
+            const vid = els.scanVideo;
+            if (vid.readyState < vid.HAVE_ENOUGH_DATA) {
+              scanRafId = requestAnimationFrame(tick);
+              return;
+            }
+            const w = vid.videoWidth;
+            const h = vid.videoHeight;
+            if (!w || !h) {
+              scanRafId = requestAnimationFrame(tick);
+              return;
+            }
+            const cvs = els.scanCanvas;
+            cvs.width = w;
+            cvs.height = h;
+            const ctx = cvs.getContext("2d");
+            ctx.drawImage(vid, 0, 0, w, h);
+            const img = ctx.getImageData(0, 0, w, h);
+            const result = (typeof jsQR !== "undefined" ? jsQR : window.jsQR)?.(img.data, w, h);
+            if (result && result.data) {
+              const code = extractCodeFromScanResult(result.data);
+              if (code) {
+                els.scanStatus.textContent = "QR detected \u2014 joining\u2026";
+                stopScanCamera();
+                scannerOpen = false;
+                els.scanOverlay.classList.add("hidden");
+                els.joinCodeInput.value = code;
+                closeJoinCode();
+                window.SFX.uiClick();
+                startGame(code, null);
+                return;
+              }
+            }
+            scanRafId = requestAnimationFrame(tick);
+          }
+          scanRafId = requestAnimationFrame(tick);
+        }).catch((err) => {
+          let msg = "Camera error. Type the code instead.";
+          if (err.name === "NotAllowedError" || err.name === "PermissionDeniedError") {
+            msg = "Camera permission denied. Allow camera access in your browser settings, or type the code instead.";
+          } else if (err.name === "NotFoundError" || err.name === "DevicesNotFoundError") {
+            msg = "No camera found on this device. Type the code instead.";
+          } else if (err.name === "NotReadableError") {
+            msg = "Camera is in use by another app. Close it and try again, or type the code instead.";
+          }
+          els.scanStatus.textContent = msg;
+        });
+      }
+      function closeScanner() {
+        scannerOpen = false;
+        stopScanCamera();
+        els.scanOverlay.classList.add("hidden");
       }
       function fetchLeaderboard() {
         fetch("/leaderboard?n=10").then((r) => r.ok ? r.json() : []).then((rows) => {
@@ -1078,6 +1188,7 @@
         els.lobbyRoster.innerHTML = '<p class="muted">Waiting for players\u2026</p>';
         hideSettings();
         closeJoinCode();
+        closeScanner();
         hideShareQr();
         clearShareInvite();
         setBusy(false);
@@ -1372,18 +1483,46 @@
           window.SFX.uiClick();
           closeJoinCode();
         });
+        els.scanOpenBtn.addEventListener("click", () => {
+          window.SFX.uiClick();
+          openScanner();
+        });
+        els.scanCloseBtn.addEventListener("click", () => {
+          window.SFX.uiClick();
+          closeScanner();
+        });
+        els.scanOverlay.addEventListener("click", (e) => {
+          if (e.target === els.scanOverlay) closeScanner();
+        });
         els.joinCodeInput.addEventListener("input", () => {
           const cur = els.joinCodeInput.value;
-          const upper = cur.toUpperCase().replace(/[^A-Z0-9]/g, "");
-          if (cur !== upper) {
-            const sel = els.joinCodeInput.selectionStart ?? upper.length;
-            els.joinCodeInput.value = upper;
-            els.joinCodeInput.setSelectionRange(sel, sel);
+          if (cur.length <= 6 && !/[:/.]/.test(cur)) {
+            const upper = cur.toUpperCase().replace(/[^A-Z0-9]/g, "");
+            if (cur !== upper) {
+              const sel = els.joinCodeInput.selectionStart ?? upper.length;
+              els.joinCodeInput.value = upper;
+              els.joinCodeInput.setSelectionRange(sel, sel);
+            }
           }
         });
+        function resolveJoinInput() {
+          const raw = els.joinCodeInput.value.trim();
+          if (!raw) return null;
+          try {
+            const url = new URL(raw);
+            const p2p = url.searchParams.get("p2p");
+            if (p2p) return p2p.trim().toUpperCase().slice(0, 6);
+            const room = url.searchParams.get("room");
+            if (room) return room.trim().toUpperCase().slice(0, 6);
+            const code = url.searchParams.get("code");
+            if (code) return code.trim().toUpperCase().slice(0, 6);
+          } catch {
+          }
+          return raw.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6) || null;
+        }
         els.joinCodeSubmit.addEventListener("click", () => {
-          const code = els.joinCodeInput.value.trim().toUpperCase();
-          if (code.length < 1) return;
+          const code = resolveJoinInput();
+          if (!code) return;
           window.SFX.uiClick();
           closeJoinCode();
           startGame(code, null);
@@ -1391,8 +1530,8 @@
         els.joinCodeInput.addEventListener("keydown", (e) => {
           if (e.key === "Enter") {
             e.preventDefault();
-            const code = els.joinCodeInput.value.trim().toUpperCase();
-            if (code.length < 1) return;
+            const code = resolveJoinInput();
+            if (!code) return;
             window.SFX.uiClick();
             closeJoinCode();
             startGame(code, null);
@@ -1422,6 +1561,7 @@
           if (document.hidden) {
             if (window.Net.room) window.Net.sendInput(0, 0, false, false);
             if (window.SFX.suspend) window.SFX.suspend();
+            closeScanner();
             hideShareQr();
           } else if (mode === "playing" && window.SFX.resume) {
             window.SFX.resume();
@@ -1431,6 +1571,10 @@
         window.addEventListener("resize", updateRotateOverlay);
         document.addEventListener("keydown", (e) => {
           if (e.key === "Escape") {
+            if (scannerOpen) {
+              closeScanner();
+              return;
+            }
             if (!els.shareQrOverlay.classList.contains("hidden")) {
               hideShareQr();
               return;
