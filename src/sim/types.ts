@@ -85,6 +85,7 @@ export interface SimStateSnapshot {
   hostId: string;
   roundLength: number;
   roomName: string;
+  botsInRoom: boolean;
 }
 
 export interface GameSimOpts {

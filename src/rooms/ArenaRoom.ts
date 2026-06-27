@@ -190,6 +190,7 @@ export class ArenaRoom extends Room<ArenaState> {
       this.sim!.setHostSettings(client.sessionId, {
         roundLength: typeof data.roundLength === "number" ? data.roundLength : undefined,
         roomName: typeof data.roomName === "string" ? data.roomName : undefined,
+        botsInRoom: typeof data.botsInRoom === "boolean" ? data.botsInRoom : undefined,
       });
     });
 
@@ -353,6 +354,7 @@ export class ArenaRoom extends Room<ArenaState> {
     this.state.hostId = state.hostId;
     this.state.roomName = state.roomName;
     this.state.roundLength = state.roundLength;
+    this.state.botsInRoom = state.botsInRoom;
   }
 
   // ---------------------------------------------------------------------------

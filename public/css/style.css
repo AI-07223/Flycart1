@@ -1353,6 +1353,22 @@ body.touch-device #share-bar {
   background: #1b1400;
   color: #fff;
 }
+.lobby-settings-checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.85);
+  cursor: pointer;
+  flex: 1;
+}
+.lobby-settings-checkbox {
+  width: 16px;
+  height: 16px;
+  accent-color: #ffcb05;
+  cursor: pointer;
+  flex-shrink: 0;
+}
 
 /* Responsive: on very small screens make livery grid 2-col and allow card to grow */
 @media (max-width: 400px) {

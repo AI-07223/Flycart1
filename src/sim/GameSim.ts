@@ -89,6 +89,7 @@ export class GameSim {
   hostId = "";
   roundLength: number;
   roomName: string;
+  botsInRoom: boolean;
   readonly botsEnabled: boolean;
   readonly isPublic: boolean;
 
@@ -100,6 +101,7 @@ export class GameSim {
     this.onEvent = opts.onEvent;
     this.roundLength = C.ROUND_SECONDS;
     this.roomName = "";
+    this.botsInRoom = opts.botsEnabled;
 
     if (this.isPublic) {
       this.phase = "playing";
@@ -243,16 +245,24 @@ export class GameSim {
   }
 
   /**
-   * Update host-controlled room settings (round length and/or room name).
+   * Update host-controlled room settings (round length, room name, and/or bots).
    * Silently ignores calls from non-hosts.
    */
-  setHostSettings(callerId: string, s: { roundLength?: number; roomName?: string }): void {
+  setHostSettings(callerId: string, s: { roundLength?: number; roomName?: string; botsInRoom?: boolean }): void {
     if (callerId !== this.hostId) return;
     if (typeof s.roundLength === "number" && Number.isFinite(s.roundLength)) {
       this.roundLength = Math.max(60, Math.min(300, Math.round(s.roundLength)));
     }
     if (typeof s.roomName === "string") {
       this.roomName = s.roomName.replace(/[\x00-\x1F\x7F]/g, "").trim().slice(0, 20);
+    }
+    if (typeof s.botsInRoom === "boolean" && !this.isPublic) {
+      this.botsInRoom = s.botsInRoom;
+      // Apply immediately: if turned off, remove any existing bots now
+      if (!this.botsInRoom) {
+        for (const id of [...this.bots.keys()]) this.removePlayer(id);
+      }
+      // If turned on, maintainBots() will add bots on the next tick
     }
   }
 
@@ -314,6 +324,7 @@ export class GameSim {
     hostId: string;
     roundLength: number;
     roomName: string;
+    botsInRoom: boolean;
   } {
     return {
       players: this.players,
@@ -324,6 +335,7 @@ export class GameSim {
       hostId: this.hostId,
       roundLength: this.roundLength,
       roomName: this.roomName,
+      botsInRoom: this.botsInRoom,
     };
   }
 
@@ -340,6 +352,7 @@ export class GameSim {
       hostId: this.hostId,
       roundLength: this.roundLength,
       roomName: this.roomName,
+      botsInRoom: this.botsInRoom,
     };
   }
 
@@ -750,7 +763,11 @@ export class GameSim {
   }
 
   private maintainBots(): void {
-    if (!this.botsEnabled) {
+    // Public rooms: use botsEnabled (original behavior, unaffected by botsInRoom toggle).
+    // Private rooms: gate on botsInRoom (the host toggle).
+    const shouldMaintain = this.isPublic ? this.botsEnabled : (this.botsEnabled && this.botsInRoom);
+
+    if (!shouldMaintain) {
       for (const id of [...this.bots.keys()]) this.removePlayer(id);
       return;
     }

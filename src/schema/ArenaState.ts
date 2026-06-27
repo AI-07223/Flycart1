@@ -60,4 +60,5 @@ export class ArenaState extends Schema {
   @type("number") ceilingY = 0;
   @type("string") roomName = "";
   @type("number") roundLength = 150;
+  @type("boolean") botsInRoom = false;
 }

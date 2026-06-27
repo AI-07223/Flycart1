@@ -357,8 +357,8 @@ const Net = {
     if (this.room) this.room.send("hostKick", { targetId });
   },
 
-  /** Host-only: update room settings (roundLength and/or roomName). */
-  sendHostSettings(s: { roundLength?: number; roomName?: string }): void {
+  /** Host-only: update room settings (roundLength, roomName, and/or botsInRoom). */
+  sendHostSettings(s: { roundLength?: number; roomName?: string; botsInRoom?: boolean }): void {
     if (this.room) this.room.send("hostSettings", s);
   },
 

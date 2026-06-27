@@ -97,6 +97,7 @@ const els = {
   lobbySettings: dollar("lobby-settings"),
   lobbyRoomName: dollar("lobby-room-name") as HTMLInputElement,
   lobbyRoundLength: dollar("lobby-round-length") as HTMLSelectElement,
+  lobbyBotsCheck: dollar("lobby-bots-check") as HTMLInputElement,
   lobbyRoster: dollar("lobby-roster"),
   lobbyReadyBtn: dollar("lobby-ready-btn") as HTMLButtonElement,
   lobbyStartBtn: dollar("lobby-start-btn") as HTMLButtonElement,
@@ -444,6 +445,9 @@ function renderLobbyRoster(): void {
     if (document.activeElement !== els.lobbyRoundLength) {
       els.lobbyRoundLength.value = serverRoundLength;
     }
+    // Reflect botsInRoom from server state (checkbox doesn't need focus-guard — it's a click, not typing)
+    const serverBotsInRoom = window.Net.state?.botsInRoom ?? false;
+    els.lobbyBotsCheck.checked = serverBotsInRoom;
   } else {
     els.lobbySettings.classList.add("hidden");
   }
@@ -1547,6 +1551,7 @@ function resetToMenu(): void {
   els.lobbySettings.classList.add("hidden");
   els.lobbyRoomName.value = "";
   els.lobbyRoundLength.value = "150";
+  els.lobbyBotsCheck.checked = false;
   hideSettings();
   closeJoinCode();
   closeScanner();
@@ -1978,6 +1983,11 @@ function init(): void {
   els.lobbyRoundLength.addEventListener("change", () => {
     const v = parseInt(els.lobbyRoundLength.value, 10);
     if (Number.isFinite(v)) window.Net.sendHostSettings({ roundLength: v });
+  });
+
+  // Host settings: bots toggle (immediate on change)
+  els.lobbyBotsCheck.addEventListener("change", () => {
+    window.Net.sendHostSettings({ botsInRoom: els.lobbyBotsCheck.checked });
   });
 
   document.addEventListener("visibilitychange", () => {

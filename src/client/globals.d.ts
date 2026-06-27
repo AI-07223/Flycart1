@@ -18,6 +18,7 @@ interface TransportState {
   hostId: string;
   roomName?: string;
   roundLength?: number;
+  botsInRoom?: boolean;
 }
 
 interface Vec3 { x: number; y: number; z: number; }
@@ -239,7 +240,7 @@ interface NetAPI {
   sendReady(): void;
   sendHostStart(): void;
   sendHostKick(targetId: string): void;
-  sendHostSettings(s: { roundLength?: number; roomName?: string }): void;
+  sendHostSettings(s: { roundLength?: number; roomName?: string; botsInRoom?: boolean }): void;
   getPhase(): string | null;
   getHostId(): string | null;
   getRosterSnapshot(): Array<{ id: string; name: string; ready: boolean; bot: boolean; score: number; color: number }>;

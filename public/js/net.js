@@ -361,7 +361,7 @@
         sendHostKick(targetId) {
           if (this.room) this.room.send("hostKick", { targetId });
         },
-        /** Host-only: update room settings (roundLength and/or roomName). */
+        /** Host-only: update room settings (roundLength, roomName, and/or botsInRoom). */
         sendHostSettings(s) {
           if (this.room) this.room.send("hostSettings", s);
         },

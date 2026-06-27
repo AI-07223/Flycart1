@@ -27,6 +27,7 @@ export interface TransportState {
   hostId: string;
   roomName?: string;
   roundLength?: number;
+  botsInRoom?: boolean;
 }
 
 /**
@@ -51,7 +52,7 @@ export interface ITransport {
   sendReady(): void;
   sendHostStart(): void;
   sendHostKick(targetId: string): void;
-  sendHostSettings(s: { roundLength?: number; roomName?: string }): void;
+  sendHostSettings(s: { roundLength?: number; roomName?: string; botsInRoom?: boolean }): void;
 
   getPhase(): string | null;
   getHostId(): string | null;

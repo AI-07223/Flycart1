@@ -92,6 +92,7 @@ class GuestTransportState implements TransportState {
   hostId   = "";
   roomName  = "";
   roundLength = 150;
+  botsInRoom  = false;
 }
 
 // ---------------------------------------------------------------------------
@@ -109,6 +110,7 @@ class HostTransportState implements TransportState {
   get hostId():   string            { return this.sim.hostId; }
   get roomName(): string            { return this.sim.roomName; }
   get roundLength(): number         { return this.sim.roundLength; }
+  get botsInRoom(): boolean         { return this.sim.botsInRoom; }
 }
 
 // ---------------------------------------------------------------------------
@@ -622,6 +624,7 @@ export class WebRtcTransport implements ITransport {
         this._sim.setHostSettings(peerId, {
           roundLength: typeof msg.roundLength === "number" ? msg.roundLength : undefined,
           roomName: typeof msg.roomName === "string" ? msg.roomName : undefined,
+          botsInRoom: typeof msg.botsInRoom === "boolean" ? msg.botsInRoom : undefined,
         });
         if (this.onStateChange) this.onStateChange();
       }
@@ -758,6 +761,7 @@ export class WebRtcTransport implements ITransport {
       gs.hostId     = snap.hostId;
       gs.roomName   = snap.roomName   ?? "";
       gs.roundLength = snap.roundLength ?? 150;
+      gs.botsInRoom  = snap.botsInRoom  ?? false;
       gs.players.mergeFrom(snap.players as Array<[string, any]>);
       gs.bullets.mergeFrom(snap.bullets as Array<[string, any]>);
       gs.pickups.mergeFrom(snap.pickups as Array<[string, any]>);
@@ -851,7 +855,7 @@ export class WebRtcTransport implements ITransport {
     }
   }
 
-  sendHostSettings(s: { roundLength?: number; roomName?: string }): void {
+  sendHostSettings(s: { roundLength?: number; roomName?: string; botsInRoom?: boolean }): void {
     if (this._isHost) {
       if (this._sim) { this._sim.setHostSettings("host", s); if (this.onStateChange) this.onStateChange(); }
     } else {

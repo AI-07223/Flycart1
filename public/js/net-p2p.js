@@ -273,6 +273,7 @@
       this.onEvent = opts.onEvent;
       this.roundLength = ROUND_SECONDS;
       this.roomName = "";
+      this.botsInRoom = opts.botsEnabled;
       if (this.isPublic) {
         this.phase = "playing";
         this.timeLeft = ROUND_SECONDS;
@@ -405,7 +406,7 @@
       this.startMatch();
     }
     /**
-     * Update host-controlled room settings (round length and/or room name).
+     * Update host-controlled room settings (round length, room name, and/or bots).
      * Silently ignores calls from non-hosts.
      */
     setHostSettings(callerId, s) {
@@ -415,6 +416,12 @@
       }
       if (typeof s.roomName === "string") {
         this.roomName = s.roomName.replace(/[\x00-\x1F\x7F]/g, "").trim().slice(0, 20);
+      }
+      if (typeof s.botsInRoom === "boolean" && !this.isPublic) {
+        this.botsInRoom = s.botsInRoom;
+        if (!this.botsInRoom) {
+          for (const id of [...this.bots.keys()]) this.removePlayer(id);
+        }
       }
     }
     /**
@@ -469,7 +476,8 @@
         timeLeft: this.timeLeft,
         hostId: this.hostId,
         roundLength: this.roundLength,
-        roomName: this.roomName
+        roomName: this.roomName,
+        botsInRoom: this.botsInRoom
       };
     }
     /**
@@ -484,7 +492,8 @@
         timeLeft: this.timeLeft,
         hostId: this.hostId,
         roundLength: this.roundLength,
-        roomName: this.roomName
+        roomName: this.roomName,
+        botsInRoom: this.botsInRoom
       };
     }
     // ---------------------------------------------------------------------------
@@ -861,7 +870,8 @@
       }
     }
     maintainBots() {
-      if (!this.botsEnabled) {
+      const shouldMaintain = this.isPublic ? this.botsEnabled : this.botsEnabled && this.botsInRoom;
+      if (!shouldMaintain) {
         for (const id of [...this.bots.keys()]) this.removePlayer(id);
         return;
       }
@@ -1077,6 +1087,7 @@
       this.hostId = "";
       this.roomName = "";
       this.roundLength = 150;
+      this.botsInRoom = false;
     }
   };
   var HostTransportState = class {
@@ -1106,6 +1117,9 @@
     }
     get roundLength() {
       return this.sim.roundLength;
+    }
+    get botsInRoom() {
+      return this.sim.botsInRoom;
     }
   };
   var SignalSocket = class {
@@ -1530,7 +1544,8 @@
         } else if (msg.type === "hostSettings") {
           this._sim.setHostSettings(peerId, {
             roundLength: typeof msg.roundLength === "number" ? msg.roundLength : void 0,
-            roomName: typeof msg.roomName === "string" ? msg.roomName : void 0
+            roomName: typeof msg.roomName === "string" ? msg.roomName : void 0,
+            botsInRoom: typeof msg.botsInRoom === "boolean" ? msg.botsInRoom : void 0
           });
           if (this.onStateChange) this.onStateChange();
         }
@@ -1650,6 +1665,7 @@
         gs.hostId = snap.hostId;
         gs.roomName = snap.roomName ?? "";
         gs.roundLength = snap.roundLength ?? 150;
+        gs.botsInRoom = snap.botsInRoom ?? false;
         gs.players.mergeFrom(snap.players);
         gs.bullets.mergeFrom(snap.bullets);
         gs.pickups.mergeFrom(snap.pickups);
