@@ -38,7 +38,11 @@
     <div id="countdown"></div>
 
     <div id="rotate-overlay">
-      <div class="rot-inner">📱 ↻<br />Rotate your device<br /><span>Landscape works best for the flight deck</span></div>
+      <div class="rot-inner">
+        <div class="rot-icon">⟳</div>
+        <div class="rot-title">Rotate to Landscape</div>
+        <div class="rot-sub">Turn your device sideways to play</div>
+      </div>
     </div>
 
     <div id="crosshair" class="hidden" aria-hidden="true">
@@ -66,7 +70,8 @@
     <div id="respawn" class="hidden">💥 Shot down — respawning…</div>
 
     <div id="touch-controls" class="hidden">
-      <div class="touch-left">
+      <!-- D-Pad layout (scheme=dpad) -->
+      <div class="touch-left" id="dpad-left">
         <div class="touch-stack horizontal">
           <button class="tbtn arrow" id="left-btn" aria-label="Turn left">◀</button>
           <button class="tbtn arrow" id="right-btn" aria-label="Turn right">▶</button>
@@ -76,6 +81,17 @@
           <button class="tbtn dive" id="dive-btn" aria-label="Dive">▼</button>
         </div>
       </div>
+      <!-- Joystick layout (scheme=joystick) -->
+      <div class="touch-left joy-left hidden" id="joystick-left">
+        <div id="joystick-base" aria-label="Movement stick">
+          <div id="joystick-thumb"></div>
+        </div>
+      </div>
+      <!-- Tilt layout (scheme=tilt) — just a calibrate button on left -->
+      <div class="touch-left tilt-left hidden" id="tilt-left">
+        <button class="tbtn tilt-cal" id="tilt-cal-btn" aria-label="Recalibrate tilt">⊕<span>CAL</span></button>
+      </div>
+      <!-- Right side: BOOST + FIRE (shared across all schemes) -->
       <div class="touch-right">
         <button class="tbtn boost" id="boost-btn">BOOST</button>
         <button class="tbtn fire" id="fire-btn">FIRE</button>
@@ -338,6 +354,15 @@
 
         <div class="settings-section">
           <h3 class="settings-heading">Controls</h3>
+          <div class="settings-row touch-only" id="ctrl-scheme-row">
+            <span class="settings-label">Touch Controls</span>
+            <div class="scheme-picker" role="radiogroup" aria-label="Touch control scheme">
+              <label class="scheme-opt"><input type="radio" name="ctrl-scheme" value="dpad" checked /> D-Pad</label>
+              <label class="scheme-opt"><input type="radio" name="ctrl-scheme" value="joystick" /> Joystick</label>
+              <label class="scheme-opt"><input type="radio" name="ctrl-scheme" value="tilt" /> Tilt</label>
+            </div>
+          </div>
+          <p id="tilt-status-msg" class="muted hidden" style="font-size:12px;padding:4px 0;"></p>
           <label class="settings-row">
             <span class="settings-label">Invert Pitch</span>
             <input type="checkbox" id="set-invert-pitch" class="settings-check" />

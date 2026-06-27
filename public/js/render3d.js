@@ -26,6 +26,8 @@ import * as THREE from "three";
   let nameLabelsLayer;
   // Pooled Map<sessionId, HTMLDivElement> for player name labels
   const nameLabelPool = new Map();
+  // Single reticle div for the local-player lead indicator
+  let leadReticle = null;
   let time = 0;
   let hitStop = 0;
   let takeoff = 0;
@@ -698,6 +700,24 @@ import * as THREE from "three";
       nameLabelsLayer.id = "name-labels";
       (document.getElementById("game-wrap") || document.body).appendChild(nameLabelsLayer);
 
+      // Lead reticle — a single pooled div projected to world space each frame.
+      leadReticle = document.createElement("div");
+      leadReticle.id = "lead-reticle";
+      // Subtle ring: 20×20px, accent colour, no pointer events.
+      leadReticle.style.cssText = [
+        "position:absolute",
+        "width:20px",
+        "height:20px",
+        "border:2px solid rgba(255,210,74,0.72)",
+        "border-radius:50%",
+        "transform:translate(-50%,-50%)",
+        "pointer-events:none",
+        "display:none",
+        "box-shadow:0 0 4px rgba(255,210,74,0.45)",
+        "z-index:20",
+      ].join(";");
+      (document.getElementById("game-wrap") || document.body).appendChild(leadReticle);
+
       applyQuality();
       Q && Q.onChange && Q.onChange(() => applyQuality());
       window.addEventListener("resize", () => this.resize());
@@ -873,6 +893,7 @@ import * as THREE from "three";
       renderer.render(scene, camera);
       this._drawMinimap(state, myId);
       this._updateNameLabels(state, myId);
+      this._updateLeadReticle(state, myId);
     },
 
     // drawMenu(dt, cosmetic): cosmetic can be {color,bodyShape,accent,trail,livery} or bare number
@@ -885,6 +906,7 @@ import * as THREE from "three";
       for (const [, bullet] of stateMaps.bullets) bullet.visible = false;
       for (const [, pickup] of stateMaps.pickups) pickup.visible = false;
 
+      if (leadReticle) leadReticle.style.display = "none";
       if (!menuDemo) {
         menuDemo = makePlane(cosmetic);
         scene.add(menuDemo);
@@ -1117,6 +1139,75 @@ import * as THREE from "three";
           div.remove();
           nameLabelPool.delete(id);
         }
+      }
+    },
+
+    _updateLeadReticle(state, myId) {
+      if (!leadReticle || !camera) return;
+
+      // Hide when no local player or local player is dead.
+      const me = state.players.get(myId);
+      if (!me || !me.alive) { leadReticle.style.display = "none"; return; }
+
+      // Use the interpolated local pose when available (same as _updateCamera).
+      const myPose = (window.Net && window.Net.localPose && window.Net.localPose.active)
+        ? window.Net.localPose
+        : { p: { x: me.px, y: me.py, z: me.pz }, f: { x: me.fx, y: me.fy, z: me.fz } };
+
+      const myPos = myPose.p;
+      const myFwd = myPose.f;
+
+      // Bullet speed — prefer the constant exposed on window.GAME, fall back to
+      // the value baked in at the time this renderer was written (322).
+      const bulletSpeed = (G && G.BULLET_SPEED) ? G.BULLET_SPEED : 322;
+
+      // Find the nearest alive enemy who is in front of the local player
+      // (dot(myFwd, toEnemy) > 0) and closest overall.
+      let nearestEnemy = null;
+      let nearestDist = Infinity;
+
+      state.players.forEach((p, id) => {
+        if (id === myId || !p.alive) return;
+        const dx = p.px - myPos.x;
+        const dy = p.py - myPos.y;
+        const dz = p.pz - myPos.z;
+        // Dot product — only consider enemies roughly in front.
+        const dot = dx * myFwd.x + dy * myFwd.y + dz * myFwd.z;
+        if (dot <= 0) return;
+        const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+        if (dist < nearestDist) {
+          nearestDist = dist;
+          nearestEnemy = p;
+        }
+      });
+
+      if (!nearestEnemy) { leadReticle.style.display = "none"; return; }
+
+      // Compute lead point: where the target will be when the bullet arrives.
+      // leadTime = distance / bulletSpeed (simple linear approximation).
+      const leadTime = nearestDist / Math.max(bulletSpeed, 1);
+      // Use reported speed + forward vector as a velocity estimate.
+      const eSpeed = nearestEnemy.speed || 0;
+      const leadX = nearestEnemy.px + nearestEnemy.fx * eSpeed * leadTime;
+      const leadY = nearestEnemy.py + nearestEnemy.fy * eSpeed * leadTime;
+      const leadZ = nearestEnemy.pz + nearestEnemy.fz * eSpeed * leadTime;
+
+      const leadVec = new THREE.Vector3(leadX, leadY, leadZ);
+      const screen = worldToScreen(leadVec);
+
+      if (!screen.visible) { leadReticle.style.display = "none"; return; }
+
+      leadReticle.style.display = "";
+      leadReticle.style.left = screen.x + "px";
+      leadReticle.style.top  = screen.y + "px";
+
+      // Tint the crosshair element if the lead point is close to screen centre.
+      const cx = window.innerWidth / 2;
+      const cy = window.innerHeight / 2;
+      const screenDist = Math.hypot(screen.x - cx, screen.y - cy);
+      const crosshairEl = document.getElementById("crosshair");
+      if (crosshairEl) {
+        crosshairEl.style.borderColor = screenDist < 60 ? "rgba(255,210,74,0.95)" : "";
       }
     },
 

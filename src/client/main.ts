@@ -512,7 +512,7 @@ function enterPlayingFromLobby(): void {
   applyMode("playing");
   els.respawn.classList.add("hidden");
   els.inter.classList.add("hidden");
-  if (window.Input.isTouchDevice()) els.touch.classList.remove("hidden");
+  if (window.Input.isTouchDevice()) { els.touch.classList.remove("hidden"); applyControlSchemeUI(window.Input.controlScheme); }
   if (!engineStarted) {
     window.SFX.startEngine();
     engineStarted = true;
@@ -682,6 +682,10 @@ function populateSettingsUI(): void {
   const invertSteerEl = document.getElementById("set-invert-steer") as HTMLInputElement | null;
   if (invertPitchEl) invertPitchEl.checked = window.Input.invertPitch;
   if (invertSteerEl) invertSteerEl.checked = window.Input.invertSteer;
+
+  // Reflect control scheme
+  const schemeRadios = document.querySelectorAll<HTMLInputElement>('input[name="ctrl-scheme"]');
+  schemeRadios.forEach((r) => { r.checked = r.value === window.Input.controlScheme; });
 }
 
 function showSettings(): void {
@@ -1004,7 +1008,7 @@ async function startGame(code: string, serverOrigin: string | null = null): Prom
   els.respawn.classList.add("hidden");
   els.inter.classList.add("hidden");
   setStatus("");
-  if (window.Input.isTouchDevice()) els.touch.classList.remove("hidden");
+  if (window.Input.isTouchDevice()) { els.touch.classList.remove("hidden"); applyControlSchemeUI(window.Input.controlScheme); }
   if (!engineStarted) {
     window.SFX.startEngine();
     engineStarted = true;
@@ -1494,6 +1498,34 @@ function setupTouchButtons(): void {
   bind(els.dive, "dive");
   bind(els.boost, "boost");
   bind(els.fire, "fire");
+
+  // Joystick setup
+  const joystickBase  = document.getElementById("joystick-base")!;
+  const joystickThumb = document.getElementById("joystick-thumb")!;
+  if (joystickBase && joystickThumb) {
+    window.Input.attachJoystick(joystickBase, joystickThumb);
+  }
+
+  // Tilt calibrate button
+  const tiltCalBtn = document.getElementById("tilt-cal-btn");
+  if (tiltCalBtn) {
+    tiltCalBtn.addEventListener("pointerdown", (e) => {
+      e.preventDefault();
+      window.Input.calibrateTilt();
+      buzz(20);
+      tiltCalBtn.classList.add("pressed");
+      setTimeout(() => tiltCalBtn.classList.remove("pressed"), 120);
+    });
+  }
+}
+
+function applyControlSchemeUI(scheme: ControlScheme): void {
+  const dpadLeft    = document.getElementById("dpad-left");
+  const joystickLeft= document.getElementById("joystick-left");
+  const tiltLeft    = document.getElementById("tilt-left");
+  if (dpadLeft)     dpadLeft.classList.toggle("hidden", scheme !== "dpad");
+  if (joystickLeft) joystickLeft.classList.toggle("hidden", scheme !== "joystick");
+  if (tiltLeft)     tiltLeft.classList.toggle("hidden", scheme !== "tilt");
 }
 
 function togglePause(): void {
@@ -1531,6 +1563,11 @@ function resetToMenu(): void {
   if (window.SFX.stopLoops) window.SFX.stopLoops();
   if (window.SFX.startMenuAmbient) window.SFX.startMenuAmbient();
   engineStarted = false;
+  // Release orientation lock on return to menu (best-effort)
+  try {
+    const so = (screen as any).orientation;
+    if (so && so.unlock) so.unlock();
+  } catch {}
   // Reset respawn / countdown tracking
   wasAlive = true;
   deathTime = -1;
@@ -1593,6 +1630,7 @@ function onDisconnect(_info?: any): void {
 
 function enterImmersive(): void {
   if (!window.Input.isTouchDevice()) { updateRotateOverlay(); return; }
+  // Best-effort fullscreen
   const root = document.documentElement as any;
   const request = root.requestFullscreen || root.webkitRequestFullscreen || root.msRequestFullscreen;
   if (request) {
@@ -1601,6 +1639,13 @@ function enterImmersive(): void {
       if (res && res.catch) res.catch(() => {});
     } catch {}
   }
+  // Best-effort landscape lock — iOS Safari lacks this; must fail silently
+  try {
+    const so = (screen as any).orientation;
+    if (so && so.lock) {
+      so.lock("landscape").catch(() => {});
+    }
+  } catch {}
   updateRotateOverlay();
 }
 
@@ -1876,6 +1921,60 @@ function init(): void {
       try { localStorage.setItem("smashcart.invertSteer", invertSteerEl.checked ? "1" : "0"); } catch {}
     });
   }
+
+  // ─── CONTROL SCHEME PICKER ────────────────────────────────────────────────
+  // Load persisted scheme
+  try {
+    const saved = localStorage.getItem("smashcart.controls") as ControlScheme | null;
+    if (saved === "joystick" || saved === "tilt" || saved === "dpad") {
+      window.Input.controlScheme = saved;
+    }
+  } catch {}
+
+  // Wire radio buttons
+  const schemeRadios = document.querySelectorAll<HTMLInputElement>('input[name="ctrl-scheme"]');
+  schemeRadios.forEach((r) => {
+    r.addEventListener("change", () => {
+      if (!r.checked) return;
+      const scheme = r.value as ControlScheme;
+      window.SFX.uiClick();
+      if (scheme === "tilt") {
+        // attachTilt handles iOS permission and potential fallback
+        window.Input.attachTilt();
+        // Only switch scheme optimistically if non-iOS; iOS waits for permission cb
+        const DevOri = DeviceOrientationEvent as any;
+        if (typeof DevOri.requestPermission !== "function") {
+          window.Input.setControlScheme("tilt");
+          applyControlSchemeUI("tilt");
+        }
+        // (iOS: setControlScheme called after permission granted via onSchemeChange cb)
+      } else {
+        window.Input.setControlScheme(scheme);
+        applyControlSchemeUI(scheme);
+      }
+    });
+  });
+
+  // Handle scheme-change notifications from Input (tilt permission fallbacks, etc.)
+  window.Input.onSchemeChange = (scheme: ControlScheme, msg?: string) => {
+    applyControlSchemeUI(scheme);
+    // Reflect in settings UI
+    schemeRadios.forEach((r) => { r.checked = r.value === scheme; });
+    // Show status message if provided
+    const tiltMsg = document.getElementById("tilt-status-msg");
+    if (tiltMsg) {
+      if (msg) {
+        tiltMsg.textContent = msg;
+        tiltMsg.classList.remove("hidden");
+        setTimeout(() => tiltMsg.classList.add("hidden"), 4000);
+      } else {
+        tiltMsg.classList.add("hidden");
+      }
+    }
+  };
+
+  // Apply initial scheme UI
+  applyControlSchemeUI(window.Input.controlScheme);
 
   // Join-by-code modal
   els.joinCodeOpenBtn.addEventListener("click", () => {

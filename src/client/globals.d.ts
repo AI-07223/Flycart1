@@ -172,6 +172,8 @@ interface TouchState {
   fire: boolean;
 }
 
+type ControlScheme = "dpad" | "joystick" | "tilt";
+
 interface InputAPI {
   turn: number;
   climb: number;
@@ -179,12 +181,18 @@ interface InputAPI {
   fire: boolean;
   onPause: (() => void) | null;
   onMute: (() => void) | null;
+  onSchemeChange: ((scheme: ControlScheme, msg?: string) => void) | null;
   touch: TouchState;
   invertSteer: boolean;
   invertPitch: boolean;
+  controlScheme: ControlScheme;
   get(): InputAPI;
   attach(): void;
   isTouchDevice(): boolean;
+  attachJoystick(baseEl: HTMLElement, thumbEl: HTMLElement): void;
+  calibrateTilt(): void;
+  attachTilt(): void;
+  setControlScheme(scheme: ControlScheme): void;
 }
 
 interface PlayerCosmetics {

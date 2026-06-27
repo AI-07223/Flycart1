@@ -15,12 +15,21 @@ export const PITCH_MAX = 0.5;
 // Combat.
 export const PLANE_RADIUS = 16;
 export const MAX_HP = 100;
-export const BULLET_SPEED = 215;
+export const BULLET_SPEED = 322; // was 215 (+50%)
 export const BULLET_DAMAGE = 25;
-export const BULLET_LIFE = 2.1;
+export const BULLET_LIFE = 2.3;  // was 2.1 — scaled up so effective range is similar at higher speed
 export const BULLET_RADIUS = 4;
 export const FIRE_COOLDOWN = 0.34;
 export const RESPAWN_DELAY = 2.5;
+
+// Larger hit radius for bullet-vs-plane detection only (not plane-vs-landmark).
+// ~1.6× PLANE_RADIUS so shots feel forgiving without changing collision geometry.
+export const BULLET_HIT_RADIUS = 26; // PLANE_RADIUS(16) + 10 flat bonus
+
+// Aim-assist: mild bullet magnetism for human-owned, non-homing bullets.
+export const AIM_ASSIST_CONE  = 0.35; // radians (~20°) — target must be within this bearing of bullet forward
+export const AIM_ASSIST_RANGE = 700;  // world units — only assist when enemy is closer than this
+export const AIM_ASSIST_TURN  = 0.55; // radians/sec the bullet curves toward target (gentler than HOMING_TURN=1.45)
 
 // Match flow.
 export const ROUND_SECONDS = 150;

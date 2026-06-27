@@ -23,9 +23,9 @@
       PITCH_MAX = 0.5;
       PLANE_RADIUS = 16;
       MAX_HP = 100;
-      BULLET_SPEED = 215;
+      BULLET_SPEED = 322;
       BULLET_DAMAGE = 25;
-      BULLET_LIFE = 2.1;
+      BULLET_LIFE = 2.3;
       BULLET_RADIUS = 4;
       FIRE_COOLDOWN = 0.34;
       MAP_HALF = 1800;

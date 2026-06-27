@@ -514,10 +514,37 @@ export class GameSim {
       let fwd = S.normalize(getF(b));
 
       if (b.homing) {
+        // Full homing powerup: strong turn rate, no cone restriction.
         const target = this.closestTarget(b.owner, pos);
         if (target) {
           const desired = S.normalize(S.sub(getP(target.player), pos));
           fwd = steerToward(fwd, desired, C.HOMING_TURN * dt);
+        }
+      } else {
+        // Aim-assist: mild magnetism for human-owned bullets only.
+        const ownerPlayer = this.players.get(b.owner);
+        if (ownerPlayer && !ownerPlayer.bot) {
+          // Find the nearest alive enemy within AIM_ASSIST_RANGE whose bearing
+          // from the bullet's current forward is within AIM_ASSIST_CONE.
+          let bestAssistDist = Infinity;
+          let assistTarget: SimPlayer | null = null;
+          for (const [pid, p] of this.players) {
+            if (!p.alive || pid === b.owner) continue;
+            const toTarget = S.sub(getP(p), pos);
+            const dist = S.len(toTarget);
+            if (dist > C.AIM_ASSIST_RANGE) continue;
+            // Angle between bullet forward and direction to target.
+            const angle = S.angBetween(fwd, S.normalize(toTarget));
+            if (angle > C.AIM_ASSIST_CONE) continue;
+            if (dist < bestAssistDist) {
+              bestAssistDist = dist;
+              assistTarget = p;
+            }
+          }
+          if (assistTarget) {
+            const desired = S.normalize(S.sub(getP(assistTarget), pos));
+            fwd = steerToward(fwd, desired, C.AIM_ASSIST_TURN * dt);
+          }
         }
       }
 
@@ -533,7 +560,9 @@ export class GameSim {
         for (const [pid, p] of this.players) {
           if (!p.alive || pid === b.owner) continue;
           const targetPos = getP(p);
-          const hitDist = C.PLANE_RADIUS + C.BULLET_RADIUS;
+          // BULLET_HIT_RADIUS (larger, forgiving) for player hits only.
+          // Landmark/cover collision still uses its own radius below.
+          const hitDist = C.BULLET_HIT_RADIUS + C.BULLET_RADIUS;
           if (S.segmentPointDistance(prev, pos, targetPos) > hitDist) continue;
           const t = S.segmentPointT(prev, pos, targetPos);
           if (t < bestT) { bestT = t; victim = p; victimId = pid; blocked = false; }

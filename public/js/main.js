@@ -9,7 +9,7 @@
   };
 
   // src/shared/constants.ts
-  var TICK_RATE, TICK_MS, CRUISE_SPEED, BOOST_SPEED, ACCEL, TURN_RATE, PITCH_RATE, PITCH_MAX, PLANE_RADIUS, MAX_HP, BULLET_SPEED, BULLET_DAMAGE, BULLET_LIFE, BULLET_RADIUS, FIRE_COOLDOWN, RESPAWN_DELAY, ROUND_SECONDS, ROUND_INTERMISSION, MIN_PLAYERS, MAP_HALF, MAP_EDGE_SOFT, GROUND_Y, MIN_ALT, SPAWN_ALT, MAX_ALT, PICKUP_ALT_MIN, PICKUP_ALT_MAX, PICKUP_FIELD_RADIUS, SPAWN_REROLL, BOT_NAMES, COLOR_COUNT, ACCENT_COUNT, TRAIL_COUNT, LIVERY_COUNT, SKIN_COUNT, PICKUP_MAX, PICKUP_INTERVAL, PICKUP_RADIUS, POWERUP_DURATION, SHIELD_CHARGES, RAPID_FACTOR, SPREAD_ANGLE, AFTERBURNER_FACTOR, HOMING_TURN, POWERUP_TYPES, POWERUP_WEIGHTS, SPAWN_INVULN, LOBBY_READY_TIMEOUT, LANDMARKS;
+  var TICK_RATE, TICK_MS, CRUISE_SPEED, BOOST_SPEED, ACCEL, TURN_RATE, PITCH_RATE, PITCH_MAX, PLANE_RADIUS, MAX_HP, BULLET_SPEED, BULLET_DAMAGE, BULLET_LIFE, BULLET_RADIUS, FIRE_COOLDOWN, RESPAWN_DELAY, BULLET_HIT_RADIUS, AIM_ASSIST_CONE, AIM_ASSIST_RANGE, AIM_ASSIST_TURN, ROUND_SECONDS, ROUND_INTERMISSION, MIN_PLAYERS, MAP_HALF, MAP_EDGE_SOFT, GROUND_Y, MIN_ALT, SPAWN_ALT, MAX_ALT, PICKUP_ALT_MIN, PICKUP_ALT_MAX, PICKUP_FIELD_RADIUS, SPAWN_REROLL, BOT_NAMES, COLOR_COUNT, ACCENT_COUNT, TRAIL_COUNT, LIVERY_COUNT, SKIN_COUNT, PICKUP_MAX, PICKUP_INTERVAL, PICKUP_RADIUS, POWERUP_DURATION, SHIELD_CHARGES, RAPID_FACTOR, SPREAD_ANGLE, AFTERBURNER_FACTOR, HOMING_TURN, POWERUP_TYPES, POWERUP_WEIGHTS, SPAWN_INVULN, LOBBY_READY_TIMEOUT, LANDMARKS;
   var init_constants = __esm({
     "src/shared/constants.ts"() {
       "use strict";
@@ -23,12 +23,16 @@
       PITCH_MAX = 0.5;
       PLANE_RADIUS = 16;
       MAX_HP = 100;
-      BULLET_SPEED = 215;
+      BULLET_SPEED = 322;
       BULLET_DAMAGE = 25;
-      BULLET_LIFE = 2.1;
+      BULLET_LIFE = 2.3;
       BULLET_RADIUS = 4;
       FIRE_COOLDOWN = 0.34;
       RESPAWN_DELAY = 2.5;
+      BULLET_HIT_RADIUS = 26;
+      AIM_ASSIST_CONE = 0.35;
+      AIM_ASSIST_RANGE = 700;
+      AIM_ASSIST_TURN = 0.55;
       ROUND_SECONDS = 150;
       ROUND_INTERMISSION = 8;
       MIN_PLAYERS = 4;
@@ -682,6 +686,28 @@
                 const desired = normalize(sub(getP(target.player), pos));
                 fwd = steerToward(fwd, desired, HOMING_TURN * dt);
               }
+            } else {
+              const ownerPlayer = this.players.get(b.owner);
+              if (ownerPlayer && !ownerPlayer.bot) {
+                let bestAssistDist = Infinity;
+                let assistTarget = null;
+                for (const [pid, p] of this.players) {
+                  if (!p.alive || pid === b.owner) continue;
+                  const toTarget = sub(getP(p), pos);
+                  const dist = len(toTarget);
+                  if (dist > AIM_ASSIST_RANGE) continue;
+                  const angle = angBetween(fwd, normalize(toTarget));
+                  if (angle > AIM_ASSIST_CONE) continue;
+                  if (dist < bestAssistDist) {
+                    bestAssistDist = dist;
+                    assistTarget = p;
+                  }
+                }
+                if (assistTarget) {
+                  const desired = normalize(sub(getP(assistTarget), pos));
+                  fwd = steerToward(fwd, desired, AIM_ASSIST_TURN * dt);
+                }
+              }
             }
             const prev = pos;
             pos = advance(pos, fwd, BULLET_SPEED * dt).p;
@@ -693,7 +719,7 @@
               for (const [pid, p] of this.players) {
                 if (!p.alive || pid === b.owner) continue;
                 const targetPos = getP(p);
-                const hitDist = PLANE_RADIUS + BULLET_RADIUS;
+                const hitDist = BULLET_HIT_RADIUS + BULLET_RADIUS;
                 if (segmentPointDistance(prev, pos, targetPos) > hitDist) continue;
                 const t = segmentPointT(prev, pos, targetPos);
                 if (t < bestT) {
@@ -2581,7 +2607,10 @@
         applyMode("playing");
         els.respawn.classList.add("hidden");
         els.inter.classList.add("hidden");
-        if (window.Input.isTouchDevice()) els.touch.classList.remove("hidden");
+        if (window.Input.isTouchDevice()) {
+          els.touch.classList.remove("hidden");
+          applyControlSchemeUI(window.Input.controlScheme);
+        }
         if (!engineStarted) {
           window.SFX.startEngine();
           engineStarted = true;
@@ -2719,6 +2748,10 @@
         const invertSteerEl = document.getElementById("set-invert-steer");
         if (invertPitchEl) invertPitchEl.checked = window.Input.invertPitch;
         if (invertSteerEl) invertSteerEl.checked = window.Input.invertSteer;
+        const schemeRadios = document.querySelectorAll('input[name="ctrl-scheme"]');
+        schemeRadios.forEach((r) => {
+          r.checked = r.value === window.Input.controlScheme;
+        });
       }
       function showSettings() {
         settingsOpen = true;
@@ -3011,7 +3044,10 @@
         els.respawn.classList.add("hidden");
         els.inter.classList.add("hidden");
         setStatus("");
-        if (window.Input.isTouchDevice()) els.touch.classList.remove("hidden");
+        if (window.Input.isTouchDevice()) {
+          els.touch.classList.remove("hidden");
+          applyControlSchemeUI(window.Input.controlScheme);
+        }
         if (!engineStarted) {
           window.SFX.startEngine();
           engineStarted = true;
@@ -3404,6 +3440,29 @@
         bind(els.dive, "dive");
         bind(els.boost, "boost");
         bind(els.fire, "fire");
+        const joystickBase = document.getElementById("joystick-base");
+        const joystickThumb = document.getElementById("joystick-thumb");
+        if (joystickBase && joystickThumb) {
+          window.Input.attachJoystick(joystickBase, joystickThumb);
+        }
+        const tiltCalBtn = document.getElementById("tilt-cal-btn");
+        if (tiltCalBtn) {
+          tiltCalBtn.addEventListener("pointerdown", (e) => {
+            e.preventDefault();
+            window.Input.calibrateTilt();
+            buzz(20);
+            tiltCalBtn.classList.add("pressed");
+            setTimeout(() => tiltCalBtn.classList.remove("pressed"), 120);
+          });
+        }
+      }
+      function applyControlSchemeUI(scheme) {
+        const dpadLeft = document.getElementById("dpad-left");
+        const joystickLeft = document.getElementById("joystick-left");
+        const tiltLeft = document.getElementById("tilt-left");
+        if (dpadLeft) dpadLeft.classList.toggle("hidden", scheme !== "dpad");
+        if (joystickLeft) joystickLeft.classList.toggle("hidden", scheme !== "joystick");
+        if (tiltLeft) tiltLeft.classList.toggle("hidden", scheme !== "tilt");
       }
       function togglePause() {
         if (mode === "playing") {
@@ -3437,6 +3496,11 @@
         if (window.SFX.stopLoops) window.SFX.stopLoops();
         if (window.SFX.startMenuAmbient) window.SFX.startMenuAmbient();
         engineStarted = false;
+        try {
+          const so = screen.orientation;
+          if (so && so.unlock) so.unlock();
+        } catch {
+        }
         wasAlive = true;
         deathTime = -1;
         countdownActive = false;
@@ -3506,6 +3570,14 @@
             });
           } catch {
           }
+        }
+        try {
+          const so = screen.orientation;
+          if (so && so.lock) {
+            so.lock("landscape").catch(() => {
+            });
+          }
+        } catch {
         }
         updateRotateOverlay();
       }
@@ -3783,6 +3855,49 @@
             }
           });
         }
+        try {
+          const saved = localStorage.getItem("smashcart.controls");
+          if (saved === "joystick" || saved === "tilt" || saved === "dpad") {
+            window.Input.controlScheme = saved;
+          }
+        } catch {
+        }
+        const schemeRadios = document.querySelectorAll('input[name="ctrl-scheme"]');
+        schemeRadios.forEach((r) => {
+          r.addEventListener("change", () => {
+            if (!r.checked) return;
+            const scheme = r.value;
+            window.SFX.uiClick();
+            if (scheme === "tilt") {
+              window.Input.attachTilt();
+              const DevOri = DeviceOrientationEvent;
+              if (typeof DevOri.requestPermission !== "function") {
+                window.Input.setControlScheme("tilt");
+                applyControlSchemeUI("tilt");
+              }
+            } else {
+              window.Input.setControlScheme(scheme);
+              applyControlSchemeUI(scheme);
+            }
+          });
+        });
+        window.Input.onSchemeChange = (scheme, msg) => {
+          applyControlSchemeUI(scheme);
+          schemeRadios.forEach((r) => {
+            r.checked = r.value === scheme;
+          });
+          const tiltMsg = document.getElementById("tilt-status-msg");
+          if (tiltMsg) {
+            if (msg) {
+              tiltMsg.textContent = msg;
+              tiltMsg.classList.remove("hidden");
+              setTimeout(() => tiltMsg.classList.add("hidden"), 4e3);
+            } else {
+              tiltMsg.classList.add("hidden");
+            }
+          }
+        };
+        applyControlSchemeUI(window.Input.controlScheme);
         els.joinCodeOpenBtn.addEventListener("click", () => {
           window.SFX.uiClick();
           openJoinCode();

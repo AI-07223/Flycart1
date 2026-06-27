@@ -11,12 +11,16 @@
   var PITCH_MAX = 0.5;
   var PLANE_RADIUS = 16;
   var MAX_HP = 100;
-  var BULLET_SPEED = 215;
+  var BULLET_SPEED = 322;
   var BULLET_DAMAGE = 25;
-  var BULLET_LIFE = 2.1;
+  var BULLET_LIFE = 2.3;
   var BULLET_RADIUS = 4;
   var FIRE_COOLDOWN = 0.34;
   var RESPAWN_DELAY = 2.5;
+  var BULLET_HIT_RADIUS = 26;
+  var AIM_ASSIST_CONE = 0.35;
+  var AIM_ASSIST_RANGE = 700;
+  var AIM_ASSIST_TURN = 0.55;
   var ROUND_SECONDS = 150;
   var ROUND_INTERMISSION = 8;
   var MIN_PLAYERS = 4;
@@ -634,6 +638,28 @@
             const desired = normalize(sub(getP(target.player), pos));
             fwd = steerToward(fwd, desired, HOMING_TURN * dt);
           }
+        } else {
+          const ownerPlayer = this.players.get(b.owner);
+          if (ownerPlayer && !ownerPlayer.bot) {
+            let bestAssistDist = Infinity;
+            let assistTarget = null;
+            for (const [pid, p] of this.players) {
+              if (!p.alive || pid === b.owner) continue;
+              const toTarget = sub(getP(p), pos);
+              const dist = len(toTarget);
+              if (dist > AIM_ASSIST_RANGE) continue;
+              const angle = angBetween(fwd, normalize(toTarget));
+              if (angle > AIM_ASSIST_CONE) continue;
+              if (dist < bestAssistDist) {
+                bestAssistDist = dist;
+                assistTarget = p;
+              }
+            }
+            if (assistTarget) {
+              const desired = normalize(sub(getP(assistTarget), pos));
+              fwd = steerToward(fwd, desired, AIM_ASSIST_TURN * dt);
+            }
+          }
         }
         const prev = pos;
         pos = advance(pos, fwd, BULLET_SPEED * dt).p;
@@ -645,7 +671,7 @@
           for (const [pid, p] of this.players) {
             if (!p.alive || pid === b.owner) continue;
             const targetPos = getP(p);
-            const hitDist = PLANE_RADIUS + BULLET_RADIUS;
+            const hitDist = BULLET_HIT_RADIUS + BULLET_RADIUS;
             if (segmentPointDistance(prev, pos, targetPos) > hitDist) continue;
             const t = segmentPointT(prev, pos, targetPos);
             if (t < bestT) {
