@@ -79,6 +79,8 @@
         connMenu: dollar("conn-menu"),
         bots: dollar("bots-check"),
         planeSwatches: dollar("plane-swatches"),
+        countdown: dollar("countdown"),
+        interLeave: dollar("intermission-leave"),
         // Slice 1 additions
         bootOverlay: dollar("boot-overlay"),
         fatalOverlay: dollar("fatal-overlay"),
@@ -115,6 +117,9 @@
       var inviteRoom = null;
       var inviteServer = null;
       var activeShareUrl = null;
+      var deathTime = -1;
+      var wasAlive = true;
+      var countdownActive = false;
       var currentLobbyCode = null;
       var currentLobbyServer = null;
       var SKINS = [16739179, 4833535, 9167690, 16765514, 12614655];
@@ -352,6 +357,8 @@
       function enterPlayingFromLobby() {
         prevPhase = "playing";
         prevHp = G.MAX_HP;
+        wasAlive = true;
+        deathTime = -1;
         applyMode("playing");
         els.respawn.classList.add("hidden");
         els.inter.classList.add("hidden");
@@ -362,6 +369,7 @@
         }
         if (window.SFX.stopMenuAmbient) window.SFX.stopMenuAmbient();
         window.SFX.startMusic();
+        runCountdown();
       }
       function setStatus(text = "") {
         els.status.textContent = text;
@@ -513,11 +521,9 @@
             els.menuLeaderboard.innerHTML = '<div class="lb-row muted">No scores yet</div>';
             return;
           }
-          const html = rows.slice(0, 5).map(
-            (entry, i) => `<div class="lb-row"><span>${i + 1}. ${escapeHtml(entry.name)}</span><span>${entry.score | 0}</span></div>`
-          ).join("");
-          els.leaderboard.innerHTML = html;
-          els.menuLeaderboard.innerHTML = html;
+          const makeRow = (entry, i) => `<div class="lb-row"><span>${i + 1}. ${escapeHtml(entry.name)}</span><span>${entry.score | 0}</span></div>`;
+          els.leaderboard.innerHTML = rows.slice(0, 5).map(makeRow).join("");
+          els.menuLeaderboard.innerHTML = rows.slice(0, 10).map(makeRow).join("");
         }).catch(() => {
           els.leaderboard.innerHTML = '<div class="lb-row muted">Leaderboard unavailable</div>';
           els.menuLeaderboard.innerHTML = '<div class="lb-row muted">Leaderboard unavailable</div>';
@@ -577,6 +583,8 @@
         }
         prevPhase = "playing";
         prevHp = G.MAX_HP;
+        wasAlive = true;
+        deathTime = -1;
         applyMode("playing");
         els.respawn.classList.add("hidden");
         els.inter.classList.add("hidden");
@@ -690,9 +698,23 @@
         const speed = local && local.active ? local.speed : me ? me.speed : 0;
         els.alt.textContent = String(Math.round(altitude));
         els.speed.textContent = String(Math.round(speed));
+        const isLowTime = state.phase === "playing" && state.timeLeft <= 10;
+        els.time.classList.toggle("low", isLowTime);
         if (me) {
           els.healthfill.style.width = Math.max(0, me.hp / G.MAX_HP * 100) + "%";
-          els.respawn.classList.toggle("hidden", me.alive);
+          if (!me.alive) {
+            if (wasAlive) {
+              deathTime = performance.now() / 1e3;
+              wasAlive = false;
+            }
+            const elapsed = performance.now() / 1e3 - deathTime;
+            const remaining = Math.max(0, Math.ceil(G.RESPAWN_DELAY - elapsed));
+            els.respawn.textContent = remaining > 0 ? `Shot down \u2014 respawning in ${remaining}\u2026` : "Shot down \u2014 respawning\u2026";
+            els.respawn.classList.remove("hidden");
+          } else {
+            wasAlive = true;
+            els.respawn.classList.add("hidden");
+          }
           if (me.alive && me.hp < prevHp) {
             els.vignette.classList.add("hit");
             setTimeout(() => els.vignette.classList.remove("hit"), 120);
@@ -700,7 +722,7 @@
           }
           els.vignette.classList.toggle("low", me.alive && me.hp > 0 && me.hp < 30);
           prevHp = me.hp;
-          if (me.power) {
+          if (me.power && me.power !== "repair") {
             const info = G.POWERUPS[me.power] || { label: me.power, icon: "\u2605", color: 16777215 };
             const left = typeof me.powerLeft === "number" ? me.powerLeft : G.POWERUP_DURATION;
             const pct = Math.max(0, Math.min(100, left / G.POWERUP_DURATION * 100));
@@ -718,8 +740,13 @@
           (p, i) => `<div class="lb-row ${p.id === myId ? "me" : ""}"><span>${i + 1}. ${escapeHtml(p.name)}${p.bot ? " \u{1F916}" : ""}</span><span>${p.score}</span></div>`
         ).join("");
         if (state.phase !== prevPhase) {
-          if (state.phase === "intermission") window.SFX.explosion();
-          else window.SFX.go();
+          if (state.phase === "intermission") {
+            window.SFX.explosion();
+          } else if (state.phase === "playing") {
+            runCountdown();
+          } else {
+            window.SFX.go();
+          }
           prevPhase = state.phase;
         }
         if (state.phase === "intermission") {
@@ -741,6 +768,41 @@
         els.callout.classList.remove("show");
         void els.callout.offsetWidth;
         els.callout.classList.add("show");
+      }
+      function runCountdown() {
+        if (countdownActive) return;
+        countdownActive = true;
+        const steps = ["3", "2", "1", "GO!"];
+        let i = 0;
+        function showStep() {
+          if (i >= steps.length) {
+            countdownActive = false;
+            els.countdown.classList.remove("pop", "go");
+            els.countdown.textContent = "";
+            return;
+          }
+          const label = steps[i];
+          const isGo = label === "GO!";
+          els.countdown.textContent = label;
+          els.countdown.classList.toggle("go", isGo);
+          els.countdown.classList.remove("pop");
+          void els.countdown.offsetWidth;
+          els.countdown.classList.add("pop");
+          if (isGo) {
+            try {
+              window.SFX.go();
+            } catch {
+            }
+          } else {
+            try {
+              window.SFX.uiClick && window.SFX.uiClick();
+            } catch {
+            }
+          }
+          i++;
+          setTimeout(showStep, isGo ? 900 : 850);
+        }
+        showStep();
       }
       function streakName(streakSize) {
         return streakSize >= 6 ? "GODLIKE!" : streakSize >= 5 ? "UNSTOPPABLE!" : streakSize >= 4 ? "RAMPAGE!" : streakSize >= 3 ? "TRIPLE HIT!" : "DOUBLE HIT!";
@@ -816,6 +878,12 @@
         if (window.SFX.stopLoops) window.SFX.stopLoops();
         if (window.SFX.startMenuAmbient) window.SFX.startMenuAmbient();
         engineStarted = false;
+        wasAlive = true;
+        deathTime = -1;
+        countdownActive = false;
+        els.countdown.classList.remove("pop", "go");
+        els.countdown.textContent = "";
+        els.time.classList.remove("low");
         applyMode("menu");
         els.touch.classList.add("hidden");
         els.share.classList.add("hidden");
@@ -1133,6 +1201,10 @@
         });
         els.joinCodeModal.addEventListener("click", (e) => {
           if (e.target === els.joinCodeModal) closeJoinCode();
+        });
+        els.interLeave.addEventListener("click", () => {
+          window.SFX.uiClick();
+          resetToMenu();
         });
         els.lobbyLeaveBtn.addEventListener("click", () => {
           window.SFX.uiClick();

@@ -67,6 +67,8 @@ const els = {
   connMenu: dollar("conn-menu") as HTMLButtonElement,
   bots: dollar("bots-check") as HTMLInputElement,
   planeSwatches: dollar("plane-swatches"),
+  countdown: dollar("countdown"),
+  interLeave: dollar("intermission-leave") as HTMLButtonElement,
   // Slice 1 additions
   bootOverlay: dollar("boot-overlay"),
   fatalOverlay: dollar("fatal-overlay"),
@@ -104,6 +106,11 @@ let selectedSkin = 0;
 let inviteRoom: string | null = null;
 let inviteServer: string | null = null;
 let activeShareUrl: string | null = null;
+// Respawn countdown tracking
+let deathTime: number = -1;
+let wasAlive: boolean = true;
+// Round-start countdown
+let countdownActive = false;
 // Slice 6: tracks the code + origin for the active private lobby
 let currentLobbyCode: string | null = null;
 let currentLobbyServer: string | null = null;
@@ -373,6 +380,8 @@ function renderLobbyRoster(): void {
 function enterPlayingFromLobby(): void {
   prevPhase = "playing";
   prevHp = G.MAX_HP;
+  wasAlive = true;
+  deathTime = -1;
   applyMode("playing");
   els.respawn.classList.add("hidden");
   els.inter.classList.add("hidden");
@@ -383,6 +392,7 @@ function enterPlayingFromLobby(): void {
   }
   if (window.SFX.stopMenuAmbient) window.SFX.stopMenuAmbient();
   window.SFX.startMusic();
+  runCountdown(); // 3-2-1-GO! on a fresh lobby match start (prevPhase is pre-set, so the loop won't)
 }
 
 function setStatus(text = ""): void {
@@ -570,11 +580,10 @@ function fetchLeaderboard(): void {
         els.menuLeaderboard.innerHTML = '<div class="lb-row muted">No scores yet</div>';
         return;
       }
-      const html = rows.slice(0, 5).map((entry: any, i: number) =>
-        `<div class="lb-row"><span>${i + 1}. ${escapeHtml(entry.name)}</span><span>${entry.score | 0}</span></div>`
-      ).join("");
-      els.leaderboard.innerHTML = html;
-      els.menuLeaderboard.innerHTML = html;
+      const makeRow = (entry: any, i: number) =>
+        `<div class="lb-row"><span>${i + 1}. ${escapeHtml(entry.name)}</span><span>${entry.score | 0}</span></div>`;
+      els.leaderboard.innerHTML = rows.slice(0, 5).map(makeRow).join("");
+      els.menuLeaderboard.innerHTML = rows.slice(0, 10).map(makeRow).join("");
     })
     .catch(() => {
       els.leaderboard.innerHTML = '<div class="lb-row muted">Leaderboard unavailable</div>';
@@ -643,6 +652,8 @@ async function startGame(code: string, serverOrigin: string | null = null): Prom
 
   prevPhase = "playing";
   prevHp = G.MAX_HP;
+  wasAlive = true;
+  deathTime = -1;
   applyMode("playing");
   els.respawn.classList.add("hidden");
   els.inter.classList.add("hidden");
@@ -793,9 +804,30 @@ function updateHud(state: any, myId: string): void {
   els.alt.textContent = String(Math.round(altitude));
   els.speed.textContent = String(Math.round(speed));
 
+  // Low-time warning: pulse red when <= 10s remain during playing phase
+  const isLowTime = state.phase === "playing" && state.timeLeft <= 10;
+  els.time.classList.toggle("low", isLowTime);
+
   if (me) {
     els.healthfill.style.width = Math.max(0, (me.hp / G.MAX_HP) * 100) + "%";
-    els.respawn.classList.toggle("hidden", me.alive);
+
+    // Respawn countdown
+    if (!me.alive) {
+      // Detect alive->dead transition
+      if (wasAlive) {
+        deathTime = performance.now() / 1000;
+        wasAlive = false;
+      }
+      const elapsed = performance.now() / 1000 - deathTime;
+      const remaining = Math.max(0, Math.ceil(G.RESPAWN_DELAY - elapsed));
+      els.respawn.textContent = remaining > 0
+        ? `Shot down — respawning in ${remaining}…`
+        : "Shot down — respawning…";
+      els.respawn.classList.remove("hidden");
+    } else {
+      wasAlive = true;
+      els.respawn.classList.add("hidden");
+    }
 
     if (me.alive && me.hp < prevHp) {
       els.vignette.classList.add("hit");
@@ -805,7 +837,8 @@ function updateHud(state: any, myId: string): void {
     els.vignette.classList.toggle("low", me.alive && me.hp > 0 && me.hp < 30);
     prevHp = me.hp;
 
-    if (me.power) {
+    // Power chip — hide for 'repair' (instantaneous, no timer bar meaningful)
+    if (me.power && me.power !== "repair") {
       const info = G.POWERUPS[me.power] || { label: me.power, icon: "★", color: 0xffffff };
       const left = typeof me.powerLeft === "number" ? me.powerLeft : G.POWERUP_DURATION;
       const pct = Math.max(0, Math.min(100, (left / G.POWERUP_DURATION) * 100));
@@ -824,9 +857,17 @@ function updateHud(state: any, myId: string): void {
     `<div class="lb-row ${p.id === myId ? "me" : ""}"><span>${i + 1}. ${escapeHtml(p.name)}${p.bot ? " 🤖" : ""}</span><span>${p.score}</span></div>`
   ).join("");
 
+  // Phase transition detection
   if (state.phase !== prevPhase) {
-    if (state.phase === "intermission") window.SFX.explosion();
-    else window.SFX.go();
+    if (state.phase === "intermission") {
+      window.SFX.explosion();
+    } else if (state.phase === "playing") {
+      // Transitioning INTO playing — fire the 3-2-1-GO! countdown
+      // (SFX.go() is called inside runCountdown on "GO!" step)
+      runCountdown();
+    } else {
+      window.SFX.go();
+    }
     prevPhase = state.phase;
   }
 
@@ -850,6 +891,36 @@ function showCallout(text: string): void {
   els.callout.classList.remove("show");
   void els.callout.offsetWidth;
   els.callout.classList.add("show");
+}
+
+function runCountdown(): void {
+  if (countdownActive) return;
+  countdownActive = true;
+  const steps = ["3", "2", "1", "GO!"];
+  let i = 0;
+  function showStep(): void {
+    if (i >= steps.length) {
+      countdownActive = false;
+      els.countdown.classList.remove("pop", "go");
+      els.countdown.textContent = "";
+      return;
+    }
+    const label = steps[i];
+    const isGo = label === "GO!";
+    els.countdown.textContent = label;
+    els.countdown.classList.toggle("go", isGo);
+    els.countdown.classList.remove("pop");
+    void els.countdown.offsetWidth;
+    els.countdown.classList.add("pop");
+    if (isGo) {
+      try { window.SFX.go(); } catch {}
+    } else {
+      try { window.SFX.uiClick && window.SFX.uiClick(); } catch {}
+    }
+    i++;
+    setTimeout(showStep, isGo ? 900 : 850);
+  }
+  showStep();
 }
 
 function streakName(streakSize: number): string {
@@ -931,6 +1002,13 @@ function resetToMenu(): void {
   if (window.SFX.stopLoops) window.SFX.stopLoops();
   if (window.SFX.startMenuAmbient) window.SFX.startMenuAmbient();
   engineStarted = false;
+  // Reset respawn / countdown tracking
+  wasAlive = true;
+  deathTime = -1;
+  countdownActive = false;
+  els.countdown.classList.remove("pop", "go");
+  els.countdown.textContent = "";
+  els.time.classList.remove("low");
   applyMode("menu");
   els.touch.classList.add("hidden");
   els.share.classList.add("hidden");
@@ -1237,6 +1315,12 @@ function init(): void {
   // Click-outside to close join modal
   els.joinCodeModal.addEventListener("click", (e: MouseEvent) => {
     if (e.target === els.joinCodeModal) closeJoinCode();
+  });
+
+  // Intermission leave button
+  els.interLeave.addEventListener("click", () => {
+    window.SFX.uiClick();
+    resetToMenu();
   });
 
   // Lobby buttons (Slice 6)
