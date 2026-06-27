@@ -414,7 +414,7 @@ kbd {
   border-radius: 10px;
   background: var(--panel);
   box-shadow: var(--shadow);
-  z-index: 12;
+  z-index: 25; /* above lobby-screen (20) so it shows while waiting in lobby */
 }
 .share-copy {
   display: flex;
@@ -782,6 +782,80 @@ body.touch-device #share-bar {
 #lobby-start-btn {
   background: var(--accent);
   color: #1b1400;
+}
+#lobby-ready-btn.active {
+  background: #2d7a3e;
+  color: #d8ffe0;
+  box-shadow: 0 5px 0 #1a4a26;
+}
+
+/* Lobby roster rows */
+.lobby-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+.lobby-row--me {
+  background: rgba(255, 203, 5, 0.08);
+  border-color: rgba(255, 203, 5, 0.22);
+}
+.lobby-row-name {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 14px;
+  font-weight: 600;
+}
+.lobby-row-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+/* Small badge chips inside roster rows */
+.lobby-badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+}
+.lobby-badge--host {
+  background: rgba(255, 203, 5, 0.18);
+  border: 1px solid rgba(255, 203, 5, 0.32);
+  color: #ffe28b;
+}
+.lobby-badge--bot {
+  background: rgba(255, 255, 255, 0.09);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #9caac0;
+}
+
+/* Ready checkmark indicator */
+.lobby-ready-mark {
+  font-size: 16px;
+  font-weight: 700;
+  color: #5a6a80;
+  width: 22px;
+  text-align: center;
+}
+.lobby-ready-mark.is-ready {
+  color: #4cd87a;
+}
+
+/* Kick button — compact, secondary style */
+.lobby-kick-btn {
+  padding: 4px 10px;
+  font-size: 12px;
+  box-shadow: 0 3px 0 #1a2034;
 }
 
 /* ─── SETTINGS SCREEN ───────────────────────────────────────────────────────── */

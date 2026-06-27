@@ -115,6 +115,8 @@
       var inviteRoom = null;
       var inviteServer = null;
       var activeShareUrl = null;
+      var currentLobbyCode = null;
+      var currentLobbyServer = null;
       var SKINS = [16739179, 4833535, 9167690, 16765514, 12614655];
       try {
         const saved = parseInt(localStorage.getItem("smashcart.skin") || "", 10);
@@ -299,6 +301,58 @@
         if (!activeShareUrl || els.qrBtn.disabled) return;
         els.shareQrOverlay.classList.remove("hidden");
       }
+      function renderLobbyRoster() {
+        const myId = window.Net.sessionId;
+        const hostId = window.Net.getHostId();
+        const roster = window.Net.getRosterSnapshot();
+        if (!roster.length) {
+          els.lobbyRoster.innerHTML = '<p class="muted">Waiting for players\u2026</p>';
+          return;
+        }
+        els.lobbyRoster.innerHTML = roster.map((p) => {
+          const isMe = p.id === myId;
+          const isHost = p.id === hostId;
+          const isLocalHost = myId === hostId;
+          const hostBadge = isHost ? '<span class="lobby-badge lobby-badge--host">HOST</span>' : "";
+          const botBadge = p.bot ? '<span class="lobby-badge lobby-badge--bot">BOT</span>' : "";
+          const readyMark = !p.bot ? `<span class="lobby-ready-mark ${p.ready ? "is-ready" : ""}">${p.ready ? "\u2713" : "\u25CB"}</span>` : "";
+          const kickBtn = isLocalHost && !isMe && !p.bot ? `<button class="lobby-kick-btn secondary" data-target="${escapeHtml(p.id)}" title="Kick">\u2715</button>` : "";
+          return `<div class="lobby-row${isMe ? " lobby-row--me" : ""}">
+  <span class="lobby-row-name">${hostBadge}${botBadge}${escapeHtml(p.name)}</span>
+  <span class="lobby-row-right">${readyMark}${kickBtn}</span>
+</div>`;
+        }).join("");
+        els.lobbyRoster.querySelectorAll(".lobby-kick-btn").forEach((btn) => {
+          btn.addEventListener("click", () => {
+            const targetId = btn.dataset.target;
+            if (targetId) {
+              window.SFX.uiClick();
+              window.Net.sendHostKick(targetId);
+            }
+          });
+        });
+        const me = roster.find((p) => p.id === myId);
+        if (me) {
+          els.lobbyReadyBtn.textContent = me.ready ? "Unready" : "Ready";
+          els.lobbyReadyBtn.classList.toggle("active", me.ready);
+        }
+        const iAmHost = myId === hostId;
+        els.lobbyStartBtn.classList.toggle("hidden", !iAmHost);
+      }
+      function enterPlayingFromLobby() {
+        prevPhase = "playing";
+        prevHp = G.MAX_HP;
+        applyMode("playing");
+        els.respawn.classList.add("hidden");
+        els.inter.classList.add("hidden");
+        if (window.Input.isTouchDevice()) els.touch.classList.remove("hidden");
+        if (!engineStarted) {
+          window.SFX.startEngine();
+          engineStarted = true;
+        }
+        if (window.SFX.stopMenuAmbient) window.SFX.stopMenuAmbient();
+        window.SFX.startMusic();
+      }
       function setStatus(text = "") {
         els.status.textContent = text;
       }
@@ -457,6 +511,9 @@
       async function startGame(code, serverOrigin = null) {
         let roomCode = code;
         if (roomCode === "PUBLIC" && !botsEnabled) roomCode = "NOBOTS";
+        if (roomCode !== "PUBLIC" && roomCode !== "NOBOTS") {
+          return joinLobby(roomCode, serverOrigin);
+        }
         if (serverOrigin) {
           const normalized = normalizeServerOrigin(serverOrigin);
           if (!normalized) {
@@ -497,14 +554,63 @@
         }
         if (window.SFX.stopMenuAmbient) window.SFX.stopMenuAmbient();
         window.SFX.startMusic();
-        if (roomCode !== "PUBLIC" && roomCode !== "NOBOTS") {
-          setInviteState(roomCode, serverOrigin);
-          updateShareInvite(roomCode, serverOrigin);
-          els.share.classList.remove("hidden");
-        } else {
-          setInviteState(null, null);
-          clearShareInvite();
-          els.share.classList.add("hidden");
+        setInviteState(null, null);
+        clearShareInvite();
+        els.share.classList.add("hidden");
+      }
+      async function joinLobby(code, serverOrigin = null) {
+        if (serverOrigin) {
+          const normalized = normalizeServerOrigin(serverOrigin);
+          if (!normalized) {
+            setStatus("The selected server address is not valid.");
+            return;
+          }
+          if (secureMismatch(normalized)) {
+            setStatus("This HTTPS page cannot connect to that insecure LAN server. Open the game from the hotspot host address instead.");
+            return;
+          }
+          serverOrigin = normalized;
+          saveLanOrigin(serverOrigin);
+          els.lanServer.value = toPageOrigin(serverOrigin);
+        }
+        window.SFX.unlock();
+        enterImmersive();
+        const name = (els.name.value || "Pilot").slice(0, 14);
+        setStatus("Connecting\u2026");
+        setBusy(true);
+        try {
+          await window.Net.connect(name, code, selectedSkin, serverOrigin);
+        } catch (e) {
+          setStatus("Could not connect: " + (e && e.message ? e.message : e));
+          setBusy(false);
+          return;
+        }
+        setStatus("");
+        setBusy(false);
+        currentLobbyCode = code;
+        currentLobbyServer = serverOrigin;
+        setInviteState(code, serverOrigin);
+        updateShareInvite(code, serverOrigin);
+        els.share.classList.remove("hidden");
+        window.Net.onStateChange = onLobbyStateChange;
+        els.lobbyTitle.textContent = `Room ${code}`;
+        renderLobbyRoster();
+        applyMode("lobby");
+        const phase = window.Net.getPhase();
+        if (phase === "playing") {
+          window.Net.onStateChange = null;
+          enterPlayingFromLobby();
+        }
+      }
+      function onLobbyStateChange() {
+        const phase = window.Net.getPhase();
+        if (mode === "lobby") {
+          renderLobbyRoster();
+          if (phase === "playing") {
+            window.Net.onStateChange = null;
+            enterPlayingFromLobby();
+          }
+        } else if (mode === "playing" || mode === "paused") {
         }
       }
       function loop(ts) {
@@ -532,6 +638,8 @@
               lastFireSnd = ts / 1e3;
             }
           }
+        } else if (mode === "lobby" && room && room.state) {
+          window.Renderer.draw(room.state, window.Net.sessionId);
         } else if (mode === "menu") {
           window.Renderer.drawMenu(dt, selectedSkin);
         } else if (room && room.state) {
@@ -663,6 +771,9 @@
         els.mute.textContent = muted ? "\u{1F507}" : "\u{1F50A}";
       }
       function resetToMenu() {
+        window.Net.onStateChange = null;
+        currentLobbyCode = null;
+        currentLobbyServer = null;
         try {
           window.Net.leave();
         } catch {
@@ -676,6 +787,8 @@
         els.inter.classList.add("hidden");
         els.respawn.classList.add("hidden");
         els.powerChip.classList.add("hidden");
+        els.lobbyTitle.textContent = "Private Room";
+        els.lobbyRoster.innerHTML = '<p class="muted">Waiting for players\u2026</p>';
         hideSettings();
         closeJoinCode();
         hideShareQr();
@@ -696,7 +809,14 @@
           if (mode !== "lost") return;
           if (ok) {
             if (window.SFX.resume) window.SFX.resume();
-            applyMode("playing");
+            const phase = window.Net.getPhase();
+            if (phase === "lobby") {
+              window.Net.onStateChange = onLobbyStateChange;
+              renderLobbyRoster();
+              applyMode("lobby");
+            } else {
+              applyMode("playing");
+            }
           } else {
             els.connMsg.textContent = "Couldn't reconnect.";
             els.connRetry.classList.remove("hidden");
@@ -818,7 +938,14 @@
           window.Net.tryReconnect().then((ok) => {
             if (ok) {
               if (window.SFX.resume) window.SFX.resume();
-              applyMode("playing");
+              const phase = window.Net.getPhase();
+              if (phase === "lobby") {
+                window.Net.onStateChange = onLobbyStateChange;
+                renderLobbyRoster();
+                applyMode("lobby");
+              } else {
+                applyMode("playing");
+              }
             } else {
               els.connMsg.textContent = "Still down.";
               els.connRetry.classList.remove("hidden");
@@ -887,14 +1014,16 @@
         });
         els.lobbyLeaveBtn.addEventListener("click", () => {
           window.SFX.uiClick();
+          window.Net.onStateChange = null;
           resetToMenu();
         });
         els.lobbyReadyBtn.addEventListener("click", () => {
           window.SFX.uiClick();
-          els.lobbyReadyBtn.classList.toggle("active");
+          window.Net.sendReady();
         });
         els.lobbyStartBtn.addEventListener("click", () => {
           window.SFX.uiClick();
+          window.Net.sendHostStart();
         });
         document.addEventListener("visibilitychange", () => {
           if (document.hidden) {

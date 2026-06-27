@@ -184,6 +184,7 @@ interface NetAPI {
   onKill: ((msg: any) => void) | null;
   onPickup: ((msg: any) => void) | null;
   onDisconnect: ((info: any) => void) | null;
+  onStateChange: (() => void) | null;
   reconnectToken: string | null;
   endpoint(origin?: string | null): string;
   connect(name: string, code: string, skin: number, serverOrigin?: string | null): Promise<any>;
@@ -191,6 +192,13 @@ interface NetAPI {
   sample(renderTime: number): Record<string, SnapshotPlayer>;
   sendInput(turn: number, climb: number, boost: boolean, fire: boolean): void;
   setName(name: string): void;
+  // Slice 6 lobby methods
+  sendReady(): void;
+  sendHostStart(): void;
+  sendHostKick(targetId: string): void;
+  getPhase(): string | null;
+  getHostId(): string | null;
+  getRosterSnapshot(): Array<{ id: string; name: string; ready: boolean; bot: boolean; score: number }>;
   leave(): void;
 }
 

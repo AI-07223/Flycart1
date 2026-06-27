@@ -76,6 +76,7 @@
         onKill: null,
         onPickup: null,
         onDisconnect: null,
+        onStateChange: null,
         reconnectToken: null,
         _leaving: false,
         _lastSendAt: 0,
@@ -123,7 +124,10 @@
           room.onMessage("pickup", (msg) => {
             if (this.onPickup) this.onPickup(msg);
           });
-          room.onStateChange(() => this._snap());
+          room.onStateChange(() => {
+            this._snap();
+            if (this.onStateChange) this.onStateChange();
+          });
           room.onError((code, message) => {
             if (!this._leaving && this.onDisconnect) this.onDisconnect({ type: "error", code, message });
           });
@@ -327,6 +331,45 @@
         },
         setName(name) {
           if (this.room) this.room.send("setName", name);
+        },
+        // ── Lobby helpers (Slice 6) ──────────────────────────────────────────────
+        /** Toggle own ready state. Server authoritative — drives UI via onStateChange. */
+        sendReady() {
+          if (this.room) this.room.send("setReady");
+        },
+        /** Host-only: force-start the match. No-op if not host. */
+        sendHostStart() {
+          if (this.room) this.room.send("hostStart");
+        },
+        /** Host-only: kick a player by their sessionId. */
+        sendHostKick(targetId) {
+          if (this.room) this.room.send("hostKick", { targetId });
+        },
+        /** Current room phase ('lobby' | 'playing' | 'intermission'), or null if not connected. */
+        getPhase() {
+          return this.room && this.room.state ? this.room.state.phase || null : null;
+        },
+        /** hostId from server state, or null. */
+        getHostId() {
+          return this.room && this.room.state ? this.room.state.hostId || null : null;
+        },
+        /**
+         * Snapshot of all players for lobby roster rendering.
+         * Returns an array of plain objects so callers don't hold live MapSchema refs.
+         */
+        getRosterSnapshot() {
+          if (!this.room || !this.room.state || !this.room.state.players) return [];
+          const out = [];
+          this.room.state.players.forEach((p, id) => {
+            out.push({
+              id,
+              name: p.name || "Pilot",
+              ready: !!p.ready,
+              bot: !!p.bot,
+              score: p.score || 0
+            });
+          });
+          return out;
         },
         leave() {
           this._leaving = true;

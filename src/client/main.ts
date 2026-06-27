@@ -104,6 +104,9 @@ let selectedSkin = 0;
 let inviteRoom: string | null = null;
 let inviteServer: string | null = null;
 let activeShareUrl: string | null = null;
+// Slice 6: tracks the code + origin for the active private lobby
+let currentLobbyCode: string | null = null;
+let currentLobbyServer: string | null = null;
 
 const SKINS = [0xff6b6b, 0x49c0ff, 0x8be34a, 0xffd24a, 0xc07bff];
 
@@ -305,6 +308,77 @@ function showShareQr(): void {
   els.shareQrOverlay.classList.remove("hidden");
 }
 
+// ─── LOBBY ROSTER ────────────────────────────────────────────────────────────
+function renderLobbyRoster(): void {
+  const myId = window.Net.sessionId;
+  const hostId = window.Net.getHostId();
+  const roster = window.Net.getRosterSnapshot();
+
+  if (!roster.length) {
+    els.lobbyRoster.innerHTML = '<p class="muted">Waiting for players…</p>';
+    return;
+  }
+
+  els.lobbyRoster.innerHTML = roster.map((p) => {
+    const isMe = p.id === myId;
+    const isHost = p.id === hostId;
+    const isLocalHost = myId === hostId;
+
+    const hostBadge = isHost
+      ? '<span class="lobby-badge lobby-badge--host">HOST</span>'
+      : '';
+    const botBadge = p.bot
+      ? '<span class="lobby-badge lobby-badge--bot">BOT</span>'
+      : '';
+    const readyMark = !p.bot
+      ? `<span class="lobby-ready-mark ${p.ready ? 'is-ready' : ''}">${p.ready ? '✓' : '○'}</span>`
+      : '';
+    const kickBtn = (isLocalHost && !isMe && !p.bot)
+      ? `<button class="lobby-kick-btn secondary" data-target="${escapeHtml(p.id)}" title="Kick">✕</button>`
+      : '';
+
+    return `<div class="lobby-row${isMe ? ' lobby-row--me' : ''}">
+  <span class="lobby-row-name">${hostBadge}${botBadge}${escapeHtml(p.name)}</span>
+  <span class="lobby-row-right">${readyMark}${kickBtn}</span>
+</div>`;
+  }).join('');
+
+  // Wire kick buttons (re-attached every render since innerHTML is replaced)
+  els.lobbyRoster.querySelectorAll<HTMLButtonElement>('.lobby-kick-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const targetId = btn.dataset.target;
+      if (targetId) { window.SFX.uiClick(); window.Net.sendHostKick(targetId); }
+    });
+  });
+
+  // Update ready button label from server state (not optimistic)
+  const me = roster.find((p) => p.id === myId);
+  if (me) {
+    els.lobbyReadyBtn.textContent = me.ready ? 'Unready' : 'Ready';
+    els.lobbyReadyBtn.classList.toggle('active', me.ready);
+  }
+
+  // Show/hide start button — host only
+  const iAmHost = myId === hostId;
+  els.lobbyStartBtn.classList.toggle('hidden', !iAmHost);
+}
+
+// Transition from lobby to in-game (called when server phase flips to 'playing')
+function enterPlayingFromLobby(): void {
+  prevPhase = "playing";
+  prevHp = G.MAX_HP;
+  applyMode("playing");
+  els.respawn.classList.add("hidden");
+  els.inter.classList.add("hidden");
+  if (window.Input.isTouchDevice()) els.touch.classList.remove("hidden");
+  if (!engineStarted) {
+    window.SFX.startEngine();
+    engineStarted = true;
+  }
+  if (window.SFX.stopMenuAmbient) window.SFX.stopMenuAmbient();
+  window.SFX.startMusic();
+}
+
 function setStatus(text = ""): void {
   els.status.textContent = text;
 }
@@ -490,9 +564,17 @@ function buildPlanePicker(): void {
   });
 }
 
+// ─── PUBLIC QUICK-PLAY (unchanged path) ──────────────────────────────────────
 async function startGame(code: string, serverOrigin: string | null = null): Promise<void> {
   let roomCode = code;
   if (roomCode === "PUBLIC" && !botsEnabled) roomCode = "NOBOTS";
+
+  // Only PUBLIC and NOBOTS go through the instant-playing path.
+  // Private codes (anything else) go through the lobby.
+  if (roomCode !== "PUBLIC" && roomCode !== "NOBOTS") {
+    return joinLobby(roomCode, serverOrigin);
+  }
+
   if (serverOrigin) {
     const normalized = normalizeServerOrigin(serverOrigin);
     if (!normalized) {
@@ -538,14 +620,91 @@ async function startGame(code: string, serverOrigin: string | null = null): Prom
   if (window.SFX.stopMenuAmbient) window.SFX.stopMenuAmbient();
   window.SFX.startMusic();
 
-  if (roomCode !== "PUBLIC" && roomCode !== "NOBOTS") {
-    setInviteState(roomCode, serverOrigin);
-    updateShareInvite(roomCode, serverOrigin);
-    els.share.classList.remove("hidden");
-  } else {
-    setInviteState(null, null);
-    clearShareInvite();
-    els.share.classList.add("hidden");
+  // Public rooms have no invite share bar
+  setInviteState(null, null);
+  clearShareInvite();
+  els.share.classList.add("hidden");
+}
+
+// ─── PRIVATE LOBBY PATH ───────────────────────────────────────────────────────
+// Called for any non-PUBLIC, non-NOBOTS code: creates or joins via Colyseus
+// and lands in mode='lobby'. The 3D scene keeps drawing behind the lobby card.
+async function joinLobby(code: string, serverOrigin: string | null = null): Promise<void> {
+  if (serverOrigin) {
+    const normalized = normalizeServerOrigin(serverOrigin);
+    if (!normalized) {
+      setStatus("The selected server address is not valid.");
+      return;
+    }
+    if (secureMismatch(normalized)) {
+      setStatus("This HTTPS page cannot connect to that insecure LAN server. Open the game from the hotspot host address instead.");
+      return;
+    }
+    serverOrigin = normalized;
+    saveLanOrigin(serverOrigin);
+    els.lanServer.value = toPageOrigin(serverOrigin);
+  }
+
+  window.SFX.unlock();
+  enterImmersive();
+
+  const name = (els.name.value || "Pilot").slice(0, 14);
+  setStatus("Connecting…");
+  setBusy(true);
+
+  try {
+    await window.Net.connect(name, code, selectedSkin, serverOrigin);
+  } catch (e: any) {
+    setStatus("Could not connect: " + (e && e.message ? e.message : e));
+    setBusy(false);
+    return;
+  }
+
+  setStatus("");
+  setBusy(false);
+
+  currentLobbyCode = code;
+  currentLobbyServer = serverOrigin;
+
+  // Show the invite share bar so the host can share the link immediately
+  setInviteState(code, serverOrigin);
+  updateShareInvite(code, serverOrigin);
+  els.share.classList.remove("hidden");
+
+  // Wire the state-change callback so roster and phase transitions are reactive
+  window.Net.onStateChange = onLobbyStateChange;
+
+  // Update lobby title
+  els.lobbyTitle.textContent = `Room ${code}`;
+
+  // Initial roster render
+  renderLobbyRoster();
+
+  applyMode("lobby");
+
+  // If the server already reports 'playing' by the time we connect (e.g. late
+  // join after host force-started), skip straight to playing.
+  const phase = window.Net.getPhase();
+  if (phase === "playing") {
+    window.Net.onStateChange = null;
+    enterPlayingFromLobby();
+  }
+}
+
+// Called every time the Colyseus state changes while in the lobby
+function onLobbyStateChange(): void {
+  const phase = window.Net.getPhase();
+
+  if (mode === "lobby") {
+    renderLobbyRoster();
+    if (phase === "playing") {
+      // Server flipped to playing — everyone enters the game
+      window.Net.onStateChange = null;
+      enterPlayingFromLobby();
+    }
+  } else if (mode === "playing" || mode === "paused") {
+    // Already playing — normal state changes are handled by the render loop
+    // (updateHud). Nothing extra needed here.
   }
 }
 
@@ -577,6 +736,9 @@ function loop(ts: number): void {
         lastFireSnd = ts / 1000;
       }
     }
+  } else if (mode === "lobby" && room && room.state) {
+    // Draw the 3D scene behind the lobby card; no input sent in lobby
+    window.Renderer.draw(room.state, window.Net.sessionId);
   } else if (mode === "menu") {
     window.Renderer.drawMenu(dt, selectedSkin);
   } else if (room && room.state) {
@@ -725,6 +887,9 @@ function toggleMute(): void {
 }
 
 function resetToMenu(): void {
+  window.Net.onStateChange = null;
+  currentLobbyCode = null;
+  currentLobbyServer = null;
   try { window.Net.leave(); } catch {}
   if (window.SFX.stopLoops) window.SFX.stopLoops();
   if (window.SFX.startMenuAmbient) window.SFX.startMenuAmbient();
@@ -735,6 +900,8 @@ function resetToMenu(): void {
   els.inter.classList.add("hidden");
   els.respawn.classList.add("hidden");
   els.powerChip.classList.add("hidden");
+  els.lobbyTitle.textContent = "Private Room";
+  els.lobbyRoster.innerHTML = '<p class="muted">Waiting for players…</p>';
   hideSettings();
   closeJoinCode();
   hideShareQr();
@@ -756,7 +923,16 @@ function onDisconnect(): void {
     if (mode !== "lost") return;
     if (ok) {
       if (window.SFX.resume) window.SFX.resume();
-      applyMode("playing");
+      // Land in the correct mode based on current server phase
+      const phase = window.Net.getPhase();
+      if (phase === "lobby") {
+        // Re-wire the state-change callback and return to lobby
+        window.Net.onStateChange = onLobbyStateChange;
+        renderLobbyRoster();
+        applyMode("lobby");
+      } else {
+        applyMode("playing");
+      }
     } else {
       els.connMsg.textContent = "Couldn't reconnect.";
       els.connRetry.classList.remove("hidden");
@@ -878,7 +1054,14 @@ function init(): void {
     window.Net.tryReconnect().then((ok) => {
       if (ok) {
         if (window.SFX.resume) window.SFX.resume();
-        applyMode("playing");
+        const phase = window.Net.getPhase();
+        if (phase === "lobby") {
+          window.Net.onStateChange = onLobbyStateChange;
+          renderLobbyRoster();
+          applyMode("lobby");
+        } else {
+          applyMode("playing");
+        }
       } else {
         els.connMsg.textContent = "Still down.";
         els.connRetry.classList.remove("hidden");
@@ -954,18 +1137,20 @@ function init(): void {
     if (e.target === els.joinCodeModal) closeJoinCode();
   });
 
-  // Lobby buttons (scaffold — netcode wired in Slice 6)
+  // Lobby buttons (Slice 6)
   els.lobbyLeaveBtn.addEventListener("click", () => {
     window.SFX.uiClick();
+    window.Net.onStateChange = null;
     resetToMenu();
   });
   els.lobbyReadyBtn.addEventListener("click", () => {
     window.SFX.uiClick();
-    els.lobbyReadyBtn.classList.toggle("active");
+    // Drive from server state via onLobbyStateChange, not optimistically
+    window.Net.sendReady();
   });
   els.lobbyStartBtn.addEventListener("click", () => {
     window.SFX.uiClick();
-    // Slice 6 will wire actual start; for now it's host-only and hidden
+    window.Net.sendHostStart();
   });
 
   document.addEventListener("visibilitychange", () => {
