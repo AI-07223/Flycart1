@@ -58,4 +58,6 @@ export class ArenaState extends Schema {
   @type("number") arenaHalf = 0;
   @type("number") floorY = 0;
   @type("number") ceilingY = 0;
+  @type("string") roomName = "";
+  @type("number") roundLength = 150;
 }

@@ -87,6 +87,8 @@ export class GameSim {
   phase: string;
   timeLeft: number;
   hostId = "";
+  roundLength: number;
+  roomName: string;
   readonly botsEnabled: boolean;
   readonly isPublic: boolean;
 
@@ -96,6 +98,8 @@ export class GameSim {
     this.botsEnabled = opts.botsEnabled;
     this.isPublic = opts.isPublic;
     this.onEvent = opts.onEvent;
+    this.roundLength = C.ROUND_SECONDS;
+    this.roomName = "";
 
     if (this.isPublic) {
       this.phase = "playing";
@@ -239,6 +243,20 @@ export class GameSim {
   }
 
   /**
+   * Update host-controlled room settings (round length and/or room name).
+   * Silently ignores calls from non-hosts.
+   */
+  setHostSettings(callerId: string, s: { roundLength?: number; roomName?: string }): void {
+    if (callerId !== this.hostId) return;
+    if (typeof s.roundLength === "number" && Number.isFinite(s.roundLength)) {
+      this.roundLength = Math.max(60, Math.min(300, Math.round(s.roundLength)));
+    }
+    if (typeof s.roomName === "string") {
+      this.roomName = s.roomName.replace(/[\x00-\x1F\x7F]/g, "").trim().slice(0, 20);
+    }
+  }
+
+  /**
    * Validates and removes the target player from the sim.
    * Returns the targetId to kick at the transport layer, or null if invalid.
    * The actual client.leave() call stays in ArenaRoom.
@@ -294,6 +312,8 @@ export class GameSim {
     phase: string;
     timeLeft: number;
     hostId: string;
+    roundLength: number;
+    roomName: string;
   } {
     return {
       players: this.players,
@@ -302,6 +322,8 @@ export class GameSim {
       phase: this.phase,
       timeLeft: this.timeLeft,
       hostId: this.hostId,
+      roundLength: this.roundLength,
+      roomName: this.roomName,
     };
   }
 
@@ -316,6 +338,8 @@ export class GameSim {
       phase: this.phase,
       timeLeft: this.timeLeft,
       hostId: this.hostId,
+      roundLength: this.roundLength,
+      roomName: this.roomName,
     };
   }
 
@@ -701,7 +725,7 @@ export class GameSim {
 
   private startMatch(): void {
     this.phase = "playing";
-    this.timeLeft = C.ROUND_SECONDS;
+    this.timeLeft = this.roundLength;
     this.lobbyElapsed = 0;
     for (const [id, p] of this.players) {
       p.score = 0;

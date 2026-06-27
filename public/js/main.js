@@ -319,6 +319,8 @@
           this.botsEnabled = opts.botsEnabled;
           this.isPublic = opts.isPublic;
           this.onEvent = opts.onEvent;
+          this.roundLength = ROUND_SECONDS;
+          this.roomName = "";
           if (this.isPublic) {
             this.phase = "playing";
             this.timeLeft = ROUND_SECONDS;
@@ -451,6 +453,19 @@
           this.startMatch();
         }
         /**
+         * Update host-controlled room settings (round length and/or room name).
+         * Silently ignores calls from non-hosts.
+         */
+        setHostSettings(callerId, s) {
+          if (callerId !== this.hostId) return;
+          if (typeof s.roundLength === "number" && Number.isFinite(s.roundLength)) {
+            this.roundLength = Math.max(60, Math.min(300, Math.round(s.roundLength)));
+          }
+          if (typeof s.roomName === "string") {
+            this.roomName = s.roomName.replace(/[\x00-\x1F\x7F]/g, "").trim().slice(0, 20);
+          }
+        }
+        /**
          * Validates and removes the target player from the sim.
          * Returns the targetId to kick at the transport layer, or null if invalid.
          * The actual client.leave() call stays in ArenaRoom.
@@ -500,7 +515,9 @@
             pickups: this.pickups,
             phase: this.phase,
             timeLeft: this.timeLeft,
-            hostId: this.hostId
+            hostId: this.hostId,
+            roundLength: this.roundLength,
+            roomName: this.roomName
           };
         }
         /**
@@ -513,7 +530,9 @@
             pickups: Array.from(this.pickups.entries()).map(([k, v]) => [k, { ...v }]),
             phase: this.phase,
             timeLeft: this.timeLeft,
-            hostId: this.hostId
+            hostId: this.hostId,
+            roundLength: this.roundLength,
+            roomName: this.roomName
           };
         }
         // ---------------------------------------------------------------------------
@@ -867,7 +886,7 @@
         }
         startMatch() {
           this.phase = "playing";
-          this.timeLeft = ROUND_SECONDS;
+          this.timeLeft = this.roundLength;
           this.lobbyElapsed = 0;
           for (const [id, p] of this.players) {
             p.score = 0;
@@ -1172,6 +1191,8 @@
           this.phase = "lobby";
           this.timeLeft = 0;
           this.hostId = "";
+          this.roomName = "";
+          this.roundLength = 150;
         }
       };
       HostTransportState = class {
@@ -1195,6 +1216,12 @@
         }
         get hostId() {
           return this.sim.hostId;
+        }
+        get roomName() {
+          return this.sim.roomName;
+        }
+        get roundLength() {
+          return this.sim.roundLength;
         }
       };
       SignalSocket = class {
@@ -1540,6 +1567,12 @@
               this._sim.hostKick(peerId, msg.targetId);
               this._broadcastEvent({ type: "kicked", targetId: msg.targetId });
               if (this.onStateChange) this.onStateChange();
+            } else if (msg.type === "hostSettings") {
+              this._sim.setHostSettings(peerId, {
+                roundLength: typeof msg.roundLength === "number" ? msg.roundLength : void 0,
+                roomName: typeof msg.roomName === "string" ? msg.roomName : void 0
+              });
+              if (this.onStateChange) this.onStateChange();
             }
           } catch {
           }
@@ -1655,6 +1688,8 @@
             gs.phase = snap.phase;
             gs.timeLeft = snap.timeLeft;
             gs.hostId = snap.hostId;
+            gs.roomName = snap.roomName ?? "";
+            gs.roundLength = snap.roundLength ?? 150;
             gs.players.mergeFrom(snap.players);
             gs.bullets.mergeFrom(snap.bullets);
             gs.pickups.mergeFrom(snap.pickups);
@@ -1741,6 +1776,16 @@
             }
           } else {
             this._sendControl({ type: "hostKick", targetId });
+          }
+        }
+        sendHostSettings(s) {
+          if (this._isHost) {
+            if (this._sim) {
+              this._sim.setHostSettings("host", s);
+              if (this.onStateChange) this.onStateChange();
+            }
+          } else {
+            this._sendControl({ type: "hostSettings", ...s });
           }
         }
         _sendControl(msg) {
@@ -2141,6 +2186,9 @@
         fatalMsg: dollar("fatal-msg"),
         lobbyScreen: dollar("lobby-screen"),
         lobbyTitle: dollar("lobby-title"),
+        lobbySettings: dollar("lobby-settings"),
+        lobbyRoomName: dollar("lobby-room-name"),
+        lobbyRoundLength: dollar("lobby-round-length"),
         lobbyRoster: dollar("lobby-roster"),
         lobbyReadyBtn: dollar("lobby-ready-btn"),
         lobbyStartBtn: dollar("lobby-start-btn"),
@@ -2183,6 +2231,7 @@
       var countdownActive = false;
       var currentLobbyCode = null;
       var currentLobbyServer = null;
+      var _settingsDebounce = null;
       var _colyseusNet = null;
       var _isP2PSession = false;
       var scannerOpen = false;
@@ -2450,6 +2499,26 @@
         const myId = window.Net.sessionId;
         const hostId = window.Net.getHostId();
         const roster = window.Net.getRosterSnapshot();
+        const iAmHost = myId === hostId;
+        const stateName = window.Net.state?.roomName;
+        if (stateName) {
+          els.lobbyTitle.textContent = stateName;
+        } else if (currentLobbyCode) {
+          els.lobbyTitle.textContent = `Room ${currentLobbyCode}`;
+        }
+        if (iAmHost) {
+          els.lobbySettings.classList.remove("hidden");
+          const serverRoomName = window.Net.state?.roomName ?? "";
+          const serverRoundLength = String(window.Net.state?.roundLength ?? 150);
+          if (document.activeElement !== els.lobbyRoomName) {
+            els.lobbyRoomName.value = serverRoomName;
+          }
+          if (document.activeElement !== els.lobbyRoundLength) {
+            els.lobbyRoundLength.value = serverRoundLength;
+          }
+        } else {
+          els.lobbySettings.classList.add("hidden");
+        }
         if (!roster.length) {
           els.lobbyRoster.innerHTML = '<p class="muted">Waiting for players\u2026</p>';
           return;
@@ -2483,7 +2552,6 @@
           els.lobbyReadyBtn.textContent = me.ready ? "Unready" : "Ready";
           els.lobbyReadyBtn.classList.toggle("active", me.ready);
         }
-        const iAmHost = myId === hostId;
         els.lobbyStartBtn.classList.toggle("hidden", !iAmHost);
       }
       function enterPlayingFromLobby() {
@@ -3366,6 +3434,9 @@
         els.powerChip.classList.add("hidden");
         els.lobbyTitle.textContent = "Private Room";
         els.lobbyRoster.innerHTML = '<p class="muted">Waiting for players\u2026</p>';
+        els.lobbySettings.classList.add("hidden");
+        els.lobbyRoomName.value = "";
+        els.lobbyRoundLength.value = "150";
         hideSettings();
         closeJoinCode();
         closeScanner();
@@ -3773,6 +3844,17 @@
         els.lobbyStartBtn.addEventListener("click", () => {
           window.SFX.uiClick();
           window.Net.sendHostStart();
+        });
+        els.lobbyRoomName.addEventListener("input", () => {
+          if (_settingsDebounce !== null) clearTimeout(_settingsDebounce);
+          _settingsDebounce = setTimeout(() => {
+            _settingsDebounce = null;
+            window.Net.sendHostSettings({ roomName: els.lobbyRoomName.value });
+          }, 400);
+        });
+        els.lobbyRoundLength.addEventListener("change", () => {
+          const v = parseInt(els.lobbyRoundLength.value, 10);
+          if (Number.isFinite(v)) window.Net.sendHostSettings({ roundLength: v });
         });
         document.addEventListener("visibilitychange", () => {
           if (document.hidden) {

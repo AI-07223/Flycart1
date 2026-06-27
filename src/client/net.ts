@@ -357,6 +357,11 @@ const Net = {
     if (this.room) this.room.send("hostKick", { targetId });
   },
 
+  /** Host-only: update room settings (roundLength and/or roomName). */
+  sendHostSettings(s: { roundLength?: number; roomName?: string }): void {
+    if (this.room) this.room.send("hostSettings", s);
+  },
+
   /** Current room phase ('lobby' | 'playing' | 'intermission'), or null if not connected. */
   getPhase(): string | null {
     return (this.room && this.room.state) ? (this.room.state.phase || null) : null;

@@ -94,6 +94,9 @@ const els = {
   fatalMsg: dollar("fatal-msg"),
   lobbyScreen: dollar("lobby-screen"),
   lobbyTitle: dollar("lobby-title"),
+  lobbySettings: dollar("lobby-settings"),
+  lobbyRoomName: dollar("lobby-room-name") as HTMLInputElement,
+  lobbyRoundLength: dollar("lobby-round-length") as HTMLSelectElement,
   lobbyRoster: dollar("lobby-roster"),
   lobbyReadyBtn: dollar("lobby-ready-btn") as HTMLButtonElement,
   lobbyStartBtn: dollar("lobby-start-btn") as HTMLButtonElement,
@@ -142,6 +145,8 @@ let countdownActive = false;
 // Slice 6: tracks the code + origin for the active private lobby
 let currentLobbyCode: string | null = null;
 let currentLobbyServer: string | null = null;
+// Host settings debounce timer
+let _settingsDebounce: ReturnType<typeof setTimeout> | null = null;
 // P2P: reference to the original Colyseus Net so we can restore it on leave
 let _colyseusNet: any = null;
 // Whether the current session is P2P (host or guest)
@@ -417,6 +422,31 @@ function renderLobbyRoster(): void {
   const myId = window.Net.sessionId;
   const hostId = window.Net.getHostId();
   const roster = window.Net.getRosterSnapshot();
+  const iAmHost = myId === hostId;
+
+  // Update title: prefer roomName from state, fallback to code label
+  const stateName = window.Net.state?.roomName;
+  if (stateName) {
+    els.lobbyTitle.textContent = stateName;
+  } else if (currentLobbyCode) {
+    els.lobbyTitle.textContent = `Room ${currentLobbyCode}`;
+  }
+
+  // Show/hide and reflect settings panel (host only)
+  if (iAmHost) {
+    els.lobbySettings.classList.remove("hidden");
+    // Reflect server state into inputs only when they are not focused (avoid clobbering typing)
+    const serverRoomName = window.Net.state?.roomName ?? "";
+    const serverRoundLength = String(window.Net.state?.roundLength ?? 150);
+    if (document.activeElement !== els.lobbyRoomName) {
+      els.lobbyRoomName.value = serverRoomName;
+    }
+    if (document.activeElement !== els.lobbyRoundLength) {
+      els.lobbyRoundLength.value = serverRoundLength;
+    }
+  } else {
+    els.lobbySettings.classList.add("hidden");
+  }
 
   if (!roster.length) {
     els.lobbyRoster.innerHTML = '<p class="muted">Waiting for players…</p>';
@@ -466,7 +496,6 @@ function renderLobbyRoster(): void {
   }
 
   // Show/hide start button — host only
-  const iAmHost = myId === hostId;
   els.lobbyStartBtn.classList.toggle('hidden', !iAmHost);
 }
 
@@ -1515,6 +1544,9 @@ function resetToMenu(): void {
   els.powerChip.classList.add("hidden");
   els.lobbyTitle.textContent = "Private Room";
   els.lobbyRoster.innerHTML = '<p class="muted">Waiting for players…</p>';
+  els.lobbySettings.classList.add("hidden");
+  els.lobbyRoomName.value = "";
+  els.lobbyRoundLength.value = "150";
   hideSettings();
   closeJoinCode();
   closeScanner();
@@ -1931,6 +1963,21 @@ function init(): void {
   els.lobbyStartBtn.addEventListener("click", () => {
     window.SFX.uiClick();
     window.Net.sendHostStart();
+  });
+
+  // Host settings: room name input (debounced ~400ms)
+  els.lobbyRoomName.addEventListener("input", () => {
+    if (_settingsDebounce !== null) clearTimeout(_settingsDebounce);
+    _settingsDebounce = setTimeout(() => {
+      _settingsDebounce = null;
+      window.Net.sendHostSettings({ roomName: els.lobbyRoomName.value });
+    }, 400);
+  });
+
+  // Host settings: round length select (immediate on change)
+  els.lobbyRoundLength.addEventListener("change", () => {
+    const v = parseInt(els.lobbyRoundLength.value, 10);
+    if (Number.isFinite(v)) window.Net.sendHostSettings({ roundLength: v });
   });
 
   document.addEventListener("visibilitychange", () => {

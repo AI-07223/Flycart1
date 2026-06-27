@@ -361,6 +361,10 @@
         sendHostKick(targetId) {
           if (this.room) this.room.send("hostKick", { targetId });
         },
+        /** Host-only: update room settings (roundLength and/or roomName). */
+        sendHostSettings(s) {
+          if (this.room) this.room.send("hostSettings", s);
+        },
         /** Current room phase ('lobby' | 'playing' | 'intermission'), or null if not connected. */
         getPhase() {
           return this.room && this.room.state ? this.room.state.phase || null : null;

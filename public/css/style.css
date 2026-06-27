@@ -1308,6 +1308,52 @@ body.touch-device #share-bar {
   border: 1px solid rgba(255, 255, 255, 0.22);
 }
 
+/* Lobby host settings panel */
+.lobby-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 14px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  margin-bottom: 10px;
+}
+.lobby-settings-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.lobby-settings-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.55);
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  flex: 0 0 90px;
+}
+.lobby-settings-input,
+.lobby-settings-select {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 8px;
+  color: #fff;
+  font-size: 14px;
+  padding: 6px 10px;
+  outline: none;
+  font-family: inherit;
+}
+.lobby-settings-input:focus,
+.lobby-settings-select:focus {
+  border-color: rgba(255, 203, 5, 0.5);
+  background: rgba(255, 255, 255, 0.10);
+}
+.lobby-settings-select option {
+  background: #1b1400;
+  color: #fff;
+}
+
 /* Responsive: on very small screens make livery grid 2-col and allow card to grow */
 @media (max-width: 400px) {
   .hangar-livery-grid { grid-template-columns: repeat(2, 1fr); }

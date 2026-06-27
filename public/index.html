@@ -264,6 +264,23 @@
           </div>
           <button id="lobby-leave-btn" class="secondary">Leave</button>
         </div>
+        <div id="lobby-settings" class="lobby-settings hidden">
+          <div class="lobby-settings-row">
+            <label for="lobby-room-name" class="lobby-settings-label">Room name</label>
+            <input id="lobby-room-name" type="text" class="lobby-settings-input" maxlength="20" placeholder="Optional name…" autocomplete="off" />
+          </div>
+          <div class="lobby-settings-row">
+            <label for="lobby-round-length" class="lobby-settings-label">Round length</label>
+            <select id="lobby-round-length" class="lobby-settings-select">
+              <option value="60">1 min</option>
+              <option value="120">2 min</option>
+              <option value="150" selected>2:30</option>
+              <option value="180">3 min</option>
+              <option value="240">4 min</option>
+              <option value="300">5 min</option>
+            </select>
+          </div>
+        </div>
         <div id="lobby-roster" class="lobby-roster">
           <p class="muted">Waiting for players…</p>
         </div>

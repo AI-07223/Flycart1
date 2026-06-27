@@ -183,6 +183,16 @@ export class ArenaRoom extends Room<ArenaState> {
       }
     });
 
+    this.onMessage("hostSettings", (client, data: unknown) => {
+      if (this.isPublic) return;
+      if (!this.rateOk(client.sessionId, C.HOST_MSG_RATE_MAX)) return;
+      if (!isRecord(data)) return;
+      this.sim!.setHostSettings(client.sessionId, {
+        roundLength: typeof data.roundLength === "number" ? data.roundLength : undefined,
+        roomName: typeof data.roomName === "string" ? data.roomName : undefined,
+      });
+    });
+
     this.setPatchRate(33);
     this.setSimulationInterval((dt) => {
       try {
@@ -341,6 +351,8 @@ export class ArenaRoom extends Room<ArenaState> {
     this.state.phase = state.phase;
     this.state.timeLeft = state.timeLeft;
     this.state.hostId = state.hostId;
+    this.state.roomName = state.roomName;
+    this.state.roundLength = state.roundLength;
   }
 
   // ---------------------------------------------------------------------------

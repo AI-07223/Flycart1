@@ -83,6 +83,8 @@ export interface SimStateSnapshot {
   phase: string;
   timeLeft: number;
   hostId: string;
+  roundLength: number;
+  roomName: string;
 }
 
 export interface GameSimOpts {

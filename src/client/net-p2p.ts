@@ -87,9 +87,11 @@ class GuestTransportState implements TransportState {
   players = new StableMap<string, any>();
   bullets = new StableMap<string, any>();
   pickups = new StableMap<string, any>();
-  phase   = "lobby";
-  timeLeft = 0;
-  hostId  = "";
+  phase    = "lobby";
+  timeLeft  = 0;
+  hostId   = "";
+  roomName  = "";
+  roundLength = 150;
 }
 
 // ---------------------------------------------------------------------------
@@ -99,12 +101,14 @@ class GuestTransportState implements TransportState {
 
 class HostTransportState implements TransportState {
   constructor(private sim: GameSim) {}
-  get players(): Map<string, any> { return this.sim.players as Map<string, any>; }
-  get bullets(): Map<string, any> { return this.sim.bullets as Map<string, any>; }
-  get pickups(): Map<string, any> { return this.sim.pickups as Map<string, any>; }
-  get phase():   string           { return this.sim.phase; }
-  get timeLeft(): number          { return this.sim.timeLeft; }
-  get hostId():  string           { return this.sim.hostId; }
+  get players(): Map<string, any>  { return this.sim.players as Map<string, any>; }
+  get bullets(): Map<string, any>  { return this.sim.bullets as Map<string, any>; }
+  get pickups(): Map<string, any>  { return this.sim.pickups as Map<string, any>; }
+  get phase():    string            { return this.sim.phase; }
+  get timeLeft(): number            { return this.sim.timeLeft; }
+  get hostId():   string            { return this.sim.hostId; }
+  get roomName(): string            { return this.sim.roomName; }
+  get roundLength(): number         { return this.sim.roundLength; }
 }
 
 // ---------------------------------------------------------------------------
@@ -614,6 +618,12 @@ export class WebRtcTransport implements ITransport {
         // Broadcast kick event so the kicked guest sees it
         this._broadcastEvent({ type: "kicked", targetId: msg.targetId });
         if (this.onStateChange) this.onStateChange();
+      } else if (msg.type === "hostSettings") {
+        this._sim.setHostSettings(peerId, {
+          roundLength: typeof msg.roundLength === "number" ? msg.roundLength : undefined,
+          roomName: typeof msg.roomName === "string" ? msg.roomName : undefined,
+        });
+        if (this.onStateChange) this.onStateChange();
       }
     } catch {}
   }
@@ -743,9 +753,11 @@ export class WebRtcTransport implements ITransport {
       const snap   = parsed.snap;
       const gs     = this._guestState!;
 
-      gs.phase    = snap.phase;
-      gs.timeLeft = snap.timeLeft;
-      gs.hostId   = snap.hostId;
+      gs.phase      = snap.phase;
+      gs.timeLeft   = snap.timeLeft;
+      gs.hostId     = snap.hostId;
+      gs.roomName   = snap.roomName   ?? "";
+      gs.roundLength = snap.roundLength ?? 150;
       gs.players.mergeFrom(snap.players as Array<[string, any]>);
       gs.bullets.mergeFrom(snap.bullets as Array<[string, any]>);
       gs.pickups.mergeFrom(snap.pickups as Array<[string, any]>);
@@ -836,6 +848,14 @@ export class WebRtcTransport implements ITransport {
       if (this._sim) { this._sim.hostKick("host", targetId); if (this.onStateChange) this.onStateChange(); }
     } else {
       this._sendControl({ type: "hostKick", targetId });
+    }
+  }
+
+  sendHostSettings(s: { roundLength?: number; roomName?: string }): void {
+    if (this._isHost) {
+      if (this._sim) { this._sim.setHostSettings("host", s); if (this.onStateChange) this.onStateChange(); }
+    } else {
+      this._sendControl({ type: "hostSettings", ...s });
     }
   }
 
