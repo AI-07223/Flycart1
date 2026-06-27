@@ -11,6 +11,9 @@ const els = {
   time: dollar("hud-time"),
   alt: dollar("hud-alt"),
   speed: dollar("hud-speed"),
+  boostFill: dollar("boost-fill"),
+  crosshair: dollar("crosshair"),
+  oobWarning: dollar("oob-warning"),
   leaderboard: dollar("leaderboard"),
   health: dollar("healthbar"),
   healthfill: dollar("healthfill"),
@@ -109,6 +112,10 @@ let activeShareUrl: string | null = null;
 // Respawn countdown tracking
 let deathTime: number = -1;
 let wasAlive: boolean = true;
+// OOB warning throttle
+let oobShownUntil: number = 0;
+// Boost bar fill level [0..1], client-side only
+let boostLevel: number = 0;
 // Round-start countdown
 let countdownActive = false;
 // Slice 6: tracks the code + origin for the active private lobby
@@ -509,6 +516,10 @@ function applyMode(nextMode: typeof mode): void {
   els.pause.classList.toggle("hidden", mode !== "paused");
   els.connLost.classList.toggle("hidden", !isLost);
   els.fatalOverlay.classList.toggle("hidden", !isError);
+  // Crosshair: visible only when actively playing (not paused)
+  els.crosshair.classList.toggle("hidden", mode !== "playing");
+  // OOB warning: always off on mode transitions; updateHud re-enables if needed
+  if (mode !== "playing") els.oobWarning.classList.add("hidden");
 }
 
 // ─── FATAL ERROR ─────────────────────────────────────────────────────────────
@@ -804,6 +815,31 @@ function updateHud(state: any, myId: string): void {
   els.alt.textContent = String(Math.round(altitude));
   els.speed.textContent = String(Math.round(speed));
 
+  // Boost indicator: read current frame's boost input state
+  const inputNow = window.Input.get();
+  const isBoosting = inputNow.boost;
+  const boostTarget = isBoosting ? 1.0 : 0.0;
+  // Fast charge, slower drain for visual feedback
+  boostLevel += (boostTarget - boostLevel) * (isBoosting ? 0.18 : 0.08);
+  boostLevel = Math.max(0, Math.min(1, boostLevel));
+  els.boostFill.style.width = (boostLevel * 100).toFixed(1) + "%";
+
+  // OOB warning: show when within MAP_EDGE_SOFT of MAP_HALF boundary on x or z
+  const posX = local && local.active ? local.p.x : me ? me.px : 0;
+  const posZ = local && local.active ? local.p.z : me ? me.pz : 0;
+  const isOob = Math.abs(posX) > (G.MAP_HALF - G.MAP_EDGE_SOFT) ||
+                Math.abs(posZ) > (G.MAP_HALF - G.MAP_EDGE_SOFT);
+  const nowSec = performance.now() / 1000;
+  if (isOob && me && me.alive) {
+    if (nowSec >= oobShownUntil) {
+      els.oobWarning.classList.remove("hidden");
+      oobShownUntil = nowSec + 2.0; // throttle: don't re-show for 2s after it hides
+    }
+  } else {
+    els.oobWarning.classList.add("hidden");
+    oobShownUntil = 0;
+  }
+
   // Low-time warning: pulse red when <= 10s remain during playing phase
   const isLowTime = state.phase === "playing" && state.timeLeft <= 10;
   els.time.classList.toggle("low", isLowTime);
@@ -1006,6 +1042,8 @@ function resetToMenu(): void {
   wasAlive = true;
   deathTime = -1;
   countdownActive = false;
+  boostLevel = 0;
+  oobShownUntil = 0;
   els.countdown.classList.remove("pop", "go");
   els.countdown.textContent = "";
   els.time.classList.remove("low");

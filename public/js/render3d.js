@@ -17,6 +17,9 @@ import * as THREE from "three";
   let minimap;
   let mmctx;
   let popupLayer;
+  let nameLabelsLayer;
+  // Pooled Map<sessionId, HTMLDivElement> for player name labels
+  const nameLabelPool = new Map();
   let time = 0;
   let hitStop = 0;
   let takeoff = 0;
@@ -482,6 +485,10 @@ import * as THREE from "three";
       popupLayer.id = "popup-layer";
       (document.getElementById("game-wrap") || document.body).appendChild(popupLayer);
 
+      nameLabelsLayer = document.createElement("div");
+      nameLabelsLayer.id = "name-labels";
+      (document.getElementById("game-wrap") || document.body).appendChild(nameLabelsLayer);
+
       applyQuality();
       Q && Q.onChange && Q.onChange(() => applyQuality());
       window.addEventListener("resize", () => this.resize());
@@ -635,12 +642,15 @@ import * as THREE from "three";
       this._updateCamera(myId);
       renderer.render(scene, camera);
       this._drawMinimap(state, myId);
+      this._updateNameLabels(state, myId);
     },
 
     drawMenu(dt, skin) {
       time += Math.min(dt || 0.016, 0.05);
       for (const [, view] of stateMaps.views) view.mesh.visible = false;
       for (const [, shield] of stateMaps.views) if (shield && shield.shield) shield.shield.visible = false;
+      // Hide all name labels during menu
+      for (const [, div] of nameLabelPool) div.style.display = "none";
       for (const [, bullet] of stateMaps.bullets) bullet.visible = false;
       for (const [, pickup] of stateMaps.pickups) pickup.visible = false;
 
@@ -743,6 +753,63 @@ import * as THREE from "three";
         mmctx.arc(x, y, 3, 0, Math.PI * 2);
         mmctx.fill();
       });
+    },
+
+    _updateNameLabels(state, myId) {
+      if (!nameLabelsLayer || !camera) return;
+
+      const seenIds = new Set();
+
+      state.players.forEach((p, id) => {
+        // Skip local player's own label (less visual clutter)
+        if (id === myId) return;
+
+        const view = stateMaps.views.get(id);
+        if (!view || !view.mesh) return;
+
+        seenIds.add(id);
+
+        // Get or create the label div
+        let div = nameLabelPool.get(id);
+        if (!div) {
+          div = document.createElement("div");
+          div.className = "name-label";
+          nameLabelsLayer.appendChild(div);
+          nameLabelPool.set(id, div);
+        }
+
+        // Hide label for dead players
+        if (!p.alive) {
+          div.style.display = "none";
+          return;
+        }
+
+        // Project a point slightly above the plane mesh
+        // Use a point ~22 world-units above the mesh position
+        const labelPos = view.mesh.position.clone();
+        labelPos.y += 22;
+        const screen = worldToScreen(labelPos);
+
+        if (!screen.visible) {
+          div.style.display = "none";
+          return;
+        }
+
+        div.style.display = "";
+        div.style.left = screen.x + "px";
+        div.style.top = screen.y + "px";
+        // Update name text only when it changes
+        const name = p.name || ("P" + id.slice(0, 4));
+        if (div.textContent !== name) div.textContent = name;
+      });
+
+      // Remove labels for players who left
+      for (const [id, div] of nameLabelPool) {
+        if (!seenIds.has(id)) {
+          div.remove();
+          nameLabelPool.delete(id);
+        }
+      }
     },
 
     killPopup(killerId, mine) {

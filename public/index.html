@@ -41,12 +41,20 @@
       <div class="rot-inner">📱 ↻<br />Rotate your device<br /><span>Landscape works best for the flight deck</span></div>
     </div>
 
+    <div id="crosshair" class="hidden" aria-hidden="true">
+      <div class="ch-h"></div>
+      <div class="ch-v"></div>
+    </div>
+
+    <div id="oob-warning" class="hidden" aria-live="assertive">⚠ OUT OF BOUNDS — TURN BACK</div>
+
     <div id="hud" class="hidden">
       <div class="hud-row">
         <div class="hud-item">SCORE <span id="hud-score">0</span></div>
         <div class="hud-item">TIME <span id="hud-time">--</span></div>
         <div class="hud-item">ALT <span id="hud-alt">0</span></div>
         <div class="hud-item">SPD <span id="hud-speed">0</span></div>
+        <div class="hud-item hud-boost-wrap">BOOST <span class="boost-bar"><span id="boost-fill"></span></span></div>
         <button id="mute-btn" class="icon-btn" title="Mute (M)">🔊</button>
       </div>
       <div id="leaderboard"></div>
