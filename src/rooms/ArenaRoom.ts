@@ -32,6 +32,12 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+function validateCosmetic(val: unknown, max: number): number {
+  return (typeof val === "number" && Number.isFinite(val) && Number.isInteger(val) && val >= 0 && val < max)
+    ? val
+    : Math.floor(Math.random() * max);
+}
+
 function normalizeName(value: unknown, fallback: string): string {
   if (typeof value !== "string") return fallback;
   const next = value.trim().slice(0, 14);
@@ -188,13 +194,15 @@ export class ArenaRoom extends Room<ArenaState> {
     });
   }
 
-  onJoin(client: Client, options: { name?: unknown; skin?: unknown } | null = {}) {
+  onJoin(client: Client, options: { name?: unknown; skin?: unknown; bodyShape?: unknown; accent?: unknown; trail?: unknown; livery?: unknown } | null = {}) {
     const joinOptions = isRecord(options) ? options : {};
     const p = new Player();
     p.name = normalizeName(joinOptions.name, "Pilot");
-    p.skin = typeof joinOptions.skin === "number" && Number.isInteger(joinOptions.skin) && joinOptions.skin >= 0 && joinOptions.skin < C.SKIN_COUNT
-      ? joinOptions.skin
-      : Math.floor(Math.random() * C.SKIN_COUNT);
+    p.skin = validateCosmetic(joinOptions.skin, C.COLOR_COUNT);
+    p.bodyShape = validateCosmetic(joinOptions.bodyShape, C.BODY_SHAPE_COUNT);
+    p.accent = validateCosmetic(joinOptions.accent, C.ACCENT_COUNT);
+    p.trail = validateCosmetic(joinOptions.trail, C.TRAIL_COUNT);
+    p.livery = validateCosmetic(joinOptions.livery, C.LIVERY_COUNT);
     p.bot = false;
     p.ready = false;
 
@@ -712,6 +720,10 @@ export class ArenaRoom extends Room<ArenaState> {
     const p = new Player();
     p.name = C.BOT_NAMES[Math.floor(Math.random() * C.BOT_NAMES.length)];
     p.skin = Math.floor(Math.random() * C.SKIN_COUNT);
+    p.bodyShape = Math.floor(Math.random() * 2); // capped [0,1] to protect mobile draw calls
+    p.accent = Math.floor(Math.random() * C.ACCENT_COUNT);
+    p.trail = Math.floor(Math.random() * C.TRAIL_COUNT);
+    p.livery = Math.floor(Math.random() * C.LIVERY_COUNT);
     p.bot = true;
     this.spawn(id, p);
     this.state.players.set(id, p);

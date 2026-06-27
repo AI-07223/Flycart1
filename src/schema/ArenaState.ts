@@ -24,6 +24,10 @@ export class Player extends Schema {
   @type("string") power = "";
   @type("number") powerLeft = 0;
   @type("boolean") ready = false;
+  @type("number") bodyShape = 0;
+  @type("number") accent = 0;
+  @type("number") trail = 0;
+  @type("number") livery = 0;
 }
 
 export class Bullet extends Schema {

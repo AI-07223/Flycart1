@@ -105,7 +105,7 @@ let lastKill = 0;
 let lastFireSnd = 0;
 let engineStarted = false;
 let botsEnabled = true;
-let selectedSkin = 0;
+let selectedCosmetics: { color: number; bodyShape: number; accent: number; trail: number; livery: number } = { color: 0, bodyShape: 0, accent: 0, trail: 0, livery: 0 };
 let inviteRoom: string | null = null;
 let inviteServer: string | null = null;
 let activeShareUrl: string | null = null;
@@ -125,8 +125,35 @@ let currentLobbyServer: string | null = null;
 const SKINS = [0xff6b6b, 0x49c0ff, 0x8be34a, 0xffd24a, 0xc07bff];
 
 try {
-  const saved = parseInt(localStorage.getItem("smashcart.skin") || "", 10);
-  if (Number.isInteger(saved) && saved >= 0 && saved < SKINS.length) selectedSkin = saved;
+  // One-time migration: if old smashcart.skin exists but smashcart.color does not, copy it over.
+  const legacySkin = localStorage.getItem("smashcart.skin");
+  if (legacySkin !== null && localStorage.getItem("smashcart.color") === null) {
+    const migrated = parseInt(legacySkin, 10);
+    if (Number.isInteger(migrated) && migrated >= 0 && migrated < G.COLOR_COUNT) {
+      localStorage.setItem("smashcart.color", String(migrated));
+      selectedCosmetics.color = migrated;
+    }
+    localStorage.removeItem("smashcart.skin");
+  } else {
+    const savedColor = parseInt(localStorage.getItem("smashcart.color") || "", 10);
+    if (Number.isInteger(savedColor) && savedColor >= 0 && savedColor < G.COLOR_COUNT) selectedCosmetics.color = savedColor;
+  }
+} catch {}
+try {
+  const savedBodyShape = parseInt(localStorage.getItem("smashcart.bodyShape") || "", 10);
+  if (Number.isInteger(savedBodyShape) && savedBodyShape >= 0 && savedBodyShape < G.BODY_SHAPE_COUNT) selectedCosmetics.bodyShape = savedBodyShape;
+} catch {}
+try {
+  const savedAccent = parseInt(localStorage.getItem("smashcart.accent") || "", 10);
+  if (Number.isInteger(savedAccent) && savedAccent >= 0 && savedAccent < G.ACCENT_COUNT) selectedCosmetics.accent = savedAccent;
+} catch {}
+try {
+  const savedTrail = parseInt(localStorage.getItem("smashcart.trail") || "", 10);
+  if (Number.isInteger(savedTrail) && savedTrail >= 0 && savedTrail < G.TRAIL_COUNT) selectedCosmetics.trail = savedTrail;
+} catch {}
+try {
+  const savedLivery = parseInt(localStorage.getItem("smashcart.livery") || "", 10);
+  if (Number.isInteger(savedLivery) && savedLivery >= 0 && savedLivery < G.LIVERY_COUNT) selectedCosmetics.livery = savedLivery;
 } catch {}
 try {
   botsEnabled = localStorage.getItem("smashcart.bots") !== "0";
@@ -606,14 +633,15 @@ function buildPlanePicker(): void {
   els.planeSwatches.innerHTML = "";
   SKINS.forEach((color, index) => {
     const button = document.createElement("button");
-    button.className = "plane-swatch" + (index === selectedSkin ? " selected" : "");
+    button.className = "plane-swatch" + (index === selectedCosmetics.color ? " selected" : "");
     button.style.background = "#" + color.toString(16).padStart(6, "0");
     button.title = `Plane ${index + 1}`;
     button.addEventListener("click", () => {
-      selectedSkin = index;
-      try { localStorage.setItem("smashcart.skin", String(index)); } catch {}
+      selectedCosmetics.color = index;
+      try { localStorage.setItem("smashcart.color", String(index)); } catch {}
       els.planeSwatches.querySelectorAll(".plane-swatch").forEach((node, i) => node.classList.toggle("selected", i === index));
       window.SFX.uiClick();
+      if (window.Renderer.updateMenuPlane) window.Renderer.updateMenuPlane(selectedCosmetics);
     });
     els.planeSwatches.appendChild(button);
   });
@@ -654,7 +682,7 @@ async function startGame(code: string, serverOrigin: string | null = null): Prom
   setBusy(true);
 
   try {
-    await window.Net.connect(name, roomCode, selectedSkin, serverOrigin);
+    await window.Net.connect(name, roomCode, selectedCosmetics, serverOrigin);
   } catch (e: any) {
     setStatus("Could not connect: " + (e && e.message ? e.message : e));
     setBusy(false);
@@ -710,7 +738,7 @@ async function joinLobby(code: string, serverOrigin: string | null = null): Prom
   setBusy(true);
 
   try {
-    await window.Net.connect(name, code, selectedSkin, serverOrigin);
+    await window.Net.connect(name, code, selectedCosmetics, serverOrigin);
   } catch (e: any) {
     setStatus("Could not connect: " + (e && e.message ? e.message : e));
     setBusy(false);
@@ -799,7 +827,7 @@ function loop(ts: number): void {
     // Draw the 3D scene behind the lobby card; no input sent in lobby
     window.Renderer.draw(room.state, window.Net.sessionId);
   } else if (mode === "menu") {
-    window.Renderer.drawMenu(dt, selectedSkin);
+    window.Renderer.drawMenu(dt, selectedCosmetics);
   } else if (room && room.state) {
     window.Renderer.draw(room.state, window.Net.sessionId);
   }

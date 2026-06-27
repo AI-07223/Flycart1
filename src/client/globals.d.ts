@@ -69,6 +69,11 @@ interface GameConstants {
   HOMING_TURN: number;
   TICK_RATE: number;
   SKIN_COUNT: number;
+  BODY_SHAPE_COUNT: number;
+  COLOR_COUNT: number;
+  ACCENT_COUNT: number;
+  TRAIL_COUNT: number;
+  LIVERY_COUNT: number;
   MAP_HALF: number;
   MAP_EDGE_SOFT: number;
   GROUND_Y: number;
@@ -161,6 +166,14 @@ interface InputAPI {
   isTouchDevice(): boolean;
 }
 
+interface PlayerCosmetics {
+  color: number;
+  bodyShape: number;
+  accent: number;
+  trail: number;
+  livery: number;
+}
+
 interface SnapshotPlayer {
   p: Vec3;
   f: Vec3;
@@ -169,6 +182,10 @@ interface SnapshotPlayer {
   turn: number;
   climb: number;
   seq: number;
+  bodyShape: number;
+  accent: number;
+  trail: number;
+  livery: number;
 }
 
 interface Snapshot {
@@ -189,7 +206,7 @@ interface NetAPI {
   onStateChange: (() => void) | null;
   reconnectToken: string | null;
   endpoint(origin?: string | null): string;
-  connect(name: string, code: string, skin: number, serverOrigin?: string | null): Promise<any>;
+  connect(name: string, code: string, cosmetics: PlayerCosmetics, serverOrigin?: string | null): Promise<any>;
   tryReconnect(): Promise<boolean>;
   sample(renderTime: number): Record<string, SnapshotPlayer>;
   sendInput(turn: number, climb: number, boost: boolean, fire: boolean): void;
@@ -220,7 +237,8 @@ interface RendererAPI {
   init(canvas: HTMLCanvasElement): void;
   sync(state: any, dt: number, myId: string): void;
   draw(state: any, myId: string): void;
-  drawMenu(dt: number, skin: number): void;
+  drawMenu(dt: number, cosmetics: PlayerCosmetics): void;
+  updateMenuPlane?(cosmetics: PlayerCosmetics): void;
   killPopup(killerId: string, mine: boolean): void;
   hitStop(ms: number): void;
   startTakeoff?(): void;

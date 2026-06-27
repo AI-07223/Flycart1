@@ -45,7 +45,13 @@ export const BOT_NAMES = [
   "Maverick", "Goose", "Iceman", "Viper", "Rio",
   "Jester", "Slider", "Hollywood", "Merlin", "Wolfman",
 ];
-export const SKIN_COUNT = 5;
+export const BODY_SHAPE_COUNT = 4;
+export const COLOR_COUNT = 12;
+export const ACCENT_COUNT = 7;
+export const TRAIL_COUNT = 5;
+export const LIVERY_COUNT = 4;
+// SKIN_COUNT aliases COLOR_COUNT — skin is the primary color index.
+export const SKIN_COUNT = COLOR_COUNT;
 
 // Powerups.
 export const PICKUP_MAX = 6;

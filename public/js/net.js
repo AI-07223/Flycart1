@@ -103,10 +103,18 @@
           const proto = location.protocol === "https:" ? "wss" : "ws";
           return `${proto}://${location.host}`;
         },
-        async connect(name, code, skin, serverOrigin = null) {
+        async connect(name, code, cosmetics, serverOrigin = null) {
           this.serverOrigin = serverOrigin;
           this.client = new window.Colyseus.Client(this.endpoint(serverOrigin));
-          const room = await this.client.joinOrCreate("arena", { name, code, skin });
+          const room = await this.client.joinOrCreate("arena", {
+            name,
+            code,
+            skin: cosmetics.color,
+            bodyShape: cosmetics.bodyShape,
+            accent: cosmetics.accent,
+            trail: cosmetics.trail,
+            livery: cosmetics.livery
+          });
           this._wire(room);
           return room;
         },

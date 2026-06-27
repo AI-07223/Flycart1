@@ -77,10 +77,18 @@ const Net = {
     return `${proto}://${location.host}`;
   },
 
-  async connect(name: string, code: string, skin: number, serverOrigin: string | null = null): Promise<any> {
+  async connect(name: string, code: string, cosmetics: { color: number; bodyShape: number; accent: number; trail: number; livery: number }, serverOrigin: string | null = null): Promise<any> {
     this.serverOrigin = serverOrigin;
     this.client = new (window as any).Colyseus.Client(this.endpoint(serverOrigin));
-    const room = await this.client.joinOrCreate("arena", { name, code, skin });
+    const room = await this.client.joinOrCreate("arena", {
+      name,
+      code,
+      skin: cosmetics.color,
+      bodyShape: cosmetics.bodyShape,
+      accent: cosmetics.accent,
+      trail: cosmetics.trail,
+      livery: cosmetics.livery,
+    });
     this._wire(room);
     return room;
   },

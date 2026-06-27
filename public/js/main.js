@@ -116,7 +116,7 @@
       var lastFireSnd = 0;
       var engineStarted = false;
       var botsEnabled = true;
-      var selectedSkin = 0;
+      var selectedCosmetics = { color: 0, bodyShape: 0, accent: 0, trail: 0, livery: 0 };
       var inviteRoom = null;
       var inviteServer = null;
       var activeShareUrl = null;
@@ -129,8 +129,38 @@
       var currentLobbyServer = null;
       var SKINS = [16739179, 4833535, 9167690, 16765514, 12614655];
       try {
-        const saved = parseInt(localStorage.getItem("smashcart.skin") || "", 10);
-        if (Number.isInteger(saved) && saved >= 0 && saved < SKINS.length) selectedSkin = saved;
+        const legacySkin = localStorage.getItem("smashcart.skin");
+        if (legacySkin !== null && localStorage.getItem("smashcart.color") === null) {
+          const migrated = parseInt(legacySkin, 10);
+          if (Number.isInteger(migrated) && migrated >= 0 && migrated < G.COLOR_COUNT) {
+            localStorage.setItem("smashcart.color", String(migrated));
+            selectedCosmetics.color = migrated;
+          }
+          localStorage.removeItem("smashcart.skin");
+        } else {
+          const savedColor = parseInt(localStorage.getItem("smashcart.color") || "", 10);
+          if (Number.isInteger(savedColor) && savedColor >= 0 && savedColor < G.COLOR_COUNT) selectedCosmetics.color = savedColor;
+        }
+      } catch {
+      }
+      try {
+        const savedBodyShape = parseInt(localStorage.getItem("smashcart.bodyShape") || "", 10);
+        if (Number.isInteger(savedBodyShape) && savedBodyShape >= 0 && savedBodyShape < G.BODY_SHAPE_COUNT) selectedCosmetics.bodyShape = savedBodyShape;
+      } catch {
+      }
+      try {
+        const savedAccent = parseInt(localStorage.getItem("smashcart.accent") || "", 10);
+        if (Number.isInteger(savedAccent) && savedAccent >= 0 && savedAccent < G.ACCENT_COUNT) selectedCosmetics.accent = savedAccent;
+      } catch {
+      }
+      try {
+        const savedTrail = parseInt(localStorage.getItem("smashcart.trail") || "", 10);
+        if (Number.isInteger(savedTrail) && savedTrail >= 0 && savedTrail < G.TRAIL_COUNT) selectedCosmetics.trail = savedTrail;
+      } catch {
+      }
+      try {
+        const savedLivery = parseInt(localStorage.getItem("smashcart.livery") || "", 10);
+        if (Number.isInteger(savedLivery) && savedLivery >= 0 && savedLivery < G.LIVERY_COUNT) selectedCosmetics.livery = savedLivery;
       } catch {
       }
       try {
@@ -540,17 +570,18 @@
         els.planeSwatches.innerHTML = "";
         SKINS.forEach((color, index) => {
           const button = document.createElement("button");
-          button.className = "plane-swatch" + (index === selectedSkin ? " selected" : "");
+          button.className = "plane-swatch" + (index === selectedCosmetics.color ? " selected" : "");
           button.style.background = "#" + color.toString(16).padStart(6, "0");
           button.title = `Plane ${index + 1}`;
           button.addEventListener("click", () => {
-            selectedSkin = index;
+            selectedCosmetics.color = index;
             try {
-              localStorage.setItem("smashcart.skin", String(index));
+              localStorage.setItem("smashcart.color", String(index));
             } catch {
             }
             els.planeSwatches.querySelectorAll(".plane-swatch").forEach((node, i) => node.classList.toggle("selected", i === index));
             window.SFX.uiClick();
+            if (window.Renderer.updateMenuPlane) window.Renderer.updateMenuPlane(selectedCosmetics);
           });
           els.planeSwatches.appendChild(button);
         });
@@ -582,7 +613,7 @@
         setStatus("Connecting\u2026");
         setBusy(true);
         try {
-          await window.Net.connect(name, roomCode, selectedSkin, serverOrigin);
+          await window.Net.connect(name, roomCode, selectedCosmetics, serverOrigin);
         } catch (e) {
           setStatus("Could not connect: " + (e && e.message ? e.message : e));
           setBusy(false);
@@ -628,7 +659,7 @@
         setStatus("Connecting\u2026");
         setBusy(true);
         try {
-          await window.Net.connect(name, code, selectedSkin, serverOrigin);
+          await window.Net.connect(name, code, selectedCosmetics, serverOrigin);
         } catch (e) {
           setStatus("Could not connect: " + (e && e.message ? e.message : e));
           setBusy(false);
@@ -691,7 +722,7 @@
         } else if (mode === "lobby" && room && room.state) {
           window.Renderer.draw(room.state, window.Net.sessionId);
         } else if (mode === "menu") {
-          window.Renderer.drawMenu(dt, selectedSkin);
+          window.Renderer.drawMenu(dt, selectedCosmetics);
         } else if (room && room.state) {
           window.Renderer.draw(room.state, window.Net.sessionId);
         }

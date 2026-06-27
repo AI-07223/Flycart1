@@ -4,7 +4,13 @@ import * as THREE from "three";
   const G = window.GAME;
   const Q = window.Quality;
   const SP = window.Sphere;
-  const SKINS = [0xff6b6b, 0x49c0ff, 0x8be34a, 0xffd24a, 0xc07bff];
+  const COLORS = [
+    0xff6b6b, 0x49c0ff, 0x8be34a, 0xffd24a, 0xc07bff, 0xff9f43,
+    0x00d2d3, 0xffeaa7, 0xdfe6e9, 0x2d3436, 0xe17055, 0x55efc4,
+  ];
+  const ACCENT_COLORS = [0x273244, 0xffffff, 0x000000, 0xffd24a, 0xff6b6b, 0x49c0ff, 0x8be34a];
+  const TRAIL_COLORS = [0xffffff, 0xff9f43, 0x49c0ff, 0xc07bff, 0x8be34a];
+  console.assert(COLORS.length === 12 && ACCENT_COLORS.length === 7 && TRAIL_COLORS.length === 5, "cosmetics array length mismatch");
 
   const tmpVec = new THREE.Vector3();
   const tmpVec2 = new THREE.Vector3();
@@ -67,36 +73,180 @@ import * as THREE from "three";
     renderer.shadowMap.enabled = cfg.shadows === "map";
   }
 
-  function makePlane(skin) {
-    const group = new THREE.Group();
-    const color = SKINS[skin % SKINS.length];
-    const bodyMat = new THREE.MeshStandardMaterial({ color, flatShading: true, roughness: 0.65 });
+  // makePlane(cosmetic): accepts {color,bodyShape,accent,trail,livery}
+  // or a bare number (backward compat: treated as {color:n, ...defaults})
+  function makePlane(cosmetic) {
+    if (typeof cosmetic === "number") {
+      cosmetic = { color: cosmetic, bodyShape: 0, accent: 0, trail: 0, livery: 0 };
+    }
+    const { color = 0, bodyShape = 0, accent = 0, trail = 0, livery = 0 } = cosmetic;
+
+    const primaryHex = COLORS[color % 12];
+    const accentHex = ACCENT_COLORS[accent % 7];
+    const trailHex = TRAIL_COLORS[trail % 5];
+
+    const bodyMat = new THREE.MeshStandardMaterial({ color: primaryHex, flatShading: true, roughness: 0.65 });
+    const accentMat = new THREE.MeshStandardMaterial({ color: accentHex, flatShading: true, roughness: 0.65 });
     const darkMat = new THREE.MeshStandardMaterial({ color: 0x273244, flatShading: true, roughness: 0.8 });
     const glassMat = new THREE.MeshStandardMaterial({ color: 0x123a5a, flatShading: true, roughness: 0.25, metalness: 0.15 });
 
-    const fuselage = new THREE.Mesh(new THREE.CapsuleGeometry(3.6, 18, 4, 8), bodyMat);
-    fuselage.rotation.x = Math.PI / 2;
-    fuselage.castShadow = true;
-    group.add(fuselage);
+    const group = new THREE.Group();
 
-    const nose = new THREE.Mesh(new THREE.ConeGeometry(3.4, 9, 8), darkMat);
-    nose.rotation.x = Math.PI / 2;
-    nose.position.z = -13;
-    group.add(nose);
+    // ---- Body shapes ----
+    let fuselage, wings, wingsUpper, wingsLower, tail, fin, noseMesh;
 
-    const wings = new THREE.Mesh(new THREE.BoxGeometry(24, 1.2, 5), bodyMat);
-    wings.position.z = 1;
-    wings.castShadow = true;
-    group.add(wings);
+    if (bodyShape === 1) {
+      // Interceptor: slim capsule, narrow swept wings, cone nose
+      fuselage = new THREE.Mesh(new THREE.CapsuleGeometry(2.8, 22, 4, 8), bodyMat);
+      fuselage.name = "fuselage";
+      fuselage.rotation.x = Math.PI / 2;
+      fuselage.castShadow = true;
+      group.add(fuselage);
 
-    const tail = new THREE.Mesh(new THREE.BoxGeometry(10, 1, 4), bodyMat);
-    tail.position.z = 10;
-    group.add(tail);
+      noseMesh = new THREE.Mesh(new THREE.ConeGeometry(2.8, 12, 8), darkMat);
+      noseMesh.rotation.x = Math.PI / 2;
+      noseMesh.position.z = -16;
+      group.add(noseMesh);
 
-    const fin = new THREE.Mesh(new THREE.BoxGeometry(1.2, 5.5, 4), bodyMat);
-    fin.position.set(0, 3, 10);
-    group.add(fin);
+      wings = new THREE.Mesh(new THREE.BoxGeometry(20, 1.0, 4), bodyMat);
+      wings.name = "wings";
+      wings.rotation.y = (5 * Math.PI) / 180;
+      wings.position.z = 1;
+      wings.castShadow = true;
+      group.add(wings);
 
+      tail = new THREE.Mesh(new THREE.BoxGeometry(8, 1, 3.5), bodyMat);
+      tail.name = "tail";
+      tail.position.z = 12;
+      group.add(tail);
+
+      fin = new THREE.Mesh(new THREE.BoxGeometry(1.0, 5.0, 3.5), bodyMat);
+      fin.name = "fin";
+      fin.position.set(0, 3, 12);
+      group.add(fin);
+
+    } else if (bodyShape === 2) {
+      // Bomber: chunky capsule, wide wings, two nacelles
+      fuselage = new THREE.Mesh(new THREE.CapsuleGeometry(5.0, 16, 4, 8), bodyMat);
+      fuselage.name = "fuselage";
+      fuselage.rotation.x = Math.PI / 2;
+      fuselage.castShadow = true;
+      group.add(fuselage);
+
+      noseMesh = new THREE.Mesh(new THREE.ConeGeometry(3.4, 9, 8), darkMat);
+      noseMesh.rotation.x = Math.PI / 2;
+      noseMesh.position.z = -13;
+      group.add(noseMesh);
+
+      wings = new THREE.Mesh(new THREE.BoxGeometry(30, 2.0, 7), bodyMat);
+      wings.name = "wings";
+      wings.position.z = 1;
+      wings.castShadow = true;
+      group.add(wings);
+
+      // Nacelles under wings at x=±8
+      const nacelleGeo = new THREE.CylinderGeometry(1.4, 1.4, 6, 8);
+      const nacelle1 = new THREE.Mesh(nacelleGeo, darkMat);
+      nacelle1.rotation.x = Math.PI / 2;
+      nacelle1.position.set(8, -2, 1);
+      nacelle1.castShadow = true;
+      group.add(nacelle1);
+      const nacelle2 = new THREE.Mesh(nacelleGeo, darkMat);
+      nacelle2.rotation.x = Math.PI / 2;
+      nacelle2.position.set(-8, -2, 1);
+      nacelle2.castShadow = true;
+      group.add(nacelle2);
+
+      tail = new THREE.Mesh(new THREE.BoxGeometry(12, 1.5, 5), bodyMat);
+      tail.name = "tail";
+      tail.position.z = 10;
+      group.add(tail);
+
+      fin = new THREE.Mesh(new THREE.BoxGeometry(1.4, 6.5, 5), bodyMat);
+      fin.name = "fin";
+      fin.position.set(0, 4, 10);
+      group.add(fin);
+
+    } else if (bodyShape === 3) {
+      // Biplane: fuselage capsule, two wing pairs, four strut cylinders
+      fuselage = new THREE.Mesh(new THREE.CapsuleGeometry(3.6, 18, 4, 8), bodyMat);
+      fuselage.name = "fuselage";
+      fuselage.rotation.x = Math.PI / 2;
+      fuselage.castShadow = true;
+      group.add(fuselage);
+
+      noseMesh = new THREE.Mesh(new THREE.ConeGeometry(3.4, 9, 8), darkMat);
+      noseMesh.rotation.x = Math.PI / 2;
+      noseMesh.position.z = -13;
+      group.add(noseMesh);
+
+      // Upper wing pair
+      wingsUpper = new THREE.Mesh(new THREE.BoxGeometry(24, 1.0, 4.5), bodyMat);
+      wingsUpper.name = "wings_upper";
+      wingsUpper.position.set(0, 3, 1);
+      wingsUpper.castShadow = true;
+      group.add(wingsUpper);
+
+      // Lower wing pair
+      wingsLower = new THREE.Mesh(new THREE.BoxGeometry(22, 1.0, 4), bodyMat);
+      wingsLower.name = "wings_lower";
+      wingsLower.position.set(0, -3, 1);
+      wingsLower.castShadow = true;
+      group.add(wingsLower);
+
+      // Four thin strut cylinders at x=±6
+      const strutGeo = new THREE.CylinderGeometry(0.4, 0.4, 6, 5);
+      const strutMat = darkMat;
+      for (const sx of [6, -6]) {
+        const s1 = new THREE.Mesh(strutGeo, strutMat);
+        s1.position.set(sx, 0, 0);
+        group.add(s1);
+        const s2 = new THREE.Mesh(strutGeo, strutMat);
+        s2.position.set(sx, 0, 3);
+        group.add(s2);
+      }
+
+      tail = new THREE.Mesh(new THREE.BoxGeometry(10, 1, 4), bodyMat);
+      tail.name = "tail";
+      tail.position.z = 10;
+      group.add(tail);
+
+      fin = new THREE.Mesh(new THREE.BoxGeometry(1.2, 5.5, 4), bodyMat);
+      fin.name = "fin";
+      fin.position.set(0, 3, 10);
+      group.add(fin);
+
+    } else {
+      // bodyShape === 0: Fighter (original default geometry)
+      fuselage = new THREE.Mesh(new THREE.CapsuleGeometry(3.6, 18, 4, 8), bodyMat);
+      fuselage.name = "fuselage";
+      fuselage.rotation.x = Math.PI / 2;
+      fuselage.castShadow = true;
+      group.add(fuselage);
+
+      noseMesh = new THREE.Mesh(new THREE.ConeGeometry(3.4, 9, 8), darkMat);
+      noseMesh.rotation.x = Math.PI / 2;
+      noseMesh.position.z = -13;
+      group.add(noseMesh);
+
+      wings = new THREE.Mesh(new THREE.BoxGeometry(24, 1.2, 5), bodyMat);
+      wings.name = "wings";
+      wings.position.z = 1;
+      wings.castShadow = true;
+      group.add(wings);
+
+      tail = new THREE.Mesh(new THREE.BoxGeometry(10, 1, 4), bodyMat);
+      tail.name = "tail";
+      tail.position.z = 10;
+      group.add(tail);
+
+      fin = new THREE.Mesh(new THREE.BoxGeometry(1.2, 5.5, 4), bodyMat);
+      fin.name = "fin";
+      fin.position.set(0, 3, 10);
+      group.add(fin);
+    }
+
+    // ---- Shared parts: canopy + prop ----
     const canopy = new THREE.Mesh(new THREE.SphereGeometry(2.6, 10, 8), glassMat);
     canopy.scale.set(1, 0.7, 1.4);
     canopy.position.set(0, 2.5, -2);
@@ -106,6 +256,65 @@ import * as THREE from "three";
     prop.position.z = -17;
     group.add(prop);
     group.userData.prop = prop;
+
+    // ---- Livery: assign bodyMat / accentMat to named parts + overlays ----
+    // Collect the wing mesh(es) for livery use
+    const wingMeshes = [];
+    if (wings) wingMeshes.push(wings);
+    if (wingsUpper) wingMeshes.push(wingsUpper);
+    if (wingsLower) wingMeshes.push(wingsLower);
+
+    if (livery === 0) {
+      // Clean: fuselage=primary, wings=accent (two-tone default)
+      // fuselage already has bodyMat
+      wingMeshes.forEach((m) => (m.material = accentMat));
+      // tail and fin keep bodyMat
+    } else if (livery === 1) {
+      // Stripe: all primary + thin accent stripe box along top of fuselage
+      // Leave everything as bodyMat (already set)
+      const stripeBox = new THREE.Mesh(
+        new THREE.BoxGeometry(0.5, 1.2, 16),
+        accentMat
+      );
+      stripeBox.name = "livery_stripe";
+      stripeBox.position.set(0, 3.8, 0);
+      group.add(stripeBox);
+    } else if (livery === 2) {
+      // Two-Tone: wings+tail+fin=accent, fuselage=primary
+      wingMeshes.forEach((m) => (m.material = accentMat));
+      if (tail) tail.material = accentMat;
+      if (fin) fin.material = accentMat;
+    } else if (livery === 3) {
+      // Camo: fuselage=primary + 3 small accent patch boxes along it
+      const patchPositions = [-5, 0, 6];
+      patchPositions.forEach((pz) => {
+        const patch = new THREE.Mesh(
+          new THREE.BoxGeometry(3.5, 3.5, 3.5),
+          accentMat
+        );
+        patch.name = "livery_camo_patch";
+        patch.position.set((Math.random() - 0.5) * 2, 2.5, pz);
+        group.add(patch);
+      });
+    }
+
+    // ---- Exhaust cone at rear ----
+    const exhaustMat = new THREE.MeshBasicMaterial({
+      color: trailHex,
+      transparent: true,
+      opacity: 0.55,
+      depthWrite: false,
+    });
+    const exhaust = new THREE.Mesh(new THREE.ConeGeometry(1.8, 5, 8), exhaustMat);
+    exhaust.rotation.x = -Math.PI / 2; // point backward (+Z direction)
+    // Position at the rear of the fuselage; adjust slightly per shape
+    const exhaustZ = bodyShape === 1 ? 14 : bodyShape === 2 ? 12 : 12;
+    exhaust.position.set(0, 0, exhaustZ);
+    exhaust.name = "exhaust";
+    group.add(exhaust);
+    group.userData.exhaust = exhaust;
+
+    group.userData.currentBodyShape = bodyShape;
     group.scale.setScalar(1.35);
     return group;
   }
@@ -512,11 +721,20 @@ import * as THREE from "three";
       const local = window.Net.localPose;
       const seen = new Set();
 
+      // Constant used for exhaust scale animation (fall back if BOOST_SPEED absent)
+      const boostSpeed = (G && G.BOOST_SPEED) ? G.BOOST_SPEED : 280;
+
       state.players.forEach((p, id) => {
         seen.add(id);
         let view = stateMaps.views.get(id);
         if (!view) {
-          view = { mesh: makePlane(p.skin), shield: null, bank: 0, wasAlive: !!p.alive, pose: null };
+          view = {
+            mesh: makePlane({ color: p.skin || 0, bodyShape: p.bodyShape || 0, accent: p.accent || 0, trail: p.trail || 0, livery: p.livery || 0 }),
+            shield: null,
+            bank: 0,
+            wasAlive: !!p.alive,
+            pose: null,
+          };
           scene.add(view.mesh);
           stateMaps.views.set(id, view);
         }
@@ -540,7 +758,7 @@ import * as THREE from "three";
           seq: local.seq,
         } : remote;
 
-        if (view.wasAlive && !pose.alive) explodeAt(new THREE.Vector3(pose.p.x, pose.p.y, pose.p.z), SKINS[p.skin % SKINS.length]);
+        if (view.wasAlive && !pose.alive) explodeAt(new THREE.Vector3(pose.p.x, pose.p.y, pose.p.z), COLORS[(p.skin || 0) % 12]);
         view.wasAlive = pose.alive;
         view.pose = pose;
         view.bank += ((pose.turn || 0) * -0.65 - view.bank) * Math.min(1, step * 10);
@@ -549,7 +767,19 @@ import * as THREE from "three";
           orientPlane(view.mesh, pose, view.bank);
           const prop = view.mesh.userData.prop;
           if (prop) prop.rotation.z = time * 38;
+
+          // Animate exhaust
+          const exhaust = view.mesh.userData.exhaust;
+          if (exhaust) {
+            const speedRatio = Math.min(1, (pose.speed || 0) / boostSpeed);
+            exhaust.material.opacity = 0.35 + 0.4 * (0.7 + 0.3 * Math.sin(time * 14 + id.charCodeAt(0)));
+            exhaust.scale.set(1, 0.6 + speedRatio * 1.4, 1);
+          }
         }
+
+        // Hide exhaust when dead
+        const exhaust = view.mesh.userData.exhaust;
+        if (exhaust) exhaust.visible = !!pose.alive;
 
         if (p.power === "shield" && pose.alive) {
           if (!view.shield) {
@@ -645,7 +875,8 @@ import * as THREE from "three";
       this._updateNameLabels(state, myId);
     },
 
-    drawMenu(dt, skin) {
+    // drawMenu(dt, cosmetic): cosmetic can be {color,bodyShape,accent,trail,livery} or bare number
+    drawMenu(dt, cosmetic) {
       time += Math.min(dt || 0.016, 0.05);
       for (const [, view] of stateMaps.views) view.mesh.visible = false;
       for (const [, shield] of stateMaps.views) if (shield && shield.shield) shield.shield.visible = false;
@@ -655,7 +886,7 @@ import * as THREE from "three";
       for (const [, pickup] of stateMaps.pickups) pickup.visible = false;
 
       if (!menuDemo) {
-        menuDemo = makePlane(skin);
+        menuDemo = makePlane(cosmetic);
         scene.add(menuDemo);
       }
       const radius = 360;
@@ -666,6 +897,14 @@ import * as THREE from "three";
       const prop = menuDemo.userData.prop;
       if (prop) prop.rotation.z = time * 38;
 
+      // Animate menu exhaust (gentle idle pulse)
+      const exhaust = menuDemo.userData.exhaust;
+      if (exhaust) {
+        exhaust.material.opacity = 0.4 + 0.15 * Math.sin(time * 10);
+        exhaust.scale.set(1, 0.8 + 0.2 * Math.sin(time * 6), 1);
+        exhaust.visible = true;
+      }
+
       const desired = new THREE.Vector3(pos.x - fwd.x * 110, pos.y + 42, pos.z - fwd.z * 110);
       const look = new THREE.Vector3(pos.x + fwd.x * 140, pos.y + 8, pos.z + fwd.z * 140);
       camPos.lerp(desired, 0.06);
@@ -674,6 +913,75 @@ import * as THREE from "three";
       camera.lookAt(camLook);
       renderer.render(scene, camera);
       if (mmctx) mmctx.clearRect(0, 0, minimap.width, minimap.height);
+    },
+
+    // updateMenuPlane(cosmetic): live-update hangar preview
+    // Rebuilds only on shape change; otherwise recolors in-place by mesh .name
+    updateMenuPlane(cosmetic) {
+      if (typeof cosmetic === "number") {
+        cosmetic = { color: cosmetic, bodyShape: 0, accent: 0, trail: 0, livery: 0 };
+      }
+      const { color = 0, bodyShape = 0, accent = 0, trail = 0 } = cosmetic;
+      const primaryHex = COLORS[color % 12];
+      const accentHex = ACCENT_COLORS[accent % 7];
+      const trailHex = TRAIL_COLORS[trail % 5];
+
+      // Rebuild on shape change (geometry changes)
+      if (!menuDemo || menuDemo.userData.currentBodyShape !== bodyShape) {
+        if (menuDemo) {
+          scene.remove(menuDemo);
+          disposeObject(menuDemo);
+        }
+        menuDemo = makePlane(cosmetic);
+        scene.add(menuDemo);
+        return;
+      }
+
+      // In-place recolor: traverse and update by .name
+      menuDemo.traverse((child) => {
+        if (!child.isMesh) return;
+        const mat = child.material;
+        if (!mat) return;
+
+        const n = child.name;
+
+        // Exhaust gets trail color
+        if (n === "exhaust") {
+          mat.color.setHex(trailHex);
+          return;
+        }
+
+        // Livery overlay meshes always use accentMat color
+        if (n === "livery_stripe" || n === "livery_camo_patch") {
+          mat.color.setHex(accentHex);
+          return;
+        }
+
+        // Named structural parts: apply per livery rules
+        const livery = cosmetic.livery || 0;
+        if (livery === 0) {
+          // Clean: fuselage=primary, wings=accent, tail+fin=primary
+          if (n === "fuselage" || n === "tail" || n === "fin") mat.color.setHex(primaryHex);
+          else if (n === "wings" || n === "wings_upper" || n === "wings_lower") mat.color.setHex(accentHex);
+        } else if (livery === 1) {
+          // Stripe: everything primary
+          if (n === "fuselage" || n === "wings" || n === "wings_upper" || n === "wings_lower" || n === "tail" || n === "fin") {
+            mat.color.setHex(primaryHex);
+          }
+        } else if (livery === 2) {
+          // Two-Tone: wings+tail+fin=accent, fuselage=primary
+          if (n === "fuselage") mat.color.setHex(primaryHex);
+          else if (n === "wings" || n === "wings_upper" || n === "wings_lower" || n === "tail" || n === "fin") mat.color.setHex(accentHex);
+        } else if (livery === 3) {
+          // Camo: fuselage=primary, patches handled above
+          if (n === "fuselage" || n === "wings" || n === "wings_upper" || n === "wings_lower" || n === "tail" || n === "fin") {
+            mat.color.setHex(primaryHex);
+          }
+        }
+      });
+
+      // Update stored bodyShape in case cosmetic object drifted
+      menuDemo.userData.currentBodyShape = bodyShape;
     },
 
     _updateCamera(myId) {
