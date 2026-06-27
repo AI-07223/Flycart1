@@ -374,7 +374,8 @@
               name: p.name || "Pilot",
               ready: !!p.ready,
               bot: !!p.bot,
-              score: p.score || 0
+              score: p.score || 0,
+              color: p.skin || 0
             });
           });
           return out;

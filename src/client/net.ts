@@ -357,9 +357,9 @@ const Net = {
    * Snapshot of all players for lobby roster rendering.
    * Returns an array of plain objects so callers don't hold live MapSchema refs.
    */
-  getRosterSnapshot(): Array<{ id: string; name: string; ready: boolean; bot: boolean; score: number }> {
+  getRosterSnapshot(): Array<{ id: string; name: string; ready: boolean; bot: boolean; score: number; color: number }> {
     if (!this.room || !this.room.state || !this.room.state.players) return [];
-    const out: Array<{ id: string; name: string; ready: boolean; bot: boolean; score: number }> = [];
+    const out: Array<{ id: string; name: string; ready: boolean; bot: boolean; score: number; color: number }> = [];
     this.room.state.players.forEach((p: any, id: string) => {
       out.push({
         id,
@@ -367,6 +367,7 @@ const Net = {
         ready: !!p.ready,
         bot: !!p.bot,
         score: p.score || 0,
+        color: p.skin || 0,
       });
     });
     return out;

@@ -81,7 +81,6 @@
         connRetry: dollar("conn-retry"),
         connMenu: dollar("conn-menu"),
         bots: dollar("bots-check"),
-        planeSwatches: dollar("plane-swatches"),
         countdown: dollar("countdown"),
         interLeave: dollar("intermission-leave"),
         // Slice 1 additions
@@ -103,11 +102,16 @@
         joinCodeSubmit: dollar("join-code-submit"),
         joinCodeCancel: dollar("join-code-cancel"),
         joinCodeOpenBtn: dollar("join-code-open-btn"),
-        menuLeaderboard: dollar("menu-leaderboard")
+        menuLeaderboard: dollar("menu-leaderboard"),
+        hangarOverlay: dollar("hangar-overlay"),
+        hangarBtn: dollar("hangar-btn"),
+        hangarCloseBtn: dollar("hangar-close-btn"),
+        hangarDone: dollar("hangar-done")
       };
       var mode = "menu";
       var settingsOpen = false;
       var joinCodeOpen = false;
+      var hangarOpen = false;
       var last = 0;
       var prevPhase = "playing";
       var prevHp = G.MAX_HP;
@@ -127,7 +131,32 @@
       var countdownActive = false;
       var currentLobbyCode = null;
       var currentLobbyServer = null;
-      var SKINS = [16739179, 4833535, 9167690, 16765514, 12614655];
+      var COLORS_HEX = [
+        "#ff6b6b",
+        // 0 Scarlet
+        "#49c0ff",
+        // 1 Cobalt
+        "#8be34a",
+        // 2 Olive
+        "#ffd24a",
+        // 3 Sunburst
+        "#c07bff",
+        // 4 Violet
+        "#ff9f43",
+        // 5 Ember
+        "#00d2d3",
+        // 6 Teal
+        "#ffeaa7",
+        // 7 Cream
+        "#dfe6e9",
+        // 8 Ghost
+        "#2d3436",
+        // 9 Stealth
+        "#e17055",
+        // 10 Rust
+        "#55efc4"
+        // 11 Mint
+      ];
       try {
         const legacySkin = localStorage.getItem("smashcart.skin");
         if (legacySkin !== null && localStorage.getItem("smashcart.color") === null) {
@@ -367,8 +396,10 @@
           const botBadge = p.bot ? '<span class="lobby-badge lobby-badge--bot">BOT</span>' : "";
           const readyMark = !p.bot ? `<span class="lobby-ready-mark ${p.ready ? "is-ready" : ""}">${p.ready ? "\u2713" : "\u25CB"}</span>` : "";
           const kickBtn = isLocalHost && !isMe && !p.bot ? `<button class="lobby-kick-btn secondary" data-target="${escapeHtml(p.id)}" title="Kick">\u2715</button>` : "";
+          const colorHex = COLORS_HEX[typeof p.color === "number" && p.color >= 0 && p.color < COLORS_HEX.length ? p.color : 0];
+          const colorDot = `<span class="lobby-color-dot" style="background:${colorHex}"></span>`;
           return `<div class="lobby-row${isMe ? " lobby-row--me" : ""}">
-  <span class="lobby-row-name">${hostBadge}${botBadge}${escapeHtml(p.name)}</span>
+  <span class="lobby-row-name">${colorDot}${hostBadge}${botBadge}${escapeHtml(p.name)}</span>
   <span class="lobby-row-right">${readyMark}${kickBtn}</span>
 </div>`;
         }).join("");
@@ -566,25 +597,119 @@
           els.menuLeaderboard.innerHTML = '<div class="lb-row muted">Leaderboard unavailable</div>';
         });
       }
-      function buildPlanePicker() {
-        els.planeSwatches.innerHTML = "";
-        SKINS.forEach((color, index) => {
-          const button = document.createElement("button");
-          button.className = "plane-swatch" + (index === selectedCosmetics.color ? " selected" : "");
-          button.style.background = "#" + color.toString(16).padStart(6, "0");
-          button.title = `Plane ${index + 1}`;
-          button.addEventListener("click", () => {
-            selectedCosmetics.color = index;
+      function showHangar() {
+        hangarOpen = true;
+        els.hangarOverlay.classList.remove("hidden");
+        if (window.Renderer && window.Renderer.updateMenuPlane) window.Renderer.updateMenuPlane(selectedCosmetics);
+      }
+      function hideHangar() {
+        hangarOpen = false;
+        els.hangarOverlay.classList.add("hidden");
+      }
+      function buildHangar() {
+        const tabs = els.hangarOverlay.querySelectorAll(".hangar-tab");
+        const sections = els.hangarOverlay.querySelectorAll(".hangar-section");
+        function activateTab(tabName) {
+          tabs.forEach((t) => {
+            const active = t.dataset.tab === tabName;
+            t.classList.toggle("active", active);
+            t.setAttribute("aria-selected", active ? "true" : "false");
+          });
+          sections.forEach((s) => {
+            const active = s.dataset.section === tabName;
+            s.classList.toggle("active", active);
+            s.classList.toggle("hidden", !active);
+          });
+        }
+        tabs.forEach((tab) => {
+          tab.addEventListener("click", () => {
+            window.SFX.uiClick();
+            activateTab(tab.dataset.tab);
+          });
+        });
+        const shapeLabels = ["Fighter", "Interceptor", "Bomber", "Biplane"];
+        shapeLabels.forEach((_, i) => {
+          const btn = dollar(`hangar-shape-${i}`);
+          btn.classList.toggle("selected", selectedCosmetics.bodyShape === i);
+          btn.addEventListener("click", () => {
+            selectedCosmetics.bodyShape = i;
             try {
-              localStorage.setItem("smashcart.color", String(index));
+              localStorage.setItem("smashcart.bodyShape", String(i));
             } catch {
             }
-            els.planeSwatches.querySelectorAll(".plane-swatch").forEach((node, i) => node.classList.toggle("selected", i === index));
+            els.hangarOverlay.querySelectorAll(".hangar-shape-btn").forEach((b, j) => b.classList.toggle("selected", j === i));
             window.SFX.uiClick();
-            if (window.Renderer.updateMenuPlane) window.Renderer.updateMenuPlane(selectedCosmetics);
+            if (window.Renderer && window.Renderer.updateMenuPlane) window.Renderer.updateMenuPlane(selectedCosmetics);
           });
-          els.planeSwatches.appendChild(button);
         });
+        COLORS_HEX.forEach((_, i) => {
+          const btn = dollar(`hangar-color-${i}`);
+          btn.classList.toggle("selected", selectedCosmetics.color === i);
+          btn.addEventListener("click", () => {
+            selectedCosmetics.color = i;
+            try {
+              localStorage.setItem("smashcart.color", String(i));
+            } catch {
+            }
+            els.hangarOverlay.querySelectorAll("[id^='hangar-color-']").forEach((b) => {
+              const idx = parseInt(b.id.replace("hangar-color-", ""), 10);
+              b.classList.toggle("selected", idx === i);
+            });
+            window.SFX.uiClick();
+            if (window.Renderer && window.Renderer.updateMenuPlane) window.Renderer.updateMenuPlane(selectedCosmetics);
+          });
+        });
+        const accentCount = 7;
+        for (let i = 0; i < accentCount; i++) {
+          const btn = dollar(`hangar-accent-${i}`);
+          btn.classList.toggle("selected", selectedCosmetics.accent === i);
+          btn.addEventListener("click", () => {
+            selectedCosmetics.accent = i;
+            try {
+              localStorage.setItem("smashcart.accent", String(i));
+            } catch {
+            }
+            els.hangarOverlay.querySelectorAll("[id^='hangar-accent-']").forEach((b) => {
+              const idx = parseInt(b.id.replace("hangar-accent-", ""), 10);
+              b.classList.toggle("selected", idx === i);
+            });
+            window.SFX.uiClick();
+            if (window.Renderer && window.Renderer.updateMenuPlane) window.Renderer.updateMenuPlane(selectedCosmetics);
+          });
+        }
+        const liveryLabels = ["Clean", "Stripe", "Two-Tone", "Camo"];
+        liveryLabels.forEach((_, i) => {
+          const btn = dollar(`hangar-livery-${i}`);
+          btn.classList.toggle("selected", selectedCosmetics.livery === i);
+          btn.addEventListener("click", () => {
+            selectedCosmetics.livery = i;
+            try {
+              localStorage.setItem("smashcart.livery", String(i));
+            } catch {
+            }
+            els.hangarOverlay.querySelectorAll(".hangar-livery-btn").forEach((b, j) => b.classList.toggle("selected", j === i));
+            window.SFX.uiClick();
+            if (window.Renderer && window.Renderer.updateMenuPlane) window.Renderer.updateMenuPlane(selectedCosmetics);
+          });
+        });
+        const trailCount = 5;
+        for (let i = 0; i < trailCount; i++) {
+          const btn = dollar(`hangar-trail-${i}`);
+          btn.classList.toggle("selected", selectedCosmetics.trail === i);
+          btn.addEventListener("click", () => {
+            selectedCosmetics.trail = i;
+            try {
+              localStorage.setItem("smashcart.trail", String(i));
+            } catch {
+            }
+            els.hangarOverlay.querySelectorAll("[id^='hangar-trail-']").forEach((b) => {
+              const idx = parseInt(b.id.replace("hangar-trail-", ""), 10);
+              b.classList.toggle("selected", idx === i);
+            });
+            window.SFX.uiClick();
+            if (window.Renderer && window.Renderer.updateMenuPlane) window.Renderer.updateMenuPlane(selectedCosmetics);
+          });
+        }
       }
       async function startGame(code, serverOrigin = null) {
         let roomCode = code;
@@ -1027,7 +1152,7 @@
           }
           window.SFX.uiClick();
         });
-        buildPlanePicker();
+        buildHangar();
         fetchLeaderboard();
         setupTouchButtons();
         updateRotateOverlay();
@@ -1158,6 +1283,21 @@
         });
         els.settingsScreen.addEventListener("click", (e) => {
           if (e.target === els.settingsScreen) hideSettings();
+        });
+        els.hangarBtn.addEventListener("click", () => {
+          window.SFX.uiClick();
+          showHangar();
+        });
+        els.hangarCloseBtn.addEventListener("click", () => {
+          window.SFX.uiClick();
+          hideHangar();
+        });
+        els.hangarDone.addEventListener("click", () => {
+          window.SFX.uiClick();
+          hideHangar();
+        });
+        els.hangarOverlay.addEventListener("click", (e) => {
+          if (e.target === els.hangarOverlay) hideHangar();
         });
         const volMasterEl = document.getElementById("set-vol-master");
         const volSfxEl = document.getElementById("set-vol-sfx");
@@ -1293,6 +1433,10 @@
           if (e.key === "Escape") {
             if (!els.shareQrOverlay.classList.contains("hidden")) {
               hideShareQr();
+              return;
+            }
+            if (hangarOpen) {
+              hideHangar();
               return;
             }
             if (settingsOpen) {

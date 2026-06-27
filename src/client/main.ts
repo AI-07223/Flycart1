@@ -69,7 +69,6 @@ const els = {
   connRetry: dollar("conn-retry") as HTMLButtonElement,
   connMenu: dollar("conn-menu") as HTMLButtonElement,
   bots: dollar("bots-check") as HTMLInputElement,
-  planeSwatches: dollar("plane-swatches"),
   countdown: dollar("countdown"),
   interLeave: dollar("intermission-leave") as HTMLButtonElement,
   // Slice 1 additions
@@ -92,11 +91,16 @@ const els = {
   joinCodeCancel: dollar("join-code-cancel") as HTMLButtonElement,
   joinCodeOpenBtn: dollar("join-code-open-btn") as HTMLButtonElement,
   menuLeaderboard: dollar("menu-leaderboard"),
+  hangarOverlay: dollar("hangar-overlay"),
+  hangarBtn: dollar("hangar-btn") as HTMLButtonElement,
+  hangarCloseBtn: dollar("hangar-close-btn") as HTMLButtonElement,
+  hangarDone: dollar("hangar-done") as HTMLButtonElement,
 };
 
 let mode: "menu" | "lobby" | "playing" | "paused" | "lost" | "error" = "menu";
 let settingsOpen = false;
 let joinCodeOpen = false;
+let hangarOpen = false;
 let last = 0;
 let prevPhase = "playing";
 let prevHp = G.MAX_HP;
@@ -123,6 +127,22 @@ let currentLobbyCode: string | null = null;
 let currentLobbyServer: string | null = null;
 
 const SKINS = [0xff6b6b, 0x49c0ff, 0x8be34a, 0xffd24a, 0xc07bff];
+
+// COLORS hex list — must match COLORS array in render3d.js (12 entries, indices 0-11)
+const COLORS_HEX = [
+  "#ff6b6b", // 0 Scarlet
+  "#49c0ff", // 1 Cobalt
+  "#8be34a", // 2 Olive
+  "#ffd24a", // 3 Sunburst
+  "#c07bff", // 4 Violet
+  "#ff9f43", // 5 Ember
+  "#00d2d3", // 6 Teal
+  "#ffeaa7", // 7 Cream
+  "#dfe6e9", // 8 Ghost
+  "#2d3436", // 9 Stealth
+  "#e17055", // 10 Rust
+  "#55efc4", // 11 Mint
+];
 
 try {
   // One-time migration: if old smashcart.skin exists but smashcart.color does not, copy it over.
@@ -383,9 +403,12 @@ function renderLobbyRoster(): void {
     const kickBtn = (isLocalHost && !isMe && !p.bot)
       ? `<button class="lobby-kick-btn secondary" data-target="${escapeHtml(p.id)}" title="Kick">✕</button>`
       : '';
+    // Color dot — uses the player's cosmetic color index (p.color), falling back to 0
+    const colorHex = COLORS_HEX[typeof p.color === 'number' && p.color >= 0 && p.color < COLORS_HEX.length ? p.color : 0];
+    const colorDot = `<span class="lobby-color-dot" style="background:${colorHex}"></span>`;
 
     return `<div class="lobby-row${isMe ? ' lobby-row--me' : ''}">
-  <span class="lobby-row-name">${hostBadge}${botBadge}${escapeHtml(p.name)}</span>
+  <span class="lobby-row-name">${colorDot}${hostBadge}${botBadge}${escapeHtml(p.name)}</span>
   <span class="lobby-row-right">${readyMark}${kickBtn}</span>
 </div>`;
   }).join('');
@@ -629,22 +652,122 @@ function fetchLeaderboard(): void {
     });
 }
 
-function buildPlanePicker(): void {
-  els.planeSwatches.innerHTML = "";
-  SKINS.forEach((color, index) => {
-    const button = document.createElement("button");
-    button.className = "plane-swatch" + (index === selectedCosmetics.color ? " selected" : "");
-    button.style.background = "#" + color.toString(16).padStart(6, "0");
-    button.title = `Plane ${index + 1}`;
-    button.addEventListener("click", () => {
-      selectedCosmetics.color = index;
-      try { localStorage.setItem("smashcart.color", String(index)); } catch {}
-      els.planeSwatches.querySelectorAll(".plane-swatch").forEach((node, i) => node.classList.toggle("selected", i === index));
-      window.SFX.uiClick();
-      if (window.Renderer.updateMenuPlane) window.Renderer.updateMenuPlane(selectedCosmetics);
+// ─── HANGAR OVERLAY ──────────────────────────────────────────────────────────
+
+function showHangar(): void {
+  hangarOpen = true;
+  els.hangarOverlay.classList.remove("hidden");
+  // Sync live preview immediately to current cosmetics
+  if (window.Renderer && window.Renderer.updateMenuPlane) window.Renderer.updateMenuPlane(selectedCosmetics);
+}
+
+function hideHangar(): void {
+  hangarOpen = false;
+  els.hangarOverlay.classList.add("hidden");
+}
+
+function buildHangar(): void {
+  // ── TABS ──────────────────────────────────────────────────────────────────
+  const tabs = els.hangarOverlay.querySelectorAll<HTMLButtonElement>(".hangar-tab");
+  const sections = els.hangarOverlay.querySelectorAll<HTMLElement>(".hangar-section");
+
+  function activateTab(tabName: string): void {
+    tabs.forEach((t) => {
+      const active = t.dataset.tab === tabName;
+      t.classList.toggle("active", active);
+      t.setAttribute("aria-selected", active ? "true" : "false");
     });
-    els.planeSwatches.appendChild(button);
+    sections.forEach((s) => {
+      const active = s.dataset.section === tabName;
+      s.classList.toggle("active", active);
+      s.classList.toggle("hidden", !active);
+    });
+  }
+
+  tabs.forEach((tab) => {
+    tab.addEventListener("click", () => {
+      window.SFX.uiClick();
+      activateTab(tab.dataset.tab!);
+    });
   });
+
+  // ── BODY SHAPE (0-3) ──────────────────────────────────────────────────────
+  const shapeLabels = ["Fighter", "Interceptor", "Bomber", "Biplane"];
+  shapeLabels.forEach((_, i) => {
+    const btn = dollar(`hangar-shape-${i}`);
+    btn.classList.toggle("selected", selectedCosmetics.bodyShape === i);
+    btn.addEventListener("click", () => {
+      selectedCosmetics.bodyShape = i;
+      try { localStorage.setItem("smashcart.bodyShape", String(i)); } catch {}
+      els.hangarOverlay.querySelectorAll<HTMLButtonElement>(".hangar-shape-btn").forEach((b, j) => b.classList.toggle("selected", j === i));
+      window.SFX.uiClick();
+      if (window.Renderer && window.Renderer.updateMenuPlane) window.Renderer.updateMenuPlane(selectedCosmetics);
+    });
+  });
+
+  // ── COLORS (0-11) ─────────────────────────────────────────────────────────
+  COLORS_HEX.forEach((_, i) => {
+    const btn = dollar(`hangar-color-${i}`);
+    btn.classList.toggle("selected", selectedCosmetics.color === i);
+    btn.addEventListener("click", () => {
+      selectedCosmetics.color = i;
+      try { localStorage.setItem("smashcart.color", String(i)); } catch {}
+      els.hangarOverlay.querySelectorAll<HTMLButtonElement>("[id^='hangar-color-']").forEach((b) => {
+        const idx = parseInt(b.id.replace("hangar-color-", ""), 10);
+        b.classList.toggle("selected", idx === i);
+      });
+      window.SFX.uiClick();
+      if (window.Renderer && window.Renderer.updateMenuPlane) window.Renderer.updateMenuPlane(selectedCosmetics);
+    });
+  });
+
+  // ── ACCENT (0-6) ──────────────────────────────────────────────────────────
+  const accentCount = 7;
+  for (let i = 0; i < accentCount; i++) {
+    const btn = dollar(`hangar-accent-${i}`);
+    btn.classList.toggle("selected", selectedCosmetics.accent === i);
+    btn.addEventListener("click", () => {
+      selectedCosmetics.accent = i;
+      try { localStorage.setItem("smashcart.accent", String(i)); } catch {}
+      els.hangarOverlay.querySelectorAll<HTMLButtonElement>("[id^='hangar-accent-']").forEach((b) => {
+        const idx = parseInt(b.id.replace("hangar-accent-", ""), 10);
+        b.classList.toggle("selected", idx === i);
+      });
+      window.SFX.uiClick();
+      if (window.Renderer && window.Renderer.updateMenuPlane) window.Renderer.updateMenuPlane(selectedCosmetics);
+    });
+  }
+
+  // ── LIVERY (0-3) ──────────────────────────────────────────────────────────
+  const liveryLabels = ["Clean", "Stripe", "Two-Tone", "Camo"];
+  liveryLabels.forEach((_, i) => {
+    const btn = dollar(`hangar-livery-${i}`);
+    btn.classList.toggle("selected", selectedCosmetics.livery === i);
+    btn.addEventListener("click", () => {
+      selectedCosmetics.livery = i;
+      try { localStorage.setItem("smashcart.livery", String(i)); } catch {}
+      els.hangarOverlay.querySelectorAll<HTMLButtonElement>(".hangar-livery-btn").forEach((b, j) => b.classList.toggle("selected", j === i));
+      window.SFX.uiClick();
+      if (window.Renderer && window.Renderer.updateMenuPlane) window.Renderer.updateMenuPlane(selectedCosmetics);
+    });
+  });
+
+  // ── TRAIL (0-4) ───────────────────────────────────────────────────────────
+  const trailCount = 5;
+  for (let i = 0; i < trailCount; i++) {
+    const btn = dollar(`hangar-trail-${i}`);
+    btn.classList.toggle("selected", selectedCosmetics.trail === i);
+    btn.addEventListener("click", () => {
+      selectedCosmetics.trail = i;
+      try { localStorage.setItem("smashcart.trail", String(i)); } catch {}
+      els.hangarOverlay.querySelectorAll<HTMLButtonElement>("[id^='hangar-trail-']").forEach((b) => {
+        const idx = parseInt(b.id.replace("hangar-trail-", ""), 10);
+        b.classList.toggle("selected", idx === i);
+      });
+      window.SFX.uiClick();
+      if (window.Renderer && window.Renderer.updateMenuPlane) window.Renderer.updateMenuPlane(selectedCosmetics);
+    });
+  }
 }
 
 // ─── PUBLIC QUICK-PLAY (unchanged path) ──────────────────────────────────────
@@ -1160,7 +1283,7 @@ function init(): void {
     window.SFX.uiClick();
   });
 
-  buildPlanePicker();
+  buildHangar();
   fetchLeaderboard();
   setupTouchButtons();
   updateRotateOverlay();
@@ -1291,6 +1414,24 @@ function init(): void {
     if (e.target === els.settingsScreen) hideSettings();
   });
 
+  // ─── HANGAR OVERLAY WIRING ────────────────────────────────────────────────
+  els.hangarBtn.addEventListener("click", () => {
+    window.SFX.uiClick();
+    showHangar();
+  });
+  els.hangarCloseBtn.addEventListener("click", () => {
+    window.SFX.uiClick();
+    hideHangar();
+  });
+  els.hangarDone.addEventListener("click", () => {
+    window.SFX.uiClick();
+    hideHangar();
+  });
+  // Click-outside to close hangar
+  els.hangarOverlay.addEventListener("click", (e: MouseEvent) => {
+    if (e.target === els.hangarOverlay) hideHangar();
+  });
+
   // ─── SETTINGS CONTROLS ───────────────────────────────────────────────────
   // Volume sliders
   const volMasterEl = document.getElementById("set-vol-master") as HTMLInputElement | null;
@@ -1419,6 +1560,7 @@ function init(): void {
   document.addEventListener("keydown", (e: KeyboardEvent) => {
     if (e.key === "Escape") {
       if (!els.shareQrOverlay.classList.contains("hidden")) { hideShareQr(); return; }
+      if (hangarOpen) { hideHangar(); return; }
       if (settingsOpen) { hideSettings(); return; }
       if (joinCodeOpen) { closeJoinCode(); return; }
     }

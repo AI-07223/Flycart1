@@ -135,10 +135,8 @@
             <label class="field-label" for="name-input">Call sign</label>
             <input id="name-input" maxlength="14" placeholder="Call sign" />
             <label class="switch"><input type="checkbox" id="bots-check" checked /> 🤖 Fill empty seats with bots</label>
-            <div id="plane-picker">
-              <span class="picker-label">Choose your plane</span>
-              <div id="plane-swatches"></div>
-            </div>
+            <!-- Hangar button replaces the old #plane-picker / #plane-swatches block -->
+            <button id="hangar-btn" class="secondary hangar-open-btn">✈ HANGAR</button>
             <p id="orientation-note" class="muted menu-note">Landscape is recommended on touch devices.</p>
           </section>
         </div>
@@ -310,6 +308,90 @@
         <div class="btn-row">
           <button id="settings-close-btn2">CLOSE</button>
         </div>
+      </div>
+    </div>
+
+    <!-- HANGAR OVERLAY: transparent backdrop so 3D preview stays visible behind the card -->
+    <div id="hangar-overlay" class="overlay hangar-overlay hidden" role="dialog" aria-labelledby="hangar-title">
+      <div class="hangar-card">
+        <div class="panel-head">
+          <h2 id="hangar-title">Hangar</h2>
+          <button id="hangar-close-btn" class="secondary" aria-label="Close hangar">✕</button>
+        </div>
+
+        <!-- Tab row -->
+        <div class="hangar-tabs" role="tablist">
+          <button class="hangar-tab active" data-tab="shape" role="tab" aria-selected="true">Shape</button>
+          <button class="hangar-tab" data-tab="color" role="tab" aria-selected="false">Color</button>
+          <button class="hangar-tab" data-tab="accent" role="tab" aria-selected="false">Accent</button>
+          <button class="hangar-tab" data-tab="trail" role="tab" aria-selected="false">Trail</button>
+        </div>
+
+        <!-- SHAPE section -->
+        <div class="hangar-section active" data-section="shape" role="tabpanel">
+          <p class="hangar-section-label">Body Shape</p>
+          <div class="hangar-shape-grid">
+            <button class="hangar-shape-btn" id="hangar-shape-0">Fighter</button>
+            <button class="hangar-shape-btn" id="hangar-shape-1">Interceptor</button>
+            <button class="hangar-shape-btn" id="hangar-shape-2">Bomber</button>
+            <button class="hangar-shape-btn" id="hangar-shape-3">Biplane</button>
+          </div>
+        </div>
+
+        <!-- COLOR section -->
+        <div class="hangar-section hidden" data-section="color" role="tabpanel">
+          <p class="hangar-section-label">Color</p>
+          <div class="hangar-swatch-grid">
+            <button class="hangar-swatch" id="hangar-color-0"  style="background:#ff6b6b" title="Scarlet"></button>
+            <button class="hangar-swatch" id="hangar-color-1"  style="background:#49c0ff" title="Cobalt"></button>
+            <button class="hangar-swatch" id="hangar-color-2"  style="background:#8be34a" title="Olive"></button>
+            <button class="hangar-swatch" id="hangar-color-3"  style="background:#ffd24a" title="Sunburst"></button>
+            <button class="hangar-swatch" id="hangar-color-4"  style="background:#c07bff" title="Violet"></button>
+            <button class="hangar-swatch" id="hangar-color-5"  style="background:#ff9f43" title="Ember"></button>
+            <button class="hangar-swatch" id="hangar-color-6"  style="background:#00d2d3" title="Teal"></button>
+            <button class="hangar-swatch" id="hangar-color-7"  style="background:#ffeaa7" title="Cream"></button>
+            <button class="hangar-swatch" id="hangar-color-8"  style="background:#dfe6e9" title="Ghost"></button>
+            <button class="hangar-swatch" id="hangar-color-9"  style="background:#2d3436" title="Stealth"></button>
+            <button class="hangar-swatch" id="hangar-color-10" style="background:#e17055" title="Rust"></button>
+            <button class="hangar-swatch" id="hangar-color-11" style="background:#55efc4" title="Mint"></button>
+          </div>
+        </div>
+
+        <!-- ACCENT section (accent colors + livery patterns) -->
+        <div class="hangar-section hidden" data-section="accent" role="tabpanel">
+          <p class="hangar-section-label">Accent Color</p>
+          <div class="hangar-swatch-grid">
+            <button class="hangar-swatch" id="hangar-accent-0" style="background:#273244" title="None"></button>
+            <button class="hangar-swatch" id="hangar-accent-1" style="background:#ffffff" title="White"></button>
+            <button class="hangar-swatch" id="hangar-accent-2" style="background:#000000" title="Black"></button>
+            <button class="hangar-swatch" id="hangar-accent-3" style="background:#ffd24a" title="Gold"></button>
+            <button class="hangar-swatch" id="hangar-accent-4" style="background:#ff6b6b" title="Red"></button>
+            <button class="hangar-swatch" id="hangar-accent-5" style="background:#49c0ff" title="Blue"></button>
+            <button class="hangar-swatch" id="hangar-accent-6" style="background:#8be34a" title="Green"></button>
+          </div>
+          <p class="hangar-section-label" style="margin-top:14px">Livery Pattern</p>
+          <div class="hangar-livery-grid">
+            <button class="hangar-livery-btn" id="hangar-livery-0">Clean</button>
+            <button class="hangar-livery-btn" id="hangar-livery-1">Stripe</button>
+            <button class="hangar-livery-btn" id="hangar-livery-2">Two-Tone</button>
+            <button class="hangar-livery-btn" id="hangar-livery-3">Camo</button>
+          </div>
+        </div>
+
+        <!-- TRAIL section -->
+        <div class="hangar-section hidden" data-section="trail" role="tabpanel">
+          <p class="hangar-section-label">Trail</p>
+          <div class="hangar-swatch-grid">
+            <button class="hangar-swatch" id="hangar-trail-0" style="background:#ffffff" title="White Smoke"></button>
+            <button class="hangar-swatch" id="hangar-trail-1" style="background:#ff9f43" title="Orange Thrust"></button>
+            <button class="hangar-swatch" id="hangar-trail-2" style="background:#49c0ff" title="Cryo Blue"></button>
+            <button class="hangar-swatch" id="hangar-trail-3" style="background:#c07bff" title="Plasma Violet"></button>
+            <button class="hangar-swatch" id="hangar-trail-4" style="background:#8be34a" title="Toxic Green"></button>
+          </div>
+        </div>
+
+        <button id="hangar-done">DONE</button>
+        <p class="muted hangar-hint">Cosmetics are visual only — no effect on flight or damage.</p>
       </div>
     </div>
 
