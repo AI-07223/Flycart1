@@ -21,11 +21,19 @@ const clamp = (v: unknown): number => { const n = parseFloat(v as string); retur
 const rd = (k: string, d: number): number => { try { const v = localStorage.getItem(k); return v == null ? d : parseFloat(v); } catch (_e) { return d; } };
 const wr = (k: string, v: number): void => { try { localStorage.setItem(k, String(v)); } catch (_e) { /* ignore */ } };
 
+// Canonical localStorage keys for volume settings (shared with main.ts settings UI)
+const KEYS = {
+  master: "smashcart.volMaster",
+  music:  "smashcart.volMusic",
+  sfx:    "smashcart.volSfx",
+  muted:  "sc_muted",
+} as const;
+
 const store = {
-  master: rd("sc_vol_master", 0.8),
-  music: rd("sc_vol_music", 0.5),
-  sfx: rd("sc_vol_sfx", 0.9),
-  muted: !!rd("sc_muted", 0),
+  master: rd(KEYS.master, 1.0),
+  music: rd(KEYS.music, 0.6),
+  sfx: rd(KEYS.sfx, 1.0),
+  muted: !!rd(KEYS.muted, 0),
 };
 
 function applyVolumes(): void {
@@ -113,7 +121,8 @@ function startMenuAmbient(): void {
     menuAmbientGain.gain.value = 0;
     menuAmbientGain.gain.linearRampToValueAtTime(0.06, ctx.currentTime + 1.5);
     menuAmbient.connect(menuAmbientGain);
-    menuAmbientGain.connect(master!);
+    // Route through musicBus so the music volume slider affects it
+    menuAmbientGain.connect(musicBus!);
     menuAmbient.start();
   } catch (_e) { menuAmbient = null; }
 }
@@ -150,11 +159,11 @@ function stopMenuAmbient(): void {
   go(): void { playBuf("ui", 0.7, 0.8); },
   uiClick(): void { playBuf("ui"); },
   pickup(): void { playBuf("ui", 1.6, 0.9); },
-  toggleMute(): boolean { store.muted = !store.muted; wr("sc_muted", store.muted ? 1 : 0); applyVolumes(); return store.muted; },
+  toggleMute(): boolean { store.muted = !store.muted; wr(KEYS.muted, store.muted ? 1 : 0); applyVolumes(); return store.muted; },
   isMuted(): boolean { return store.muted; },
-  setMaster(v: number): void { store.master = clamp(v); wr("sc_vol_master", store.master); applyVolumes(); },
-  setMusic(v: number): void { store.music = clamp(v); wr("sc_vol_music", store.music); applyVolumes(); },
-  setSfx(v: number): void { store.sfx = clamp(v); wr("sc_vol_sfx", store.sfx); applyVolumes(); },
+  setMaster(v: number): void { store.master = clamp(v); wr(KEYS.master, store.master); applyVolumes(); },
+  setMusic(v: number): void { store.music = clamp(v); wr(KEYS.music, store.music); applyVolumes(); },
+  setSfx(v: number): void { store.sfx = clamp(v); wr(KEYS.sfx, store.sfx); applyVolumes(); },
   vols(): { master: number; music: number; sfx: number; muted: boolean } {
     return { master: store.master, music: store.music, sfx: store.sfx, muted: store.muted };
   },

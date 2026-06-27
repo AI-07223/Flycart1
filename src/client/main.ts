@@ -118,6 +118,12 @@ try {
   botsEnabled = localStorage.getItem("smashcart.bots") !== "0";
 } catch {}
 
+// Persisted input inversion flags — loaded into Input after Input is available
+function loadInputPrefs(): void {
+  try { window.Input.invertPitch = localStorage.getItem("smashcart.invertPitch") === "1"; } catch {}
+  try { window.Input.invertSteer = localStorage.getItem("smashcart.invertSteer") === "1"; } catch {}
+}
+
 function escapeHtml(s: string): string {
   return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c] as string));
 }
@@ -503,8 +509,37 @@ function showFatal(msg: string): void {
 
 // ─── SETTINGS OVERLAY ────────────────────────────────────────────────────────
 // Settings is a sub-state: it doesn't change `mode`, it overlays on top.
+
+// Sync all settings controls to current live state so the UI matches reality.
+function populateSettingsUI(): void {
+  const vols = window.SFX.vols();
+  const volMasterEl = document.getElementById("set-vol-master") as HTMLInputElement | null;
+  const volSfxEl    = document.getElementById("set-vol-sfx")    as HTMLInputElement | null;
+  const volMusicEl  = document.getElementById("set-vol-music")  as HTMLInputElement | null;
+  if (volMasterEl) volMasterEl.value = String(vols.master);
+  if (volSfxEl)    volSfxEl.value    = String(vols.sfx);
+  if (volMusicEl)  volMusicEl.value  = String(vols.music);
+
+  // Quality — #set-quality may be a <select> or a group of <input type="radio">
+  const qualityTier = window.Quality._auto ? "auto" : window.Quality.current;
+  const qualitySelect = document.getElementById("set-quality") as HTMLSelectElement | null;
+  if (qualitySelect && qualitySelect.tagName === "SELECT") {
+    qualitySelect.value = qualityTier;
+  } else {
+    // Radio group
+    const radios = document.querySelectorAll<HTMLInputElement>('input[name="set-quality"]');
+    radios.forEach((r) => { r.checked = r.value === qualityTier; });
+  }
+
+  const invertPitchEl = document.getElementById("set-invert-pitch") as HTMLInputElement | null;
+  const invertSteerEl = document.getElementById("set-invert-steer") as HTMLInputElement | null;
+  if (invertPitchEl) invertPitchEl.checked = window.Input.invertPitch;
+  if (invertSteerEl) invertSteerEl.checked = window.Input.invertSteer;
+}
+
 function showSettings(): void {
   settingsOpen = true;
+  populateSettingsUI();
   els.settingsScreen.classList.remove("hidden");
 }
 
@@ -722,6 +757,8 @@ function loop(ts: number): void {
     const input = window.Input.get();
     window.Net.sendInput(input.turn, input.climb, input.boost, input.fire);
     (window.Net as any).stepLocal && (window.Net as any).stepLocal(dt);
+    // Adaptive quality watchdog — only runs when tier is 'auto' (Quality._auto)
+    window.Quality.sample(dt);
 
     window.Renderer.sync(state, dt, myId);
     window.Renderer.draw(state, myId);
@@ -966,6 +1003,7 @@ function init(): void {
 
   window.Renderer.init(els.canvas);
   window.Input.attach();
+  loadInputPrefs();
   window.Assets.load();
   window.Net.onKill = onKill;
   window.Net.onPickup = onPickup;
@@ -1006,9 +1044,22 @@ function init(): void {
     const origin = resolveLanOrigin();
     if (origin) startGame(genCode(), origin);
   });
+  // Load persisted call sign
+  try {
+    const savedName = localStorage.getItem("smashcart.name");
+    if (savedName) els.name.value = savedName;
+  } catch {}
+  // Persist call sign on change and blur
+  els.name.addEventListener("change", () => {
+    try { localStorage.setItem("smashcart.name", els.name.value); } catch {}
+  });
+  els.name.addEventListener("blur", () => {
+    try { localStorage.setItem("smashcart.name", els.name.value); } catch {}
+  });
   els.name.addEventListener("keydown", (e: KeyboardEvent) => {
     if (e.key === "Enter") {
       e.preventDefault();
+      try { localStorage.setItem("smashcart.name", els.name.value); } catch {}
       startGame(inviteRoom || "PUBLIC", inviteRoom ? inviteServer : null);
     }
   });
@@ -1095,6 +1146,57 @@ function init(): void {
   els.settingsScreen.addEventListener("click", (e: MouseEvent) => {
     if (e.target === els.settingsScreen) hideSettings();
   });
+
+  // ─── SETTINGS CONTROLS ───────────────────────────────────────────────────
+  // Volume sliders
+  const volMasterEl = document.getElementById("set-vol-master") as HTMLInputElement | null;
+  const volSfxEl    = document.getElementById("set-vol-sfx")    as HTMLInputElement | null;
+  const volMusicEl  = document.getElementById("set-vol-music")  as HTMLInputElement | null;
+  if (volMasterEl) {
+    volMasterEl.addEventListener("input", () => { window.SFX.setMaster(parseFloat(volMasterEl.value)); });
+  }
+  if (volSfxEl) {
+    volSfxEl.addEventListener("input", () => { window.SFX.setSfx(parseFloat(volSfxEl.value)); });
+  }
+  if (volMusicEl) {
+    volMusicEl.addEventListener("input", () => { window.SFX.setMusic(parseFloat(volMusicEl.value)); });
+  }
+
+  // Quality control — supports both <select> and radio group
+  function applyQualityChoice(value: string): void {
+    if (value === "auto") {
+      // Re-enable adaptive sampling: reset the auto flag and let sample() drive it
+      window.Quality._auto = true;
+      try { localStorage.removeItem("smashcart.quality"); } catch {}
+    } else {
+      window.Quality.set(value, true); // persists to localStorage as sc_quality
+    }
+  }
+  const qualitySelect = document.getElementById("set-quality") as HTMLSelectElement | null;
+  if (qualitySelect && qualitySelect.tagName === "SELECT") {
+    qualitySelect.addEventListener("change", () => { window.SFX.uiClick(); applyQualityChoice(qualitySelect.value); });
+  } else {
+    // Radio group
+    document.querySelectorAll<HTMLInputElement>('input[name="set-quality"]').forEach((r) => {
+      r.addEventListener("change", () => { if (r.checked) { window.SFX.uiClick(); applyQualityChoice(r.value); } });
+    });
+  }
+
+  // Invert pitch / steer checkboxes
+  const invertPitchEl = document.getElementById("set-invert-pitch") as HTMLInputElement | null;
+  const invertSteerEl = document.getElementById("set-invert-steer") as HTMLInputElement | null;
+  if (invertPitchEl) {
+    invertPitchEl.addEventListener("change", () => {
+      window.Input.invertPitch = invertPitchEl.checked;
+      try { localStorage.setItem("smashcart.invertPitch", invertPitchEl.checked ? "1" : "0"); } catch {}
+    });
+  }
+  if (invertSteerEl) {
+    invertSteerEl.addEventListener("change", () => {
+      window.Input.invertSteer = invertSteerEl.checked;
+      try { localStorage.setItem("smashcart.invertSteer", invertSteerEl.checked ? "1" : "0"); } catch {}
+    });
+  }
 
   // Join-by-code modal
   els.joinCodeOpenBtn.addEventListener("click", () => {

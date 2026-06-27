@@ -127,6 +127,16 @@
         botsEnabled = localStorage.getItem("smashcart.bots") !== "0";
       } catch {
       }
+      function loadInputPrefs() {
+        try {
+          window.Input.invertPitch = localStorage.getItem("smashcart.invertPitch") === "1";
+        } catch {
+        }
+        try {
+          window.Input.invertSteer = localStorage.getItem("smashcart.invertSteer") === "1";
+        } catch {
+        }
+      }
       function escapeHtml(s) {
         return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
       }
@@ -454,8 +464,32 @@
         els.fatalMsg.textContent = msg;
         applyMode("error");
       }
+      function populateSettingsUI() {
+        const vols = window.SFX.vols();
+        const volMasterEl = document.getElementById("set-vol-master");
+        const volSfxEl = document.getElementById("set-vol-sfx");
+        const volMusicEl = document.getElementById("set-vol-music");
+        if (volMasterEl) volMasterEl.value = String(vols.master);
+        if (volSfxEl) volSfxEl.value = String(vols.sfx);
+        if (volMusicEl) volMusicEl.value = String(vols.music);
+        const qualityTier = window.Quality._auto ? "auto" : window.Quality.current;
+        const qualitySelect = document.getElementById("set-quality");
+        if (qualitySelect && qualitySelect.tagName === "SELECT") {
+          qualitySelect.value = qualityTier;
+        } else {
+          const radios = document.querySelectorAll('input[name="set-quality"]');
+          radios.forEach((r) => {
+            r.checked = r.value === qualityTier;
+          });
+        }
+        const invertPitchEl = document.getElementById("set-invert-pitch");
+        const invertSteerEl = document.getElementById("set-invert-steer");
+        if (invertPitchEl) invertPitchEl.checked = window.Input.invertPitch;
+        if (invertSteerEl) invertSteerEl.checked = window.Input.invertSteer;
+      }
       function showSettings() {
         settingsOpen = true;
+        populateSettingsUI();
         els.settingsScreen.classList.remove("hidden");
       }
       function hideSettings() {
@@ -626,6 +660,7 @@
           const input = window.Input.get();
           window.Net.sendInput(input.turn, input.climb, input.boost, input.fire);
           window.Net.stepLocal && window.Net.stepLocal(dt);
+          window.Quality.sample(dt);
           window.Renderer.sync(state, dt, myId);
           window.Renderer.draw(state, myId);
           updateHud(state, myId);
@@ -851,6 +886,7 @@
         primeLanInput();
         window.Renderer.init(els.canvas);
         window.Input.attach();
+        loadInputPrefs();
         window.Assets.load();
         window.Net.onKill = onKill;
         window.Net.onPickup = onPickup;
@@ -890,9 +926,30 @@
           const origin = resolveLanOrigin();
           if (origin) startGame(genCode(), origin);
         });
+        try {
+          const savedName = localStorage.getItem("smashcart.name");
+          if (savedName) els.name.value = savedName;
+        } catch {
+        }
+        els.name.addEventListener("change", () => {
+          try {
+            localStorage.setItem("smashcart.name", els.name.value);
+          } catch {
+          }
+        });
+        els.name.addEventListener("blur", () => {
+          try {
+            localStorage.setItem("smashcart.name", els.name.value);
+          } catch {
+          }
+        });
         els.name.addEventListener("keydown", (e) => {
           if (e.key === "Enter") {
             e.preventDefault();
+            try {
+              localStorage.setItem("smashcart.name", els.name.value);
+            } catch {
+            }
             startGame(inviteRoom || "PUBLIC", inviteRoom ? inviteServer : null);
           }
         });
@@ -975,6 +1032,71 @@
         els.settingsScreen.addEventListener("click", (e) => {
           if (e.target === els.settingsScreen) hideSettings();
         });
+        const volMasterEl = document.getElementById("set-vol-master");
+        const volSfxEl = document.getElementById("set-vol-sfx");
+        const volMusicEl = document.getElementById("set-vol-music");
+        if (volMasterEl) {
+          volMasterEl.addEventListener("input", () => {
+            window.SFX.setMaster(parseFloat(volMasterEl.value));
+          });
+        }
+        if (volSfxEl) {
+          volSfxEl.addEventListener("input", () => {
+            window.SFX.setSfx(parseFloat(volSfxEl.value));
+          });
+        }
+        if (volMusicEl) {
+          volMusicEl.addEventListener("input", () => {
+            window.SFX.setMusic(parseFloat(volMusicEl.value));
+          });
+        }
+        function applyQualityChoice(value) {
+          if (value === "auto") {
+            window.Quality._auto = true;
+            try {
+              localStorage.removeItem("smashcart.quality");
+            } catch {
+            }
+          } else {
+            window.Quality.set(value, true);
+          }
+        }
+        const qualitySelect = document.getElementById("set-quality");
+        if (qualitySelect && qualitySelect.tagName === "SELECT") {
+          qualitySelect.addEventListener("change", () => {
+            window.SFX.uiClick();
+            applyQualityChoice(qualitySelect.value);
+          });
+        } else {
+          document.querySelectorAll('input[name="set-quality"]').forEach((r) => {
+            r.addEventListener("change", () => {
+              if (r.checked) {
+                window.SFX.uiClick();
+                applyQualityChoice(r.value);
+              }
+            });
+          });
+        }
+        const invertPitchEl = document.getElementById("set-invert-pitch");
+        const invertSteerEl = document.getElementById("set-invert-steer");
+        if (invertPitchEl) {
+          invertPitchEl.addEventListener("change", () => {
+            window.Input.invertPitch = invertPitchEl.checked;
+            try {
+              localStorage.setItem("smashcart.invertPitch", invertPitchEl.checked ? "1" : "0");
+            } catch {
+            }
+          });
+        }
+        if (invertSteerEl) {
+          invertSteerEl.addEventListener("change", () => {
+            window.Input.invertSteer = invertSteerEl.checked;
+            try {
+              localStorage.setItem("smashcart.invertSteer", invertSteerEl.checked ? "1" : "0");
+            } catch {
+            }
+          });
+        }
         els.joinCodeOpenBtn.addEventListener("click", () => {
           window.SFX.uiClick();
           openJoinCode();

@@ -17,6 +17,7 @@
         onPause: null,
         onMute: null,
         invertSteer: false,
+        invertPitch: false,
         touch: { left: false, right: false, climb: false, dive: false, boost: false, fire: false },
         get() {
           const left = !!(keys["ArrowLeft"] || keys["a"] || keys["A"] || this.touch.left);
@@ -25,7 +26,8 @@
           const diveDown = !!(keys["ArrowDown"] || keys["s"] || keys["S"] || this.touch.dive);
           const steer = (right ? 1 : 0) - (left ? 1 : 0);
           this.turn = this.invertSteer ? -steer : steer;
-          this.climb = (climbUp ? 1 : 0) - (diveDown ? 1 : 0);
+          const rawClimb = (climbUp ? 1 : 0) - (diveDown ? 1 : 0);
+          this.climb = this.invertPitch ? -rawClimb : rawClimb;
           this.boost = !!(keys["Shift"] || this.touch.boost);
           this.fire = !!(keys[" "] || keys["Spacebar"] || this.touch.fire);
           return this;

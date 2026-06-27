@@ -19,6 +19,7 @@ const Input = {
   onPause: null as (() => void) | null,
   onMute: null as (() => void) | null,
   invertSteer: false,
+  invertPitch: false,
   touch: { left: false, right: false, climb: false, dive: false, boost: false, fire: false } as TouchState,
 
   get(): typeof Input {
@@ -29,7 +30,8 @@ const Input = {
 
     const steer = (right ? 1 : 0) - (left ? 1 : 0);
     this.turn = this.invertSteer ? -steer : steer;
-    this.climb = (climbUp ? 1 : 0) - (diveDown ? 1 : 0);
+    const rawClimb = (climbUp ? 1 : 0) - (diveDown ? 1 : 0);
+    this.climb = this.invertPitch ? -rawClimb : rawClimb;
     this.boost = !!(keys["Shift"] || this.touch.boost);
     this.fire = !!(keys[" "] || keys["Spacebar"] || this.touch.fire);
     return this;

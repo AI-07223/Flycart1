@@ -97,6 +97,7 @@ interface QualityAPI {
   TIERS: Record<string, QualityTier>;
   ORDER: string[];
   current: string;
+  _auto: boolean;
   init(): QualityAPI;
   cfg(): QualityTier;
   onChange(cb: (cfg: QualityTier, tier: string) => void): void;
@@ -154,6 +155,7 @@ interface InputAPI {
   onMute: (() => void) | null;
   touch: TouchState;
   invertSteer: boolean;
+  invertPitch: boolean;
   get(): InputAPI;
   attach(): void;
   isTouchDevice(): boolean;

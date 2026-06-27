@@ -38,11 +38,17 @@
         } catch (_e) {
         }
       };
+      var KEYS = {
+        master: "smashcart.volMaster",
+        music: "smashcart.volMusic",
+        sfx: "smashcart.volSfx",
+        muted: "sc_muted"
+      };
       var store = {
-        master: rd("sc_vol_master", 0.8),
-        music: rd("sc_vol_music", 0.5),
-        sfx: rd("sc_vol_sfx", 0.9),
-        muted: !!rd("sc_muted", 0)
+        master: rd(KEYS.master, 1),
+        music: rd(KEYS.music, 0.6),
+        sfx: rd(KEYS.sfx, 1),
+        muted: !!rd(KEYS.muted, 0)
       };
       function applyVolumes() {
         if (!ctx || !master || !musicBus || !sfxBus) return;
@@ -143,7 +149,7 @@
           menuAmbientGain.gain.value = 0;
           menuAmbientGain.gain.linearRampToValueAtTime(0.06, ctx.currentTime + 1.5);
           menuAmbient.connect(menuAmbientGain);
-          menuAmbientGain.connect(master);
+          menuAmbientGain.connect(musicBus);
           menuAmbient.start();
         } catch (_e) {
           menuAmbient = null;
@@ -244,7 +250,7 @@
         },
         toggleMute() {
           store.muted = !store.muted;
-          wr("sc_muted", store.muted ? 1 : 0);
+          wr(KEYS.muted, store.muted ? 1 : 0);
           applyVolumes();
           return store.muted;
         },
@@ -253,17 +259,17 @@
         },
         setMaster(v) {
           store.master = clamp(v);
-          wr("sc_vol_master", store.master);
+          wr(KEYS.master, store.master);
           applyVolumes();
         },
         setMusic(v) {
           store.music = clamp(v);
-          wr("sc_vol_music", store.music);
+          wr(KEYS.music, store.music);
           applyVolumes();
         },
         setSfx(v) {
           store.sfx = clamp(v);
-          wr("sc_vol_sfx", store.sfx);
+          wr(KEYS.sfx, store.sfx);
           applyVolumes();
         },
         vols() {
