@@ -37,6 +37,7 @@ import * as THREE from "three";
   let boundary;
   let landscapeRoot;
   let menuDemo = null;
+  let hangarOpen = false;
   let particles = [];
 
   const camPos = new THREE.Vector3(0, 90, 160);
@@ -899,8 +900,10 @@ import * as THREE from "three";
     // drawMenu(dt, cosmetic): cosmetic can be {color,bodyShape,accent,trail,livery} or bare number
     drawMenu(dt, cosmetic) {
       time += Math.min(dt || 0.016, 0.05);
-      for (const [, view] of stateMaps.views) view.mesh.visible = false;
-      for (const [, shield] of stateMaps.views) if (shield && shield.shield) shield.shield.visible = false;
+      for (const [, view] of stateMaps.views) {
+        view.mesh.visible = false;
+        if (view.shield) view.shield.visible = false;
+      }
       // Hide all name labels during menu
       for (const [, div] of nameLabelPool) div.style.display = "none";
       for (const [, bullet] of stateMaps.bullets) bullet.visible = false;
@@ -911,9 +914,13 @@ import * as THREE from "three";
         menuDemo = makePlane(cosmetic);
         scene.add(menuDemo);
       }
-      const radius = 360;
-      const angle = time * 0.18;
-      const pos = { x: Math.cos(angle) * radius, y: 95 + Math.sin(time * 0.8) * 12, z: Math.sin(angle) * radius };
+
+      // Hangar mode: slow the rotation and pull the camera closer for a clear showcase
+      const radius = hangarOpen ? 160 : 360;
+      const rotSpeed = hangarOpen ? 0.07 : 0.18;
+      const bobAmp = hangarOpen ? 6 : 12;
+      const angle = time * rotSpeed;
+      const pos = { x: Math.cos(angle) * radius, y: 85 + Math.sin(time * 0.8) * bobAmp, z: Math.sin(angle) * radius };
       const fwd = SP.normalize({ x: -Math.sin(angle), y: Math.cos(time * 0.8) * 0.08, z: Math.cos(angle) });
       orientPlane(menuDemo, { p: pos, f: fwd }, Math.sin(time * 1.3) * 0.22);
       const prop = menuDemo.userData.prop;
@@ -927,10 +934,24 @@ import * as THREE from "three";
         exhaust.visible = true;
       }
 
-      const desired = new THREE.Vector3(pos.x - fwd.x * 110, pos.y + 42, pos.z - fwd.z * 110);
-      const look = new THREE.Vector3(pos.x + fwd.x * 140, pos.y + 8, pos.z + fwd.z * 140);
-      camPos.lerp(desired, 0.06);
-      camLook.lerp(look, 0.08);
+      // Hangar mode: camera pulls back less and shifts left to frame the plane
+      // in the right portion of the screen (hangar card sits on the left side)
+      const camPullBack = hangarOpen ? 70 : 110;
+      const camUp = hangarOpen ? 30 : 42;
+      const camLookAhead = hangarOpen ? 80 : 140;
+      const lerpSpeed = hangarOpen ? 0.10 : 0.06;
+
+      // Lateral offset: shift camera right when hangar open so plane is left-of-center
+      const right = new THREE.Vector3(-fwd.z, 0, fwd.x).normalize();
+      const lateralShift = hangarOpen ? 60 : 0;
+      const desired = new THREE.Vector3(
+        pos.x - fwd.x * camPullBack + right.x * lateralShift,
+        pos.y + camUp,
+        pos.z - fwd.z * camPullBack + right.z * lateralShift
+      );
+      const look = new THREE.Vector3(pos.x + fwd.x * camLookAhead, pos.y + 8, pos.z + fwd.z * camLookAhead);
+      camPos.lerp(desired, lerpSpeed);
+      camLook.lerp(look, lerpSpeed + 0.02);
       camera.position.copy(camPos);
       camera.lookAt(camLook);
       renderer.render(scene, camera);
@@ -1252,6 +1273,12 @@ import * as THREE from "three";
     setMenuSection() {},
     showMenu() {},
     hideMenu() {},
+
+    // Called by main.ts when the hangar overlay opens/closes.
+    // Switches drawMenu into a zoomed, slower showcase framing.
+    setHangarOpen(open) {
+      hangarOpen = !!open;
+    },
   };
 
   window.Renderer = Renderer;

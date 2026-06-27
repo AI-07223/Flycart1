@@ -379,7 +379,7 @@
       </div>
     </div>
 
-    <!-- HANGAR OVERLAY: transparent backdrop so 3D preview stays visible behind the card -->
+    <!-- HANGAR OVERLAY: card anchored left, 3D plane visible in the clear right zone -->
     <div id="hangar-overlay" class="overlay hangar-overlay hidden" role="dialog" aria-labelledby="hangar-title">
       <div class="hangar-card">
         <div class="panel-head">
@@ -460,6 +460,10 @@
 
         <button id="hangar-done">DONE</button>
         <p class="muted hangar-hint">Cosmetics are visual only — no effect on flight or damage.</p>
+      </div>
+      <!-- Preview zone: clear right column where the 3D plane rotates -->
+      <div class="hangar-preview-zone" aria-hidden="true">
+        <p class="hangar-preview-label">Live preview</p>
       </div>
     </div>
 

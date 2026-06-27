@@ -2889,11 +2889,13 @@
       function showHangar() {
         hangarOpen = true;
         els.hangarOverlay.classList.remove("hidden");
+        if (window.Renderer && window.Renderer.setHangarOpen) window.Renderer.setHangarOpen(true);
         if (window.Renderer && window.Renderer.updateMenuPlane) window.Renderer.updateMenuPlane(selectedCosmetics);
       }
       function hideHangar() {
         hangarOpen = false;
         els.hangarOverlay.classList.add("hidden");
+        if (window.Renderer && window.Renderer.setHangarOpen) window.Renderer.setHangarOpen(false);
       }
       function buildHangar() {
         const tabs = els.hangarOverlay.querySelectorAll(".hangar-tab");

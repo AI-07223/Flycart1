@@ -840,6 +840,8 @@ function fetchLeaderboard(): void {
 function showHangar(): void {
   hangarOpen = true;
   els.hangarOverlay.classList.remove("hidden");
+  // Tell renderer to switch to hangar showcase framing (zoomed, slower orbit)
+  if (window.Renderer && window.Renderer.setHangarOpen) window.Renderer.setHangarOpen(true);
   // Sync live preview immediately to current cosmetics
   if (window.Renderer && window.Renderer.updateMenuPlane) window.Renderer.updateMenuPlane(selectedCosmetics);
 }
@@ -847,6 +849,8 @@ function showHangar(): void {
 function hideHangar(): void {
   hangarOpen = false;
   els.hangarOverlay.classList.add("hidden");
+  // Restore normal menu camera framing
+  if (window.Renderer && window.Renderer.setHangarOpen) window.Renderer.setHangarOpen(false);
 }
 
 function buildHangar(): void {

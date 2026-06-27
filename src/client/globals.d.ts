@@ -284,6 +284,7 @@ interface RendererAPI {
   draw(state: any, myId: string): void;
   drawMenu(dt: number, cosmetics: PlayerCosmetics): void;
   updateMenuPlane?(cosmetics: PlayerCosmetics): void;
+  setHangarOpen?(open: boolean): void;
   killPopup(killerId: string, mine: boolean): void;
   hitStop(ms: number): void;
   startTakeoff?(): void;

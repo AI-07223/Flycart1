@@ -7,7 +7,7 @@
 
 import { build } from "esbuild";
 import { readdirSync } from "fs";
-import { join, basename, dirname } from "path";
+import { join, dirname } from "path";
 import { fileURLToPath } from "url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -15,13 +15,39 @@ const ROOT = join(__dirname, "..");
 const SRC_DIR = join(ROOT, "src", "client");
 const OUT_DIR = join(ROOT, "public", "js");
 
-// Collect all .ts files in src/client/ (excluding .d.ts)
-const entries = readdirSync(SRC_DIR)
-  .filter((f) => f.endsWith(".ts") && !f.endsWith(".d.ts"))
-  .map((f) => ({
-    entry: join(SRC_DIR, f),
-    outfile: join(OUT_DIR, f.replace(/\.ts$/, ".js")),
-    name: basename(f, ".ts"),
+// Explicit allowlist of entry modules that index.html loads as standalone <script> tags.
+// net-p2p.ts, host-sim.ts, and transport.ts are NOT entry points — they are imported
+// by main.ts and bundled into main.js automatically. Do NOT add them here.
+// render3d.js is hand-written JS and is not compiled by this script.
+const ENTRY_NAMES = [
+  "sphere",
+  "constants",
+  "quality",
+  "audio",
+  "assets",
+  "input",
+  "net",
+  "qr",
+  "main",
+];
+
+const availableFiles = new Set(
+  readdirSync(SRC_DIR).filter((f) => f.endsWith(".ts") && !f.endsWith(".d.ts"))
+);
+
+const entries = ENTRY_NAMES
+  .filter((name) => {
+    const filename = `${name}.ts`;
+    if (!availableFiles.has(filename)) {
+      console.warn(`  ⚠ Entry ${filename} not found in src/client/ — skipping`);
+      return false;
+    }
+    return true;
+  })
+  .map((name) => ({
+    entry: join(SRC_DIR, `${name}.ts`),
+    outfile: join(OUT_DIR, `${name}.js`),
+    name,
   }));
 
 if (entries.length === 0) {
