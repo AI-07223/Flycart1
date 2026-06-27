@@ -93,6 +93,9 @@ class GuestTransportState implements TransportState {
   roomName  = "";
   roundLength = 150;
   botsInRoom  = false;
+  mode     = "ffa";
+  teamScore0  = 0;
+  teamScore1  = 0;
 }
 
 // ---------------------------------------------------------------------------
@@ -111,6 +114,9 @@ class HostTransportState implements TransportState {
   get roomName(): string            { return this.sim.roomName; }
   get roundLength(): number         { return this.sim.roundLength; }
   get botsInRoom(): boolean         { return this.sim.botsInRoom; }
+  get mode(): string                { return this.sim.mode; }
+  get teamScore0(): number          { return this.sim.teamScore0; }
+  get teamScore1(): number          { return this.sim.teamScore1; }
 }
 
 // ---------------------------------------------------------------------------
@@ -625,6 +631,7 @@ export class WebRtcTransport implements ITransport {
           roundLength: typeof msg.roundLength === "number" ? msg.roundLength : undefined,
           roomName: typeof msg.roomName === "string" ? msg.roomName : undefined,
           botsInRoom: typeof msg.botsInRoom === "boolean" ? msg.botsInRoom : undefined,
+          mode: typeof msg.mode === "string" ? msg.mode : undefined,
         });
         if (this.onStateChange) this.onStateChange();
       }
@@ -762,6 +769,9 @@ export class WebRtcTransport implements ITransport {
       gs.roomName   = snap.roomName   ?? "";
       gs.roundLength = snap.roundLength ?? 150;
       gs.botsInRoom  = snap.botsInRoom  ?? false;
+      gs.mode        = snap.mode        ?? "ffa";
+      gs.teamScore0  = snap.teamScore0  ?? 0;
+      gs.teamScore1  = snap.teamScore1  ?? 0;
       gs.players.mergeFrom(snap.players as Array<[string, any]>);
       gs.bullets.mergeFrom(snap.bullets as Array<[string, any]>);
       gs.pickups.mergeFrom(snap.pickups as Array<[string, any]>);
@@ -855,7 +865,7 @@ export class WebRtcTransport implements ITransport {
     }
   }
 
-  sendHostSettings(s: { roundLength?: number; roomName?: string; botsInRoom?: boolean }): void {
+  sendHostSettings(s: { roundLength?: number; roomName?: string; botsInRoom?: boolean; mode?: string }): void {
     if (this._isHost) {
       if (this._sim) { this._sim.setHostSettings("host", s); if (this.onStateChange) this.onStateChange(); }
     } else {

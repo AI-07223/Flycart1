@@ -96,6 +96,10 @@ export const READY_RATE_MAX = 4;
 export const HOST_MSG_RATE_MAX = 2;
 export const HOST_KICK_RATE_MAX = 4;
 
+// Team Deathmatch: two teams, indexed 0 (blue) and 1 (red).
+export const TEAM_COUNT = 2;
+export const TEAM_COLORS = [0x4aa3ff, 0xff5a5a] as const; // [blue, red]
+
 export type LandmarkKind = "mesa" | "spire" | "tower" | "hangar";
 
 export interface Landmark {

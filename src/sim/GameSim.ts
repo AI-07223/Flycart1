@@ -90,6 +90,9 @@ export class GameSim {
   roundLength: number;
   roomName: string;
   botsInRoom: boolean;
+  mode: string;
+  teamScore0: number;
+  teamScore1: number;
   readonly botsEnabled: boolean;
   readonly isPublic: boolean;
 
@@ -102,6 +105,9 @@ export class GameSim {
     this.roundLength = C.ROUND_SECONDS;
     this.roomName = "";
     this.botsInRoom = opts.botsEnabled;
+    this.mode = "ffa";
+    this.teamScore0 = 0;
+    this.teamScore1 = 0;
 
     if (this.isPublic) {
       this.phase = "playing";
@@ -144,6 +150,7 @@ export class GameSim {
       accent: opts.accent,
       trail: opts.trail,
       livery: opts.livery,
+      team: -1,
     };
 
     if (this.isPublic) {
@@ -248,7 +255,7 @@ export class GameSim {
    * Update host-controlled room settings (round length, room name, and/or bots).
    * Silently ignores calls from non-hosts.
    */
-  setHostSettings(callerId: string, s: { roundLength?: number; roomName?: string; botsInRoom?: boolean }): void {
+  setHostSettings(callerId: string, s: { roundLength?: number; roomName?: string; botsInRoom?: boolean; mode?: string }): void {
     if (callerId !== this.hostId) return;
     if (typeof s.roundLength === "number" && Number.isFinite(s.roundLength)) {
       this.roundLength = Math.max(60, Math.min(300, Math.round(s.roundLength)));
@@ -263,6 +270,9 @@ export class GameSim {
         for (const id of [...this.bots.keys()]) this.removePlayer(id);
       }
       // If turned on, maintainBots() will add bots on the next tick
+    }
+    if (typeof s.mode === "string" && (s.mode === "ffa" || s.mode === "tdm")) {
+      this.mode = s.mode;
     }
   }
 
@@ -325,6 +335,9 @@ export class GameSim {
     roundLength: number;
     roomName: string;
     botsInRoom: boolean;
+    mode: string;
+    teamScore0: number;
+    teamScore1: number;
   } {
     return {
       players: this.players,
@@ -336,6 +349,9 @@ export class GameSim {
       roundLength: this.roundLength,
       roomName: this.roomName,
       botsInRoom: this.botsInRoom,
+      mode: this.mode,
+      teamScore0: this.teamScore0,
+      teamScore1: this.teamScore1,
     };
   }
 
@@ -353,6 +369,9 @@ export class GameSim {
       roundLength: this.roundLength,
       roomName: this.roomName,
       botsInRoom: this.botsInRoom,
+      mode: this.mode,
+      teamScore0: this.teamScore0,
+      teamScore1: this.teamScore1,
     };
   }
 
@@ -600,6 +619,12 @@ export class GameSim {
   }
 
   private damage(p: SimPlayer, victimId: string, killerId: string): void {
+    // TDM friendly-fire gate: bullets do NOT damage teammates.
+    if (this.mode === "tdm") {
+      const killer = this.players.get(killerId);
+      if (killer && killer.team >= 0 && p.team >= 0 && killer.team === p.team) return;
+    }
+
     if (this.now < (this.invulnUntil.get(victimId) ?? 0)) return;
     const shield = this.shield.get(victimId) ?? 0;
     if (shield > 0) {
@@ -623,7 +648,15 @@ export class GameSim {
     this.respawnAt.set(victimId, this.now + C.RESPAWN_DELAY);
 
     const killer = this.players.get(killerId);
-    if (killer && killerId !== victimId) killer.score += 1;
+    if (killer && killerId !== victimId) {
+      killer.score += 1;
+      // TDM: also increment the killer's team score (only for kills between different teams).
+      if (this.mode === "tdm" && killer.team === 0) {
+        this.teamScore0 += 1;
+      } else if (this.mode === "tdm" && killer.team === 1) {
+        this.teamScore1 += 1;
+      }
+    }
     this.onEvent({
       type: "kill",
       killer: killerId,
@@ -769,6 +802,18 @@ export class GameSim {
     this.phase = "playing";
     this.timeLeft = this.roundLength;
     this.lobbyElapsed = 0;
+    this.teamScore0 = 0;
+    this.teamScore1 = 0;
+
+    if (this.mode === "tdm") {
+      // Assign balanced teams: alternate assignment sorted by insertion order.
+      let teamIdx = 0;
+      for (const [, p] of this.players) {
+        p.team = teamIdx % C.TEAM_COUNT;
+        teamIdx++;
+      }
+    }
+
     for (const [id, p] of this.players) {
       p.score = 0;
       p.ready = false;
@@ -836,7 +881,14 @@ export class GameSim {
       accent: Math.floor(Math.random() * C.ACCENT_COUNT),
       trail: Math.floor(Math.random() * C.TRAIL_COUNT),
       livery: Math.floor(Math.random() * C.LIVERY_COUNT),
+      team: -1,
     };
+    // If a TDM match is already in progress, assign to the smaller team.
+    if (this.mode === "tdm" && this.phase === "playing") {
+      let t0 = 0; let t1 = 0;
+      for (const [, pl] of this.players) { if (pl.team === 0) t0++; else if (pl.team === 1) t1++; }
+      p.team = t0 <= t1 ? 0 : 1;
+    }
     this.spawn(id, p);
     this.players.set(id, p);
     this.inputs.set(id, { ...ZERO_INPUT });

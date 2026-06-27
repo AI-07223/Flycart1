@@ -1110,6 +1110,10 @@ import * as THREE from "three";
       if (!nameLabelsLayer || !camera) return;
 
       const seenIds = new Set();
+      // TDM team colors (hex strings, matching TEAM_COLORS in constants.ts)
+      const TEAM_BG = ["rgba(74,163,255,0.30)", "rgba(255,90,90,0.30)"];
+      const TEAM_BORDER = ["rgba(74,163,255,0.75)", "rgba(255,90,90,0.75)"];
+      const isTdm = (state.mode === "tdm");
 
       state.players.forEach((p, id) => {
         // Skip local player's own label (less visual clutter)
@@ -1152,6 +1156,16 @@ import * as THREE from "three";
         // Update name text only when it changes
         const name = p.name || ("P" + id.slice(0, 4));
         if (div.textContent !== name) div.textContent = name;
+
+        // TDM: tint label background by team color for instant friend/foe read
+        const team = (p.team !== undefined && p.team !== null) ? p.team : -1;
+        if (isTdm && team >= 0 && team <= 1) {
+          div.style.background = TEAM_BG[team];
+          div.style.boxShadow = `0 0 0 1px ${TEAM_BORDER[team]}`;
+        } else {
+          div.style.background = "";
+          div.style.boxShadow = "";
+        }
       });
 
       // Remove labels for players who left

@@ -355,6 +355,16 @@ kbd {
   font-size: 11px;
 }
 .lb-row.me { color: var(--accent); font-weight: 700; }
+/* TDM team color dot in leaderboard/final-board rows */
+.lb-team-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  margin-right: 4px;
+  vertical-align: middle;
+  flex-shrink: 0;
+}
 
 /* Power chip: compact, right-edge anchor to avoid blocking center */
 #power-chip {
@@ -1223,6 +1233,32 @@ body.touch-device #share-bar {
   pointer-events: none;
   will-change: transform, left, top;
 }
+
+/* ─── TDM TEAM SCORE BAR ─────────────────────────────────────────────────────── */
+.hud-team-score {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 10px;
+  border-radius: 7px;
+  background: rgba(0,0,0,0.45);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  pointer-events: none;
+  margin-top: 4px;
+}
+.hud-team {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.hud-team--blue { color: #4aa3ff; }
+.hud-team--red  { color: #ff5a5a; }
+.hud-team-sep   { color: rgba(255,255,255,0.45); font-size: 11px; }
+/* Local team indicator: bold border on your own team chip */
+.hud-team--blue.is-my-team,
+.hud-team--red.is-my-team  { text-shadow: 0 0 10px currentColor; }
 
 /* ─── LOW-TIME WARNING ───────────────────────────────────────────────────────── */
 #hud-time.low {

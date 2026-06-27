@@ -9,7 +9,7 @@
   };
 
   // src/shared/constants.ts
-  var TICK_RATE, TICK_MS, CRUISE_SPEED, BOOST_SPEED, ACCEL, TURN_RATE, PITCH_RATE, PITCH_MAX, PLANE_RADIUS, MAX_HP, BULLET_SPEED, BULLET_DAMAGE, BULLET_LIFE, BULLET_RADIUS, FIRE_COOLDOWN, RESPAWN_DELAY, BULLET_HIT_RADIUS, AIM_ASSIST_CONE, AIM_ASSIST_RANGE, AIM_ASSIST_TURN, ROUND_SECONDS, ROUND_INTERMISSION, MIN_PLAYERS, MAP_HALF, MAP_EDGE_SOFT, GROUND_Y, MIN_ALT, SPAWN_ALT, MAX_ALT, PICKUP_ALT_MIN, PICKUP_ALT_MAX, PICKUP_FIELD_RADIUS, SPAWN_REROLL, BOT_NAMES, COLOR_COUNT, ACCENT_COUNT, TRAIL_COUNT, LIVERY_COUNT, SKIN_COUNT, PICKUP_MAX, PICKUP_INTERVAL, PICKUP_RADIUS, POWERUP_DURATION, SHIELD_CHARGES, RAPID_FACTOR, SPREAD_ANGLE, AFTERBURNER_FACTOR, HOMING_TURN, POWERUP_TYPES, POWERUP_WEIGHTS, SPAWN_INVULN, LOBBY_READY_TIMEOUT, LANDMARKS;
+  var TICK_RATE, TICK_MS, CRUISE_SPEED, BOOST_SPEED, ACCEL, TURN_RATE, PITCH_RATE, PITCH_MAX, PLANE_RADIUS, MAX_HP, BULLET_SPEED, BULLET_DAMAGE, BULLET_LIFE, BULLET_RADIUS, FIRE_COOLDOWN, RESPAWN_DELAY, BULLET_HIT_RADIUS, AIM_ASSIST_CONE, AIM_ASSIST_RANGE, AIM_ASSIST_TURN, ROUND_SECONDS, ROUND_INTERMISSION, MIN_PLAYERS, MAP_HALF, MAP_EDGE_SOFT, GROUND_Y, MIN_ALT, SPAWN_ALT, MAX_ALT, PICKUP_ALT_MIN, PICKUP_ALT_MAX, PICKUP_FIELD_RADIUS, SPAWN_REROLL, BOT_NAMES, COLOR_COUNT, ACCENT_COUNT, TRAIL_COUNT, LIVERY_COUNT, SKIN_COUNT, PICKUP_MAX, PICKUP_INTERVAL, PICKUP_RADIUS, POWERUP_DURATION, SHIELD_CHARGES, RAPID_FACTOR, SPREAD_ANGLE, AFTERBURNER_FACTOR, HOMING_TURN, POWERUP_TYPES, POWERUP_WEIGHTS, SPAWN_INVULN, LOBBY_READY_TIMEOUT, TEAM_COUNT, LANDMARKS;
   var init_constants = __esm({
     "src/shared/constants.ts"() {
       "use strict";
@@ -83,6 +83,7 @@
       };
       SPAWN_INVULN = 1.2;
       LOBBY_READY_TIMEOUT = 120;
+      TEAM_COUNT = 2;
       LANDMARKS = [
         { kind: "tower", x: 0, z: 0, radius: 96, height: 170, color: 16747069, cover: true },
         { kind: "mesa", x: -620, z: -340, radius: 90, height: 56, color: 11636066, cover: true },
@@ -326,6 +327,9 @@
           this.roundLength = ROUND_SECONDS;
           this.roomName = "";
           this.botsInRoom = opts.botsEnabled;
+          this.mode = "ffa";
+          this.teamScore0 = 0;
+          this.teamScore1 = 0;
           if (this.isPublic) {
             this.phase = "playing";
             this.timeLeft = ROUND_SECONDS;
@@ -368,7 +372,8 @@
             bodyShape: opts.bodyShape,
             accent: opts.accent,
             trail: opts.trail,
-            livery: opts.livery
+            livery: opts.livery,
+            team: -1
           };
           if (this.isPublic) {
             this.spawn(id, p);
@@ -475,6 +480,9 @@
               for (const id of [...this.bots.keys()]) this.removePlayer(id);
             }
           }
+          if (typeof s.mode === "string" && (s.mode === "ffa" || s.mode === "tdm")) {
+            this.mode = s.mode;
+          }
         }
         /**
          * Validates and removes the target player from the sim.
@@ -529,7 +537,10 @@
             hostId: this.hostId,
             roundLength: this.roundLength,
             roomName: this.roomName,
-            botsInRoom: this.botsInRoom
+            botsInRoom: this.botsInRoom,
+            mode: this.mode,
+            teamScore0: this.teamScore0,
+            teamScore1: this.teamScore1
           };
         }
         /**
@@ -545,7 +556,10 @@
             hostId: this.hostId,
             roundLength: this.roundLength,
             roomName: this.roomName,
-            botsInRoom: this.botsInRoom
+            botsInRoom: this.botsInRoom,
+            mode: this.mode,
+            teamScore0: this.teamScore0,
+            teamScore1: this.teamScore1
           };
         }
         // ---------------------------------------------------------------------------
@@ -761,6 +775,10 @@
           }
         }
         damage(p, victimId, killerId) {
+          if (this.mode === "tdm") {
+            const killer2 = this.players.get(killerId);
+            if (killer2 && killer2.team >= 0 && p.team >= 0 && killer2.team === p.team) return;
+          }
           if (this.now < (this.invulnUntil.get(victimId) ?? 0)) return;
           const shield = this.shield.get(victimId) ?? 0;
           if (shield > 0) {
@@ -781,7 +799,14 @@
           this.clearPower(victimId, p);
           this.respawnAt.set(victimId, this.now + RESPAWN_DELAY);
           const killer = this.players.get(killerId);
-          if (killer && killerId !== victimId) killer.score += 1;
+          if (killer && killerId !== victimId) {
+            killer.score += 1;
+            if (this.mode === "tdm" && killer.team === 0) {
+              this.teamScore0 += 1;
+            } else if (this.mode === "tdm" && killer.team === 1) {
+              this.teamScore1 += 1;
+            }
+          }
           this.onEvent({
             type: "kill",
             killer: killerId,
@@ -923,6 +948,15 @@
           this.phase = "playing";
           this.timeLeft = this.roundLength;
           this.lobbyElapsed = 0;
+          this.teamScore0 = 0;
+          this.teamScore1 = 0;
+          if (this.mode === "tdm") {
+            let teamIdx = 0;
+            for (const [, p] of this.players) {
+              p.team = teamIdx % TEAM_COUNT;
+              teamIdx++;
+            }
+          }
           for (const [id, p] of this.players) {
             p.score = 0;
             p.ready = false;
@@ -986,8 +1020,18 @@
             // capped [0,1] to protect mobile draw calls
             accent: Math.floor(Math.random() * ACCENT_COUNT),
             trail: Math.floor(Math.random() * TRAIL_COUNT),
-            livery: Math.floor(Math.random() * LIVERY_COUNT)
+            livery: Math.floor(Math.random() * LIVERY_COUNT),
+            team: -1
           };
+          if (this.mode === "tdm" && this.phase === "playing") {
+            let t0 = 0;
+            let t1 = 0;
+            for (const [, pl] of this.players) {
+              if (pl.team === 0) t0++;
+              else if (pl.team === 1) t1++;
+            }
+            p.team = t0 <= t1 ? 0 : 1;
+          }
           this.spawn(id, p);
           this.players.set(id, p);
           this.inputs.set(id, { ...ZERO_INPUT });
@@ -1230,6 +1274,9 @@
           this.roomName = "";
           this.roundLength = 150;
           this.botsInRoom = false;
+          this.mode = "ffa";
+          this.teamScore0 = 0;
+          this.teamScore1 = 0;
         }
       };
       HostTransportState = class {
@@ -1262,6 +1309,15 @@
         }
         get botsInRoom() {
           return this.sim.botsInRoom;
+        }
+        get mode() {
+          return this.sim.mode;
+        }
+        get teamScore0() {
+          return this.sim.teamScore0;
+        }
+        get teamScore1() {
+          return this.sim.teamScore1;
         }
       };
       SignalSocket = class {
@@ -1611,7 +1667,8 @@
               this._sim.setHostSettings(peerId, {
                 roundLength: typeof msg.roundLength === "number" ? msg.roundLength : void 0,
                 roomName: typeof msg.roomName === "string" ? msg.roomName : void 0,
-                botsInRoom: typeof msg.botsInRoom === "boolean" ? msg.botsInRoom : void 0
+                botsInRoom: typeof msg.botsInRoom === "boolean" ? msg.botsInRoom : void 0,
+                mode: typeof msg.mode === "string" ? msg.mode : void 0
               });
               if (this.onStateChange) this.onStateChange();
             }
@@ -1732,6 +1789,9 @@
             gs.roomName = snap.roomName ?? "";
             gs.roundLength = snap.roundLength ?? 150;
             gs.botsInRoom = snap.botsInRoom ?? false;
+            gs.mode = snap.mode ?? "ffa";
+            gs.teamScore0 = snap.teamScore0 ?? 0;
+            gs.teamScore1 = snap.teamScore1 ?? 0;
             gs.players.mergeFrom(snap.players);
             gs.bullets.mergeFrom(snap.bullets);
             gs.pickups.mergeFrom(snap.pickups);
@@ -2232,6 +2292,12 @@
         lobbyRoomName: dollar("lobby-room-name"),
         lobbyRoundLength: dollar("lobby-round-length"),
         lobbyBotsCheck: dollar("lobby-bots-check"),
+        lobbyMode: dollar("lobby-mode"),
+        hudTeamScore: dollar("hud-team-score"),
+        hudTeamBlue: dollar("hud-team-blue"),
+        hudTeamRed: dollar("hud-team-red"),
+        hudTScore0: dollar("hud-tscore0"),
+        hudTScore1: dollar("hud-tscore1"),
         lobbyRoster: dollar("lobby-roster"),
         lobbyReadyBtn: dollar("lobby-ready-btn"),
         lobbyStartBtn: dollar("lobby-start-btn"),
@@ -2561,6 +2627,8 @@
           }
           const serverBotsInRoom = window.Net.state?.botsInRoom ?? false;
           els.lobbyBotsCheck.checked = serverBotsInRoom;
+          const serverMode = window.Net.state?.mode ?? "ffa";
+          els.lobbyMode.value = serverMode;
         } else {
           els.lobbySettings.classList.add("hidden");
         }
@@ -3322,12 +3390,26 @@
             els.powerChip.classList.add("hidden");
           }
         }
+        const isTdm = state.mode === "tdm";
+        if (isTdm) {
+          els.hudTeamScore.classList.remove("hidden");
+          const ts0 = state.teamScore0 ?? 0;
+          const ts1 = state.teamScore1 ?? 0;
+          els.hudTScore0.textContent = String(ts0);
+          els.hudTScore1.textContent = String(ts1);
+          const myTeam = me ? me.team ?? -1 : -1;
+          els.hudTeamBlue.classList.toggle("is-my-team", myTeam === 0);
+          els.hudTeamRed.classList.toggle("is-my-team", myTeam === 1);
+        } else {
+          els.hudTeamScore.classList.add("hidden");
+        }
         const list = [];
-        state.players.forEach((p, id) => list.push({ id, name: p.name, score: p.score, bot: p.bot }));
+        state.players.forEach((p, id) => list.push({ id, name: p.name, score: p.score, bot: p.bot, team: p.team ?? -1 }));
         list.sort((a, b) => b.score - a.score);
-        els.leaderboard.innerHTML = list.slice(0, 5).map(
-          (p, i) => `<div class="lb-row ${p.id === myId ? "me" : ""}"><span>${i + 1}. ${escapeHtml(p.name)}${p.bot ? " \u{1F916}" : ""}</span><span>${p.score}</span></div>`
-        ).join("");
+        els.leaderboard.innerHTML = list.slice(0, 5).map((p, i) => {
+          const teamDot = isTdm && p.team >= 0 ? `<span class="lb-team-dot" style="background:${p.team === 0 ? "#4aa3ff" : "#ff5a5a"}"></span>` : "";
+          return `<div class="lb-row ${p.id === myId ? "me" : ""}"><span>${teamDot}${i + 1}. ${escapeHtml(p.name)}${p.bot ? " \u{1F916}" : ""}</span><span>${p.score}</span></div>`;
+        }).join("");
         if (state.phase !== prevPhase) {
           if (state.phase === "intermission") {
             window.SFX.explosion();
@@ -3341,11 +3423,27 @@
         if (state.phase === "intermission") {
           els.inter.classList.remove("hidden");
           els.interTime.textContent = String(Math.ceil(state.timeLeft));
-          const winner = list[0];
-          els.winnerLine.textContent = winner ? winner.id === myId ? "\u{1F3C6} You win!" : `\u{1F3C6} ${winner.name} wins!` : "";
-          els.finalBoard.innerHTML = list.slice(0, 6).map(
-            (p, i) => `<li class="${p.id === myId ? "me" : ""}${i === 0 ? " win" : ""}"><span>${i + 1}. ${escapeHtml(p.name)}${p.bot ? " \u{1F916}" : ""}</span><span>${p.score}</span></li>`
-          ).join("");
+          if (isTdm) {
+            const ts0 = state.teamScore0 ?? 0;
+            const ts1 = state.teamScore1 ?? 0;
+            const myTeam = me ? me.team ?? -1 : -1;
+            const winTeam = ts0 > ts1 ? 0 : ts1 > ts0 ? 1 : -1;
+            const winTeamName = winTeam === 0 ? "Blue" : winTeam === 1 ? "Red" : null;
+            if (winTeam < 0) {
+              els.winnerLine.textContent = "\u{1F3C6} Draw!";
+            } else if (myTeam === winTeam) {
+              els.winnerLine.textContent = `\u{1F3C6} ${winTeamName} team wins! (You're on it!)`;
+            } else {
+              els.winnerLine.textContent = `\u{1F3C6} ${winTeamName} team wins!`;
+            }
+          } else {
+            const winner = list[0];
+            els.winnerLine.textContent = winner ? winner.id === myId ? "\u{1F3C6} You win!" : `\u{1F3C6} ${winner.name} wins!` : "";
+          }
+          els.finalBoard.innerHTML = list.slice(0, 6).map((p, i) => {
+            const teamDot = isTdm && p.team >= 0 ? `<span class="lb-team-dot" style="background:${p.team === 0 ? "#4aa3ff" : "#ff5a5a"}"></span>` : "";
+            return `<li class="${p.id === myId ? "me" : ""}${i === 0 ? " win" : ""}"><span>${teamDot}${i + 1}. ${escapeHtml(p.name)}${p.bot ? " \u{1F916}" : ""}</span><span>${p.score}</span></li>`;
+          }).join("");
           const myRank = list.findIndex((p) => p.id === myId);
           els.yourPlace.textContent = myRank >= 0 ? `You placed ${ordinal(myRank + 1)} of ${list.length}` : "";
         } else {
@@ -3523,6 +3621,8 @@
         els.lobbyRoomName.value = "";
         els.lobbyRoundLength.value = "150";
         els.lobbyBotsCheck.checked = false;
+        els.lobbyMode.value = "ffa";
+        els.hudTeamScore.classList.add("hidden");
         hideSettings();
         closeJoinCode();
         closeScanner();
@@ -3995,6 +4095,9 @@
         });
         els.lobbyBotsCheck.addEventListener("change", () => {
           window.Net.sendHostSettings({ botsInRoom: els.lobbyBotsCheck.checked });
+        });
+        els.lobbyMode.addEventListener("change", () => {
+          window.Net.sendHostSettings({ mode: els.lobbyMode.value });
         });
         document.addEventListener("visibilitychange", () => {
           if (document.hidden) {

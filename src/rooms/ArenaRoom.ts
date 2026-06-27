@@ -191,6 +191,7 @@ export class ArenaRoom extends Room<ArenaState> {
         roundLength: typeof data.roundLength === "number" ? data.roundLength : undefined,
         roomName: typeof data.roomName === "string" ? data.roomName : undefined,
         botsInRoom: typeof data.botsInRoom === "boolean" ? data.botsInRoom : undefined,
+        mode: typeof data.mode === "string" ? data.mode : undefined,
       });
     });
 
@@ -307,6 +308,7 @@ export class ArenaRoom extends Room<ArenaState> {
       schemaPlayer.accent = sp.accent;
       schemaPlayer.trail = sp.trail;
       schemaPlayer.livery = sp.livery;
+      schemaPlayer.team = sp.team;
     }
     for (const id of this.state.players.keys()) {
       if (!state.players.has(id)) this.state.players.delete(id);
@@ -355,6 +357,9 @@ export class ArenaRoom extends Room<ArenaState> {
     this.state.roomName = state.roomName;
     this.state.roundLength = state.roundLength;
     this.state.botsInRoom = state.botsInRoom;
+    this.state.mode = state.mode;
+    this.state.teamScore0 = state.teamScore0;
+    this.state.teamScore1 = state.teamScore1;
   }
 
   // ---------------------------------------------------------------------------

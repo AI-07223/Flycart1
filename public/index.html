@@ -61,6 +61,12 @@
         <div class="hud-item hud-boost-wrap">BOOST <span class="boost-bar"><span id="boost-fill"></span></span></div>
         <button id="mute-btn" class="icon-btn" title="Mute (M)">🔊</button>
       </div>
+      <!-- TDM team score bar: only visible in Team Deathmatch mode -->
+      <div id="hud-team-score" class="hidden hud-team-score">
+        <span id="hud-team-blue" class="hud-team hud-team--blue">&#9646; BLUE <span id="hud-tscore0">0</span></span>
+        <span class="hud-team-sep">vs</span>
+        <span id="hud-team-red" class="hud-team hud-team--red"><span id="hud-tscore1">0</span> RED &#9646;</span>
+      </div>
       <div id="leaderboard"></div>
       <div id="power-chip" class="hidden"></div>
     </div>
@@ -302,6 +308,13 @@
               <input id="lobby-bots-check" type="checkbox" class="lobby-settings-checkbox" />
               Fill empty seats with bots
             </label>
+          </div>
+          <div class="lobby-settings-row">
+            <label for="lobby-mode" class="lobby-settings-label">Mode</label>
+            <select id="lobby-mode" class="lobby-settings-select">
+              <option value="ffa" selected>Free-for-All</option>
+              <option value="tdm">Team Deathmatch</option>
+            </select>
           </div>
         </div>
         <div id="lobby-roster" class="lobby-roster">

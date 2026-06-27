@@ -26,6 +26,8 @@ export interface SimPlayer {
   accent: number;
   trail: number;
   livery: number;
+  /** TDM team assignment: 0=blue, 1=red. -1 = unassigned (FFA or pre-match). */
+  team: number;
 }
 
 export interface SimBullet {
@@ -86,6 +88,9 @@ export interface SimStateSnapshot {
   roundLength: number;
   roomName: string;
   botsInRoom: boolean;
+  mode: string;
+  teamScore0: number;
+  teamScore1: number;
 }
 
 export interface GameSimOpts {

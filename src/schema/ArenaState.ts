@@ -28,6 +28,8 @@ export class Player extends Schema {
   @type("number") accent = 0;
   @type("number") trail = 0;
   @type("number") livery = 0;
+  /** TDM team: 0=blue, 1=red, -1=unassigned (FFA). Appended last to preserve field order. */
+  @type("number") team = -1;
 }
 
 export class Bullet extends Schema {
@@ -61,4 +63,8 @@ export class ArenaState extends Schema {
   @type("string") roomName = "";
   @type("number") roundLength = 150;
   @type("boolean") botsInRoom = false;
+  /** Game mode: 'ffa' (default) | 'tdm'. Appended after botsInRoom to preserve field order. */
+  @type("string") mode = "ffa";
+  @type("number") teamScore0 = 0;
+  @type("number") teamScore1 = 0;
 }

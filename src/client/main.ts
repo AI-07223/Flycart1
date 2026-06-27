@@ -98,6 +98,12 @@ const els = {
   lobbyRoomName: dollar("lobby-room-name") as HTMLInputElement,
   lobbyRoundLength: dollar("lobby-round-length") as HTMLSelectElement,
   lobbyBotsCheck: dollar("lobby-bots-check") as HTMLInputElement,
+  lobbyMode: dollar("lobby-mode") as HTMLSelectElement,
+  hudTeamScore: dollar("hud-team-score"),
+  hudTeamBlue: dollar("hud-team-blue"),
+  hudTeamRed: dollar("hud-team-red"),
+  hudTScore0: dollar("hud-tscore0"),
+  hudTScore1: dollar("hud-tscore1"),
   lobbyRoster: dollar("lobby-roster"),
   lobbyReadyBtn: dollar("lobby-ready-btn") as HTMLButtonElement,
   lobbyStartBtn: dollar("lobby-start-btn") as HTMLButtonElement,
@@ -448,6 +454,9 @@ function renderLobbyRoster(): void {
     // Reflect botsInRoom from server state (checkbox doesn't need focus-guard — it's a click, not typing)
     const serverBotsInRoom = window.Net.state?.botsInRoom ?? false;
     els.lobbyBotsCheck.checked = serverBotsInRoom;
+    // Reflect mode from server state
+    const serverMode = window.Net.state?.mode ?? "ffa";
+    els.lobbyMode.value = serverMode;
   } else {
     els.lobbySettings.classList.add("hidden");
   }
@@ -1375,12 +1384,32 @@ function updateHud(state: any, myId: string): void {
     }
   }
 
-  const list: Array<{ id: string; name: string; score: number; bot: boolean }> = [];
-  state.players.forEach((p: any, id: string) => list.push({ id, name: p.name, score: p.score, bot: p.bot }));
+  const isTdm = (state.mode === "tdm");
+
+  // TDM team score bar
+  if (isTdm) {
+    els.hudTeamScore.classList.remove("hidden");
+    const ts0 = state.teamScore0 ?? 0;
+    const ts1 = state.teamScore1 ?? 0;
+    els.hudTScore0.textContent = String(ts0);
+    els.hudTScore1.textContent = String(ts1);
+    // Highlight the local player's team chip
+    const myTeam = me ? (me.team ?? -1) : -1;
+    els.hudTeamBlue.classList.toggle("is-my-team", myTeam === 0);
+    els.hudTeamRed.classList.toggle("is-my-team", myTeam === 1);
+  } else {
+    els.hudTeamScore.classList.add("hidden");
+  }
+
+  const list: Array<{ id: string; name: string; score: number; bot: boolean; team: number }> = [];
+  state.players.forEach((p: any, id: string) => list.push({ id, name: p.name, score: p.score, bot: p.bot, team: p.team ?? -1 }));
   list.sort((a, b) => b.score - a.score);
-  els.leaderboard.innerHTML = list.slice(0, 5).map((p, i) =>
-    `<div class="lb-row ${p.id === myId ? "me" : ""}"><span>${i + 1}. ${escapeHtml(p.name)}${p.bot ? " 🤖" : ""}</span><span>${p.score}</span></div>`
-  ).join("");
+  els.leaderboard.innerHTML = list.slice(0, 5).map((p, i) => {
+    const teamDot = isTdm && p.team >= 0
+      ? `<span class="lb-team-dot" style="background:${p.team === 0 ? "#4aa3ff" : "#ff5a5a"}"></span>`
+      : "";
+    return `<div class="lb-row ${p.id === myId ? "me" : ""}"><span>${teamDot}${i + 1}. ${escapeHtml(p.name)}${p.bot ? " 🤖" : ""}</span><span>${p.score}</span></div>`;
+  }).join("");
 
   // Phase transition detection
   if (state.phase !== prevPhase) {
@@ -1399,11 +1428,29 @@ function updateHud(state: any, myId: string): void {
   if (state.phase === "intermission") {
     els.inter.classList.remove("hidden");
     els.interTime.textContent = String(Math.ceil(state.timeLeft));
-    const winner = list[0];
-    els.winnerLine.textContent = winner ? (winner.id === myId ? "🏆 You win!" : `🏆 ${winner.name} wins!`) : "";
-    els.finalBoard.innerHTML = list.slice(0, 6).map((p, i) =>
-      `<li class="${p.id === myId ? "me" : ""}${i === 0 ? " win" : ""}"><span>${i + 1}. ${escapeHtml(p.name)}${p.bot ? " 🤖" : ""}</span><span>${p.score}</span></li>`
-    ).join("");
+    if (isTdm) {
+      const ts0 = state.teamScore0 ?? 0;
+      const ts1 = state.teamScore1 ?? 0;
+      const myTeam = me ? (me.team ?? -1) : -1;
+      const winTeam = ts0 > ts1 ? 0 : ts1 > ts0 ? 1 : -1;
+      const winTeamName = winTeam === 0 ? "Blue" : winTeam === 1 ? "Red" : null;
+      if (winTeam < 0) {
+        els.winnerLine.textContent = "🏆 Draw!";
+      } else if (myTeam === winTeam) {
+        els.winnerLine.textContent = `🏆 ${winTeamName} team wins! (You're on it!)`;
+      } else {
+        els.winnerLine.textContent = `🏆 ${winTeamName} team wins!`;
+      }
+    } else {
+      const winner = list[0];
+      els.winnerLine.textContent = winner ? (winner.id === myId ? "🏆 You win!" : `🏆 ${winner.name} wins!`) : "";
+    }
+    els.finalBoard.innerHTML = list.slice(0, 6).map((p, i) => {
+      const teamDot = isTdm && p.team >= 0
+        ? `<span class="lb-team-dot" style="background:${p.team === 0 ? "#4aa3ff" : "#ff5a5a"}"></span>`
+        : "";
+      return `<li class="${p.id === myId ? "me" : ""}${i === 0 ? " win" : ""}"><span>${teamDot}${i + 1}. ${escapeHtml(p.name)}${p.bot ? " 🤖" : ""}</span><span>${p.score}</span></li>`;
+    }).join("");
     const myRank = list.findIndex((p) => p.id === myId);
     els.yourPlace.textContent = myRank >= 0 ? `You placed ${ordinal(myRank + 1)} of ${list.length}` : "";
   } else {
@@ -1593,6 +1640,8 @@ function resetToMenu(): void {
   els.lobbyRoomName.value = "";
   els.lobbyRoundLength.value = "150";
   els.lobbyBotsCheck.checked = false;
+  els.lobbyMode.value = "ffa";
+  els.hudTeamScore.classList.add("hidden");
   hideSettings();
   closeJoinCode();
   closeScanner();
@@ -2091,6 +2140,11 @@ function init(): void {
   // Host settings: bots toggle (immediate on change)
   els.lobbyBotsCheck.addEventListener("change", () => {
     window.Net.sendHostSettings({ botsInRoom: els.lobbyBotsCheck.checked });
+  });
+
+  // Host settings: mode select (immediate on change)
+  els.lobbyMode.addEventListener("change", () => {
+    window.Net.sendHostSettings({ mode: els.lobbyMode.value });
   });
 
   document.addEventListener("visibilitychange", () => {
