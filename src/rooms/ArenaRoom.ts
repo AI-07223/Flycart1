@@ -101,6 +101,7 @@ export class ArenaRoom extends Room<ArenaState> {
   private shield = new Map<string, number>();
   private invulnUntil = new Map<string, number>();
   private msgTimes = new Map<string, number[]>();
+  private clientMap = new Map<string, Client>();
 
   private now = 0;
   private bulletSeq = 0;
@@ -108,16 +109,28 @@ export class ArenaRoom extends Room<ArenaState> {
   private pickupSeq = 0;
   private pickupAt = 0;
   private botsEnabled = true;
+  private lobbyElapsed = 0;
+  private isPublic = true;
 
   onCreate(options: { code?: string } = {}) {
     this.state = new ArenaState();
-    this.state.timeLeft = C.ROUND_SECONDS;
-    this.state.phase = "playing";
+    const code = options.code || "PUBLIC";
+    this.isPublic = code === "PUBLIC" || code === "NOBOTS";
+    this.botsEnabled = code !== "NOBOTS";
+    this.setMetadata({ code });
+
     this.state.arenaHalf = C.MAP_HALF;
     this.state.floorY = C.GROUND_Y;
     this.state.ceilingY = C.MAX_ALT;
-    this.botsEnabled = (options.code || "PUBLIC") !== "NOBOTS";
-    this.setMetadata({ code: options.code || "PUBLIC" });
+
+    if (this.isPublic) {
+      this.state.phase = "playing";
+      this.state.timeLeft = C.ROUND_SECONDS;
+    } else {
+      this.state.phase = "lobby";
+      this.state.timeLeft = 0;
+      this.lobbyElapsed = 0;
+    }
 
     this.onMessage("input", (client, data: unknown) => {
       if (!this.rateOk(client.sessionId, C.INPUT_RATE_MAX)) return;
@@ -131,6 +144,36 @@ export class ArenaRoom extends Room<ArenaState> {
       if (!this.rateOk(client.sessionId, C.NAME_RATE_MAX)) return;
       const p = this.state.players.get(client.sessionId);
       if (p) p.name = normalizeName(name, p.name);
+    });
+
+    this.onMessage("setReady", (client) => {
+      if (this.isPublic) return;
+      if (!this.rateOk(client.sessionId, C.READY_RATE_MAX)) return;
+      const p = this.state.players.get(client.sessionId);
+      if (!p || p.bot) return;
+      p.ready = !p.ready;
+      this.checkAutoStart();
+    });
+
+    this.onMessage("hostStart", (client) => {
+      if (this.isPublic) return;
+      if (!this.rateOk(client.sessionId, C.HOST_MSG_RATE_MAX)) return;
+      if (client.sessionId !== this.state.hostId) return;
+      if (this.state.phase !== "lobby") return;
+      this.startMatch();
+    });
+
+    this.onMessage("hostKick", (client, data: unknown) => {
+      if (this.isPublic) return;
+      if (!this.rateOk(client.sessionId, C.HOST_KICK_RATE_MAX)) return;
+      if (client.sessionId !== this.state.hostId) return;
+      if (!isRecord(data)) return;
+      const targetId = typeof data.targetId === "string" ? data.targetId : null;
+      if (!targetId) return;
+      const target = this.state.players.get(targetId);
+      if (!target || target.bot) return;
+      if (targetId === client.sessionId) return;
+      this.clientMap.get(targetId)?.leave(1000);
     });
 
     this.setPatchRate(33);
@@ -153,16 +196,45 @@ export class ArenaRoom extends Room<ArenaState> {
       ? joinOptions.skin
       : Math.floor(Math.random() * C.SKIN_COUNT);
     p.bot = false;
-    this.spawn(client.sessionId, p);
+    p.ready = false;
+
+    this.clientMap.set(client.sessionId, client);
+
+    if (this.isPublic) {
+      this.spawn(client.sessionId, p);
+    } else {
+      // Lobby: add player in a spectator-like state, not yet in combat.
+      p.alive = false;
+      p.px = 0;
+      p.py = C.SPAWN_ALT;
+      p.pz = 0;
+      p.fx = 1;
+      p.fy = 0;
+      p.fz = 0;
+      p.speed = 0;
+      p.hp = C.MAX_HP;
+      // First human joiner becomes host.
+      if (this.state.hostId === "") {
+        this.state.hostId = client.sessionId;
+      }
+    }
+
     this.state.players.set(client.sessionId, p);
     this.inputs.set(client.sessionId, { ...ZERO_INPUT });
   }
 
   async onLeave(client: Client, consented?: boolean) {
+    this.clientMap.delete(client.sessionId);
     if (consented) { this.removePlayer(client.sessionId); return; }
     this.inputs.set(client.sessionId, { ...ZERO_INPUT });
+    // In lobby, use a short reconnect window since the slot is less precious.
+    const reconnectWindow = (!this.isPublic && this.state.phase === "lobby")
+      ? C.LOBBY_RECONNECT_WINDOW
+      : C.RECONNECT_WINDOW;
     try {
-      await this.allowReconnection(client, C.RECONNECT_WINDOW);
+      await this.allowReconnection(client, reconnectWindow);
+      // Restore client reference on successful reconnect.
+      this.clientMap.set(client.sessionId, client);
     } catch {
       this.removePlayer(client.sessionId);
     }
@@ -172,27 +244,47 @@ export class ArenaRoom extends Room<ArenaState> {
     this.now += dt;
     const playing = this.state.phase === "playing";
 
-    this.maintainBots();
-    this.maintainPickups();
+    if (playing) {
+      this.maintainBots();
+      this.maintainPickups();
+    }
     this.updateTimer(dt);
 
-    for (const [id, brain] of this.bots) this.thinkBot(id, brain);
+    if (playing) {
+      for (const [id, brain] of this.bots) this.thinkBot(id, brain);
 
-    for (const [id, p] of this.state.players) {
-      if (!p.alive) {
-        const at = this.respawnAt.get(id) ?? 0;
-        if (this.now >= at) this.spawn(id, p);
-        continue;
+      for (const [id, p] of this.state.players) {
+        if (!p.alive) {
+          const at = this.respawnAt.get(id) ?? 0;
+          if (this.now >= at) this.spawn(id, p);
+          continue;
+        }
+        this.stepPlane(id, p, dt, playing);
       }
-      this.stepPlane(id, p, dt, playing);
-    }
 
-    this.stepBullets(dt, playing);
-    this.collectPickups();
-    this.expirePowers();
+      this.stepBullets(dt, playing);
+      this.collectPickups();
+      this.expirePowers();
+    }
   }
 
   private updateTimer(dt: number) {
+    if (this.state.phase === "lobby") {
+      // Count human players only.
+      let humanCount = 0;
+      for (const [, p] of this.state.players) if (!p.bot) humanCount++;
+      if (humanCount >= 2) {
+        this.lobbyElapsed += dt;
+        if (this.lobbyElapsed >= C.LOBBY_READY_TIMEOUT) {
+          this.startMatch();
+        }
+      } else {
+        // Reset watchdog if not enough players.
+        this.lobbyElapsed = 0;
+      }
+      return;
+    }
+
     if (this.state.phase === "playing") {
       this.state.timeLeft = Math.max(0, this.state.timeLeft - dt);
       if (this.state.timeLeft <= 0) {
@@ -203,15 +295,29 @@ export class ArenaRoom extends Room<ArenaState> {
       return;
     }
 
+    // Intermission countdown.
     this.state.timeLeft = Math.max(0, this.state.timeLeft - dt);
     if (this.state.timeLeft > 0) return;
 
-    for (const [id, p] of this.state.players) {
-      p.score = 0;
-      this.spawn(id, p);
+    if (this.isPublic) {
+      // Public rooms: auto-restart into playing.
+      for (const [id, p] of this.state.players) {
+        p.score = 0;
+        this.spawn(id, p);
+      }
+      this.state.phase = "playing";
+      this.state.timeLeft = C.ROUND_SECONDS;
+    } else {
+      // Private rooms: return to lobby so players can ready up again.
+      for (const [, p] of this.state.players) {
+        p.score = 0;
+        p.ready = false;
+        p.alive = false;
+      }
+      this.lobbyElapsed = 0;
+      this.state.phase = "lobby";
+      this.state.timeLeft = 0;
     }
-    this.state.phase = "playing";
-    this.state.timeLeft = C.ROUND_SECONDS;
   }
 
   private stepPlane(id: string, p: Player, dt: number, playing: boolean) {
@@ -529,7 +635,17 @@ export class ArenaRoom extends Room<ArenaState> {
   }
 
   private removePlayer(id: string) {
+    // Host reassignment: if the leaving player was host, find the next human.
+    if (id === this.state.hostId) {
+      let nextHost = "";
+      for (const [pid, p] of this.state.players) {
+        if (pid !== id && !p.bot) { nextHost = pid; break; }
+      }
+      this.state.hostId = nextHost;
+    }
+
     this.state.players.delete(id);
+    this.clientMap.delete(id);
     this.inputs.delete(id);
     this.lastShot.delete(id);
     this.respawnAt.delete(id);
@@ -545,6 +661,32 @@ export class ArenaRoom extends Room<ArenaState> {
     this.shield.delete(id);
     this.invulnUntil.delete(id);
     this.msgTimes.delete(id);
+  }
+
+  private startMatch() {
+    this.state.phase = "playing";
+    this.state.timeLeft = C.ROUND_SECONDS;
+    this.lobbyElapsed = 0;
+    for (const [id, p] of this.state.players) {
+      p.score = 0;
+      p.ready = false;
+      this.spawn(id, p);
+    }
+  }
+
+  private checkAutoStart() {
+    if (this.state.phase !== "lobby") return;
+    let humanCount = 0;
+    let readyCount = 0;
+    for (const [, p] of this.state.players) {
+      if (!p.bot) {
+        humanCount++;
+        if (p.ready) readyCount++;
+      }
+    }
+    if (humanCount >= 2 && readyCount === humanCount) {
+      this.startMatch();
+    }
   }
 
   private maintainBots() {

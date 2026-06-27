@@ -32,6 +32,7 @@ const els = {
   pause: dollar("pause-screen"),
   resume: dollar("resume-btn") as HTMLButtonElement,
   pauseMenu: dollar("pause-menu-btn") as HTMLButtonElement,
+  pauseSettings: dollar("pause-settings-btn") as HTMLButtonElement,
   share: dollar("share-bar"),
   shareLink: dollar("share-link") as HTMLInputElement,
   qrBtn: dollar("qr-btn") as HTMLButtonElement,
@@ -66,9 +67,31 @@ const els = {
   connMenu: dollar("conn-menu") as HTMLButtonElement,
   bots: dollar("bots-check") as HTMLInputElement,
   planeSwatches: dollar("plane-swatches"),
+  // Slice 1 additions
+  bootOverlay: dollar("boot-overlay"),
+  fatalOverlay: dollar("fatal-overlay"),
+  fatalMsg: dollar("fatal-msg"),
+  lobbyScreen: dollar("lobby-screen"),
+  lobbyTitle: dollar("lobby-title"),
+  lobbyRoster: dollar("lobby-roster"),
+  lobbyReadyBtn: dollar("lobby-ready-btn") as HTMLButtonElement,
+  lobbyStartBtn: dollar("lobby-start-btn") as HTMLButtonElement,
+  lobbyLeaveBtn: dollar("lobby-leave-btn") as HTMLButtonElement,
+  settingsScreen: dollar("settings-screen"),
+  settingsCloseBtn: dollar("settings-close-btn") as HTMLButtonElement,
+  settingsCloseBtn2: dollar("settings-close-btn2") as HTMLButtonElement,
+  menuSettingsBtn: dollar("menu-settings-btn") as HTMLButtonElement,
+  joinCodeModal: dollar("join-code-modal"),
+  joinCodeInput: dollar("join-code-input") as HTMLInputElement,
+  joinCodeSubmit: dollar("join-code-submit") as HTMLButtonElement,
+  joinCodeCancel: dollar("join-code-cancel") as HTMLButtonElement,
+  joinCodeOpenBtn: dollar("join-code-open-btn") as HTMLButtonElement,
+  menuLeaderboard: dollar("menu-leaderboard"),
 };
 
-let mode: "menu" | "playing" | "paused" | "lost" = "menu";
+let mode: "menu" | "lobby" | "playing" | "paused" | "lost" | "error" = "menu";
+let settingsOpen = false;
+let joinCodeOpen = false;
 let last = 0;
 let prevPhase = "playing";
 let prevHp = G.MAX_HP;
@@ -374,19 +397,80 @@ function resolveLanOrigin(): string | null {
   return origin;
 }
 
+// ─── STATE MACHINE ───────────────────────────────────────────────────────────
+// applyMode() is the single source of truth for which top-level screens are
+// visible. Sub-state overlays (settings, join-code, share-qr, intermission,
+// rotate) are managed by their own helpers and do NOT change `mode`.
+function applyMode(nextMode: typeof mode): void {
+  mode = nextMode;
+
+  // Top-level screen visibility
+  const isMenu    = mode === "menu";
+  const isLobby   = mode === "lobby";
+  const isPlaying = mode === "playing" || mode === "paused";
+  const isLost    = mode === "lost";
+  const isError   = mode === "error";
+
+  els.bootOverlay.classList.add("hidden");           // boot overlay only shown pre-init
+  els.start.classList.toggle("hidden", !isMenu);
+  els.lobbyScreen.classList.toggle("hidden", !isLobby);
+  els.hud.classList.toggle("hidden", !isPlaying);
+  els.health.classList.toggle("hidden", !isPlaying);
+  els.pause.classList.toggle("hidden", mode !== "paused");
+  els.connLost.classList.toggle("hidden", !isLost);
+  els.fatalOverlay.classList.toggle("hidden", !isError);
+}
+
+// ─── FATAL ERROR ─────────────────────────────────────────────────────────────
+function showFatal(msg: string): void {
+  els.fatalMsg.textContent = msg;
+  applyMode("error");
+}
+
+// ─── SETTINGS OVERLAY ────────────────────────────────────────────────────────
+// Settings is a sub-state: it doesn't change `mode`, it overlays on top.
+function showSettings(): void {
+  settingsOpen = true;
+  els.settingsScreen.classList.remove("hidden");
+}
+
+function hideSettings(): void {
+  settingsOpen = false;
+  els.settingsScreen.classList.add("hidden");
+}
+
+// ─── JOIN-BY-CODE MODAL ───────────────────────────────────────────────────────
+function openJoinCode(): void {
+  joinCodeOpen = true;
+  els.joinCodeModal.classList.remove("hidden");
+  els.joinCodeInput.value = "";
+  els.joinCodeInput.focus();
+}
+
+function closeJoinCode(): void {
+  joinCodeOpen = false;
+  els.joinCodeModal.classList.add("hidden");
+}
+
 function fetchLeaderboard(): void {
   fetch("/leaderboard?n=10")
     .then((r) => (r.ok ? r.json() : []))
     .then((rows) => {
       if (!Array.isArray(rows) || !rows.length) {
         els.leaderboard.innerHTML = '<div class="lb-row muted">No scores yet</div>';
+        els.menuLeaderboard.innerHTML = '<div class="lb-row muted">No scores yet</div>';
         return;
       }
-      els.leaderboard.innerHTML = rows.slice(0, 5).map((entry: any, i: number) =>
+      const html = rows.slice(0, 5).map((entry: any, i: number) =>
         `<div class="lb-row"><span>${i + 1}. ${escapeHtml(entry.name)}</span><span>${entry.score | 0}</span></div>`
       ).join("");
+      els.leaderboard.innerHTML = html;
+      els.menuLeaderboard.innerHTML = html;
     })
-    .catch(() => { els.leaderboard.innerHTML = '<div class="lb-row muted">Leaderboard unavailable</div>'; });
+    .catch(() => {
+      els.leaderboard.innerHTML = '<div class="lb-row muted">Leaderboard unavailable</div>';
+      els.menuLeaderboard.innerHTML = '<div class="lb-row muted">Leaderboard unavailable</div>';
+    });
 }
 
 function buildPlanePicker(): void {
@@ -440,15 +524,11 @@ async function startGame(code: string, serverOrigin: string | null = null): Prom
     return;
   }
 
-  mode = "playing";
   prevPhase = "playing";
   prevHp = G.MAX_HP;
-  els.start.classList.add("hidden");
-  els.hud.classList.remove("hidden");
-  els.health.classList.remove("hidden");
+  applyMode("playing");
   els.respawn.classList.add("hidden");
   els.inter.classList.add("hidden");
-  els.connLost.classList.add("hidden");
   setStatus("");
   if (window.Input.isTouchDevice()) els.touch.classList.remove("hidden");
   if (!engineStarted) {
@@ -631,13 +711,11 @@ function setupTouchButtons(): void {
 
 function togglePause(): void {
   if (mode === "playing") {
-    mode = "paused";
-    els.pause.classList.remove("hidden");
+    applyMode("paused");
     window.Net.sendInput(0, 0, false, false);
     window.SFX.setEngine(0, false);
   } else if (mode === "paused") {
-    mode = "playing";
-    els.pause.classList.add("hidden");
+    applyMode("playing");
   }
 }
 
@@ -650,18 +728,16 @@ function resetToMenu(): void {
   try { window.Net.leave(); } catch {}
   if (window.SFX.stopLoops) window.SFX.stopLoops();
   if (window.SFX.startMenuAmbient) window.SFX.startMenuAmbient();
-  mode = "menu";
   engineStarted = false;
-  els.start.classList.remove("hidden");
-  els.hud.classList.add("hidden");
-  els.health.classList.add("hidden");
+  applyMode("menu");
   els.touch.classList.add("hidden");
   els.share.classList.add("hidden");
   els.inter.classList.add("hidden");
-  els.pause.classList.add("hidden");
-  els.connLost.classList.add("hidden");
   els.respawn.classList.add("hidden");
   els.powerChip.classList.add("hidden");
+  hideSettings();
+  closeJoinCode();
+  hideShareQr();
   clearShareInvite();
   setBusy(false);
   fetchLeaderboard();
@@ -672,17 +748,15 @@ function resetToMenu(): void {
 
 function onDisconnect(): void {
   if (mode === "menu" || mode === "lost") return;
-  mode = "lost";
   if (window.SFX.suspend) window.SFX.suspend();
   els.connMsg.textContent = "Reconnecting…";
   els.connRetry.classList.add("hidden");
-  els.connLost.classList.remove("hidden");
+  applyMode("lost");
   window.Net.tryReconnect().then((ok) => {
     if (mode !== "lost") return;
     if (ok) {
-      els.connLost.classList.add("hidden");
       if (window.SFX.resume) window.SFX.resume();
-      mode = "playing";
+      applyMode("playing");
     } else {
       els.connMsg.textContent = "Couldn't reconnect.";
       els.connRetry.classList.remove("hidden");
@@ -803,9 +877,8 @@ function init(): void {
     els.connRetry.classList.add("hidden");
     window.Net.tryReconnect().then((ok) => {
       if (ok) {
-        els.connLost.classList.add("hidden");
         if (window.SFX.resume) window.SFX.resume();
-        mode = "playing";
+        applyMode("playing");
       } else {
         els.connMsg.textContent = "Still down.";
         els.connRetry.classList.remove("hidden");
@@ -815,6 +888,85 @@ function init(): void {
 
   window.Input.onPause = () => { if (mode !== "menu") togglePause(); };
   window.Input.onMute = () => toggleMute();
+
+  // Settings overlay — menu button
+  els.menuSettingsBtn.addEventListener("click", () => {
+    window.SFX.uiClick();
+    showSettings();
+  });
+  // Settings overlay — pause button
+  els.pauseSettings.addEventListener("click", () => {
+    window.SFX.uiClick();
+    showSettings();
+  });
+  // Settings overlay — close buttons
+  els.settingsCloseBtn.addEventListener("click", () => {
+    window.SFX.uiClick();
+    hideSettings();
+  });
+  els.settingsCloseBtn2.addEventListener("click", () => {
+    window.SFX.uiClick();
+    hideSettings();
+  });
+  // Click-outside to close settings
+  els.settingsScreen.addEventListener("click", (e: MouseEvent) => {
+    if (e.target === els.settingsScreen) hideSettings();
+  });
+
+  // Join-by-code modal
+  els.joinCodeOpenBtn.addEventListener("click", () => {
+    window.SFX.uiClick();
+    openJoinCode();
+  });
+  els.joinCodeCancel.addEventListener("click", () => {
+    window.SFX.uiClick();
+    closeJoinCode();
+  });
+  // Force uppercase as user types
+  els.joinCodeInput.addEventListener("input", () => {
+    const cur = els.joinCodeInput.value;
+    const upper = cur.toUpperCase().replace(/[^A-Z0-9]/g, "");
+    if (cur !== upper) {
+      const sel = els.joinCodeInput.selectionStart ?? upper.length;
+      els.joinCodeInput.value = upper;
+      els.joinCodeInput.setSelectionRange(sel, sel);
+    }
+  });
+  els.joinCodeSubmit.addEventListener("click", () => {
+    const code = els.joinCodeInput.value.trim().toUpperCase();
+    if (code.length < 1) return;
+    window.SFX.uiClick();
+    closeJoinCode();
+    startGame(code, null);
+  });
+  els.joinCodeInput.addEventListener("keydown", (e: KeyboardEvent) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      const code = els.joinCodeInput.value.trim().toUpperCase();
+      if (code.length < 1) return;
+      window.SFX.uiClick();
+      closeJoinCode();
+      startGame(code, null);
+    }
+  });
+  // Click-outside to close join modal
+  els.joinCodeModal.addEventListener("click", (e: MouseEvent) => {
+    if (e.target === els.joinCodeModal) closeJoinCode();
+  });
+
+  // Lobby buttons (scaffold — netcode wired in Slice 6)
+  els.lobbyLeaveBtn.addEventListener("click", () => {
+    window.SFX.uiClick();
+    resetToMenu();
+  });
+  els.lobbyReadyBtn.addEventListener("click", () => {
+    window.SFX.uiClick();
+    els.lobbyReadyBtn.classList.toggle("active");
+  });
+  els.lobbyStartBtn.addEventListener("click", () => {
+    window.SFX.uiClick();
+    // Slice 6 will wire actual start; for now it's host-only and hidden
+  });
 
   document.addEventListener("visibilitychange", () => {
     if (document.hidden) {
@@ -828,10 +980,36 @@ function init(): void {
   window.addEventListener("orientationchange", updateRotateOverlay);
   window.addEventListener("resize", updateRotateOverlay);
   document.addEventListener("keydown", (e: KeyboardEvent) => {
-    if (e.key === "Escape" && !els.shareQrOverlay.classList.contains("hidden")) hideShareQr();
+    if (e.key === "Escape") {
+      if (!els.shareQrOverlay.classList.contains("hidden")) { hideShareQr(); return; }
+      if (settingsOpen) { hideSettings(); return; }
+      if (joinCodeOpen) { closeJoinCode(); return; }
+    }
   });
+
+  // Fade out the boot overlay now that init is complete
+  els.bootOverlay.classList.add("fade-out");
+  setTimeout(() => els.bootOverlay.classList.add("hidden"), 450);
 
   requestAnimationFrame((t) => { last = t; loop(t); });
 }
 
 window.addEventListener("DOMContentLoaded", init);
+
+// Fatal overlay: surface unrecoverable JS errors to the user.
+// The existing inline <script> in index.html already POSTs to /api/errors
+// for server-side logging — these listeners add the user-visible layer on top.
+window.addEventListener("error", (e: ErrorEvent) => {
+  // Only show fatal if the game has started past boot; ignore render/asset
+  // warnings that are non-fatal. A simple heuristic: only show if mode is
+  // already set (i.e. DOMContentLoaded has fired and init() ran).
+  if (mode !== "menu" && mode !== "lobby" && mode !== "playing" && mode !== "paused") {
+    showFatal(e.message || "An unexpected error occurred.");
+  }
+});
+window.addEventListener("unhandledrejection", (e: PromiseRejectionEvent) => {
+  if (mode !== "menu" && mode !== "lobby" && mode !== "playing" && mode !== "paused") {
+    const msg = (e.reason && (e.reason as any).message) ? (e.reason as any).message : String(e.reason);
+    showFatal(msg || "An unexpected error occurred.");
+  }
+});

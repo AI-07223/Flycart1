@@ -23,6 +23,7 @@ export class Player extends Schema {
   @type("boolean") boosting = false;
   @type("string") power = "";
   @type("number") powerLeft = 0;
+  @type("boolean") ready = false;
 }
 
 export class Bullet extends Schema {
@@ -49,6 +50,7 @@ export class ArenaState extends Schema {
   @type({ map: Pickup }) pickups = new MapSchema<Pickup>();
   @type("number") timeLeft = 0;
   @type("string") phase = "playing";
+  @type("string") hostId = "";
   @type("number") arenaHalf = 0;
   @type("number") floorY = 0;
   @type("number") ceilingY = 0;

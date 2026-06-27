@@ -15,6 +15,23 @@
 </head>
 <body>
   <div id="game-wrap">
+    <!-- BOOT OVERLAY: shown immediately on load, hidden after init() completes -->
+    <div id="boot-overlay">
+      <div class="boot-inner">
+        <div class="boot-spinner" aria-hidden="true"></div>
+        <p class="boot-label">Loading…</p>
+      </div>
+    </div>
+
+    <!-- FATAL ERROR OVERLAY: hidden by default, shown by showFatal() -->
+    <div id="fatal-overlay" class="overlay hidden" role="alertdialog" aria-labelledby="fatal-msg">
+      <div class="fatal-card">
+        <h2>Something went wrong</h2>
+        <p id="fatal-msg" class="muted"></p>
+        <button onclick="location.reload()">Reload Page</button>
+      </div>
+    </div>
+
     <canvas id="game"></canvas>
     <div id="vignette"></div>
     <div id="callout"></div>
@@ -85,7 +102,11 @@
 
     <div id="start-screen" class="overlay">
       <div class="menu-shell">
-        <div class="menu-hero">
+        <div class="menu-shell-head">
+        <button id="menu-settings-btn" class="icon-btn" title="Settings">⚙</button>
+      </div>
+
+      <div class="menu-hero">
           <div class="hero-copy">
             <p class="eyebrow">Flat-world air combat</p>
             <h1>SMASH<span>CART</span></h1>
@@ -125,6 +146,7 @@
             <h2>Play with Friends</h2>
             <p>Create a private room with a six-character code and share the invite link.</p>
             <button id="friends-btn" class="secondary">CREATE ROOM</button>
+            <button id="join-code-open-btn" class="secondary">HAVE A CODE?</button>
             <p id="friends-note" class="panel-foot">Room codes stay on the same server that created them.</p>
           </section>
 
@@ -141,6 +163,15 @@
               <button id="lan-friends-btn" class="secondary">LAN ROOM</button>
             </div>
             <p id="lan-hint" class="muted"></p>
+          </section>
+
+          <section class="menu-panel menu-lb-panel">
+            <div class="panel-head">
+              <h2>All-Time Leaders</h2>
+            </div>
+            <div id="menu-leaderboard">
+              <div class="lb-row muted">Loading…</div>
+            </div>
           </section>
 
           <section class="menu-panel controls-panel">
@@ -182,6 +213,7 @@
       <p class="muted">Your plane keeps drifting forward. Resume or return to the menu.</p>
       <div class="btn-row">
         <button id="resume-btn">RESUME</button>
+        <button id="pause-settings-btn" class="secondary">⚙ SETTINGS</button>
         <button id="pause-menu-btn" class="secondary">MAIN MENU</button>
       </div>
     </div>
@@ -192,6 +224,95 @@
       <div class="btn-row">
         <button id="conn-retry" class="hidden">RECONNECT</button>
         <button id="conn-menu" class="secondary">MAIN MENU</button>
+      </div>
+    </div>
+
+    <!-- LOBBY SCREEN: pre-game waiting room, shown after createPrivateRoom -->
+    <div id="lobby-screen" class="overlay hidden">
+      <div class="lobby-card">
+        <div class="panel-head">
+          <div>
+            <p class="eyebrow">Waiting Room</p>
+            <h2 id="lobby-title">Private Room</h2>
+          </div>
+          <button id="lobby-leave-btn" class="secondary">Leave</button>
+        </div>
+        <div id="lobby-roster" class="lobby-roster">
+          <p class="muted">Waiting for players…</p>
+        </div>
+        <div class="btn-row lobby-actions">
+          <button id="lobby-ready-btn" class="secondary">Ready</button>
+          <button id="lobby-start-btn" class="hidden">START GAME</button>
+        </div>
+      </div>
+      <!-- share bar is reused here when in lobby; #share-bar is shown separately -->
+    </div>
+
+    <!-- SETTINGS SCREEN: modal overlay, reachable from menu and pause -->
+    <div id="settings-screen" class="overlay hidden" role="dialog" aria-labelledby="settings-title">
+      <div class="settings-card">
+        <div class="panel-head">
+          <h2 id="settings-title">Settings</h2>
+          <button id="settings-close-btn" class="secondary" aria-label="Close settings">✕</button>
+        </div>
+
+        <div class="settings-section">
+          <h3 class="settings-heading">Audio</h3>
+          <label class="settings-row">
+            <span class="settings-label">Master Volume</span>
+            <input type="range" id="set-vol-master" min="0" max="1" step="0.01" value="1" />
+          </label>
+          <label class="settings-row">
+            <span class="settings-label">SFX Volume</span>
+            <input type="range" id="set-vol-sfx" min="0" max="1" step="0.01" value="1" />
+          </label>
+          <label class="settings-row">
+            <span class="settings-label">Music Volume</span>
+            <input type="range" id="set-vol-music" min="0" max="1" step="0.01" value="0.5" />
+          </label>
+        </div>
+
+        <div class="settings-section">
+          <h3 class="settings-heading">Graphics</h3>
+          <div class="settings-row">
+            <span class="settings-label">Quality</span>
+            <div class="settings-quality" id="set-quality" role="radiogroup" aria-label="Quality">
+              <label class="quality-opt"><input type="radio" name="quality" value="low" /> Low</label>
+              <label class="quality-opt"><input type="radio" name="quality" value="medium" /> Medium</label>
+              <label class="quality-opt"><input type="radio" name="quality" value="high" /> High</label>
+              <label class="quality-opt"><input type="radio" name="quality" value="auto" checked /> Auto</label>
+            </div>
+          </div>
+        </div>
+
+        <div class="settings-section">
+          <h3 class="settings-heading">Controls</h3>
+          <label class="settings-row">
+            <span class="settings-label">Invert Pitch</span>
+            <input type="checkbox" id="set-invert-pitch" class="settings-check" />
+          </label>
+          <label class="settings-row">
+            <span class="settings-label">Invert Steer</span>
+            <input type="checkbox" id="set-invert-steer" class="settings-check" />
+          </label>
+        </div>
+
+        <div class="btn-row">
+          <button id="settings-close-btn2">CLOSE</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- JOIN-BY-CODE MODAL: shown over menu via "Have a code?" trigger -->
+    <div id="join-code-modal" class="overlay hidden" role="dialog" aria-labelledby="join-code-title">
+      <div class="join-code-card">
+        <h2 id="join-code-title">Join by Code</h2>
+        <p class="muted">Enter the 6-character room code shared with you.</p>
+        <input id="join-code-input" maxlength="6" placeholder="ABCDEF" autocomplete="off" spellcheck="false" />
+        <div class="btn-row">
+          <button id="join-code-submit">JOIN</button>
+          <button id="join-code-cancel" class="secondary">Cancel</button>
+        </div>
       </div>
     </div>
   </div>

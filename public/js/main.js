@@ -44,6 +44,7 @@
         pause: dollar("pause-screen"),
         resume: dollar("resume-btn"),
         pauseMenu: dollar("pause-menu-btn"),
+        pauseSettings: dollar("pause-settings-btn"),
         share: dollar("share-bar"),
         shareLink: dollar("share-link"),
         qrBtn: dollar("qr-btn"),
@@ -77,9 +78,31 @@
         connRetry: dollar("conn-retry"),
         connMenu: dollar("conn-menu"),
         bots: dollar("bots-check"),
-        planeSwatches: dollar("plane-swatches")
+        planeSwatches: dollar("plane-swatches"),
+        // Slice 1 additions
+        bootOverlay: dollar("boot-overlay"),
+        fatalOverlay: dollar("fatal-overlay"),
+        fatalMsg: dollar("fatal-msg"),
+        lobbyScreen: dollar("lobby-screen"),
+        lobbyTitle: dollar("lobby-title"),
+        lobbyRoster: dollar("lobby-roster"),
+        lobbyReadyBtn: dollar("lobby-ready-btn"),
+        lobbyStartBtn: dollar("lobby-start-btn"),
+        lobbyLeaveBtn: dollar("lobby-leave-btn"),
+        settingsScreen: dollar("settings-screen"),
+        settingsCloseBtn: dollar("settings-close-btn"),
+        settingsCloseBtn2: dollar("settings-close-btn2"),
+        menuSettingsBtn: dollar("menu-settings-btn"),
+        joinCodeModal: dollar("join-code-modal"),
+        joinCodeInput: dollar("join-code-input"),
+        joinCodeSubmit: dollar("join-code-submit"),
+        joinCodeCancel: dollar("join-code-cancel"),
+        joinCodeOpenBtn: dollar("join-code-open-btn"),
+        menuLeaderboard: dollar("menu-leaderboard")
       };
       var mode = "menu";
+      var settingsOpen = false;
+      var joinCodeOpen = false;
       var last = 0;
       var prevPhase = "playing";
       var prevHp = G.MAX_HP;
@@ -357,17 +380,59 @@
         saveLanOrigin(origin);
         return origin;
       }
+      function applyMode(nextMode) {
+        mode = nextMode;
+        const isMenu = mode === "menu";
+        const isLobby = mode === "lobby";
+        const isPlaying = mode === "playing" || mode === "paused";
+        const isLost = mode === "lost";
+        const isError = mode === "error";
+        els.bootOverlay.classList.add("hidden");
+        els.start.classList.toggle("hidden", !isMenu);
+        els.lobbyScreen.classList.toggle("hidden", !isLobby);
+        els.hud.classList.toggle("hidden", !isPlaying);
+        els.health.classList.toggle("hidden", !isPlaying);
+        els.pause.classList.toggle("hidden", mode !== "paused");
+        els.connLost.classList.toggle("hidden", !isLost);
+        els.fatalOverlay.classList.toggle("hidden", !isError);
+      }
+      function showFatal(msg) {
+        els.fatalMsg.textContent = msg;
+        applyMode("error");
+      }
+      function showSettings() {
+        settingsOpen = true;
+        els.settingsScreen.classList.remove("hidden");
+      }
+      function hideSettings() {
+        settingsOpen = false;
+        els.settingsScreen.classList.add("hidden");
+      }
+      function openJoinCode() {
+        joinCodeOpen = true;
+        els.joinCodeModal.classList.remove("hidden");
+        els.joinCodeInput.value = "";
+        els.joinCodeInput.focus();
+      }
+      function closeJoinCode() {
+        joinCodeOpen = false;
+        els.joinCodeModal.classList.add("hidden");
+      }
       function fetchLeaderboard() {
         fetch("/leaderboard?n=10").then((r) => r.ok ? r.json() : []).then((rows) => {
           if (!Array.isArray(rows) || !rows.length) {
             els.leaderboard.innerHTML = '<div class="lb-row muted">No scores yet</div>';
+            els.menuLeaderboard.innerHTML = '<div class="lb-row muted">No scores yet</div>';
             return;
           }
-          els.leaderboard.innerHTML = rows.slice(0, 5).map(
+          const html = rows.slice(0, 5).map(
             (entry, i) => `<div class="lb-row"><span>${i + 1}. ${escapeHtml(entry.name)}</span><span>${entry.score | 0}</span></div>`
           ).join("");
+          els.leaderboard.innerHTML = html;
+          els.menuLeaderboard.innerHTML = html;
         }).catch(() => {
           els.leaderboard.innerHTML = '<div class="lb-row muted">Leaderboard unavailable</div>';
+          els.menuLeaderboard.innerHTML = '<div class="lb-row muted">Leaderboard unavailable</div>';
         });
       }
       function buildPlanePicker() {
@@ -419,15 +484,11 @@
           setBusy(false);
           return;
         }
-        mode = "playing";
         prevPhase = "playing";
         prevHp = G.MAX_HP;
-        els.start.classList.add("hidden");
-        els.hud.classList.remove("hidden");
-        els.health.classList.remove("hidden");
+        applyMode("playing");
         els.respawn.classList.add("hidden");
         els.inter.classList.add("hidden");
-        els.connLost.classList.add("hidden");
         setStatus("");
         if (window.Input.isTouchDevice()) els.touch.classList.remove("hidden");
         if (!engineStarted) {
@@ -590,13 +651,11 @@
       }
       function togglePause() {
         if (mode === "playing") {
-          mode = "paused";
-          els.pause.classList.remove("hidden");
+          applyMode("paused");
           window.Net.sendInput(0, 0, false, false);
           window.SFX.setEngine(0, false);
         } else if (mode === "paused") {
-          mode = "playing";
-          els.pause.classList.add("hidden");
+          applyMode("playing");
         }
       }
       function toggleMute() {
@@ -610,18 +669,16 @@
         }
         if (window.SFX.stopLoops) window.SFX.stopLoops();
         if (window.SFX.startMenuAmbient) window.SFX.startMenuAmbient();
-        mode = "menu";
         engineStarted = false;
-        els.start.classList.remove("hidden");
-        els.hud.classList.add("hidden");
-        els.health.classList.add("hidden");
+        applyMode("menu");
         els.touch.classList.add("hidden");
         els.share.classList.add("hidden");
         els.inter.classList.add("hidden");
-        els.pause.classList.add("hidden");
-        els.connLost.classList.add("hidden");
         els.respawn.classList.add("hidden");
         els.powerChip.classList.add("hidden");
+        hideSettings();
+        closeJoinCode();
+        hideShareQr();
         clearShareInvite();
         setBusy(false);
         fetchLeaderboard();
@@ -631,17 +688,15 @@
       }
       function onDisconnect() {
         if (mode === "menu" || mode === "lost") return;
-        mode = "lost";
         if (window.SFX.suspend) window.SFX.suspend();
         els.connMsg.textContent = "Reconnecting\u2026";
         els.connRetry.classList.add("hidden");
-        els.connLost.classList.remove("hidden");
+        applyMode("lost");
         window.Net.tryReconnect().then((ok) => {
           if (mode !== "lost") return;
           if (ok) {
-            els.connLost.classList.add("hidden");
             if (window.SFX.resume) window.SFX.resume();
-            mode = "playing";
+            applyMode("playing");
           } else {
             els.connMsg.textContent = "Couldn't reconnect.";
             els.connRetry.classList.remove("hidden");
@@ -762,9 +817,8 @@
           els.connRetry.classList.add("hidden");
           window.Net.tryReconnect().then((ok) => {
             if (ok) {
-              els.connLost.classList.add("hidden");
               if (window.SFX.resume) window.SFX.resume();
-              mode = "playing";
+              applyMode("playing");
             } else {
               els.connMsg.textContent = "Still down.";
               els.connRetry.classList.remove("hidden");
@@ -775,6 +829,73 @@
           if (mode !== "menu") togglePause();
         };
         window.Input.onMute = () => toggleMute();
+        els.menuSettingsBtn.addEventListener("click", () => {
+          window.SFX.uiClick();
+          showSettings();
+        });
+        els.pauseSettings.addEventListener("click", () => {
+          window.SFX.uiClick();
+          showSettings();
+        });
+        els.settingsCloseBtn.addEventListener("click", () => {
+          window.SFX.uiClick();
+          hideSettings();
+        });
+        els.settingsCloseBtn2.addEventListener("click", () => {
+          window.SFX.uiClick();
+          hideSettings();
+        });
+        els.settingsScreen.addEventListener("click", (e) => {
+          if (e.target === els.settingsScreen) hideSettings();
+        });
+        els.joinCodeOpenBtn.addEventListener("click", () => {
+          window.SFX.uiClick();
+          openJoinCode();
+        });
+        els.joinCodeCancel.addEventListener("click", () => {
+          window.SFX.uiClick();
+          closeJoinCode();
+        });
+        els.joinCodeInput.addEventListener("input", () => {
+          const cur = els.joinCodeInput.value;
+          const upper = cur.toUpperCase().replace(/[^A-Z0-9]/g, "");
+          if (cur !== upper) {
+            const sel = els.joinCodeInput.selectionStart ?? upper.length;
+            els.joinCodeInput.value = upper;
+            els.joinCodeInput.setSelectionRange(sel, sel);
+          }
+        });
+        els.joinCodeSubmit.addEventListener("click", () => {
+          const code = els.joinCodeInput.value.trim().toUpperCase();
+          if (code.length < 1) return;
+          window.SFX.uiClick();
+          closeJoinCode();
+          startGame(code, null);
+        });
+        els.joinCodeInput.addEventListener("keydown", (e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            const code = els.joinCodeInput.value.trim().toUpperCase();
+            if (code.length < 1) return;
+            window.SFX.uiClick();
+            closeJoinCode();
+            startGame(code, null);
+          }
+        });
+        els.joinCodeModal.addEventListener("click", (e) => {
+          if (e.target === els.joinCodeModal) closeJoinCode();
+        });
+        els.lobbyLeaveBtn.addEventListener("click", () => {
+          window.SFX.uiClick();
+          resetToMenu();
+        });
+        els.lobbyReadyBtn.addEventListener("click", () => {
+          window.SFX.uiClick();
+          els.lobbyReadyBtn.classList.toggle("active");
+        });
+        els.lobbyStartBtn.addEventListener("click", () => {
+          window.SFX.uiClick();
+        });
         document.addEventListener("visibilitychange", () => {
           if (document.hidden) {
             if (window.Net.room) window.Net.sendInput(0, 0, false, false);
@@ -787,14 +908,40 @@
         window.addEventListener("orientationchange", updateRotateOverlay);
         window.addEventListener("resize", updateRotateOverlay);
         document.addEventListener("keydown", (e) => {
-          if (e.key === "Escape" && !els.shareQrOverlay.classList.contains("hidden")) hideShareQr();
+          if (e.key === "Escape") {
+            if (!els.shareQrOverlay.classList.contains("hidden")) {
+              hideShareQr();
+              return;
+            }
+            if (settingsOpen) {
+              hideSettings();
+              return;
+            }
+            if (joinCodeOpen) {
+              closeJoinCode();
+              return;
+            }
+          }
         });
+        els.bootOverlay.classList.add("fade-out");
+        setTimeout(() => els.bootOverlay.classList.add("hidden"), 450);
         requestAnimationFrame((t) => {
           last = t;
           loop(t);
         });
       }
       window.addEventListener("DOMContentLoaded", init);
+      window.addEventListener("error", (e) => {
+        if (mode !== "menu" && mode !== "lobby" && mode !== "playing" && mode !== "paused") {
+          showFatal(e.message || "An unexpected error occurred.");
+        }
+      });
+      window.addEventListener("unhandledrejection", (e) => {
+        if (mode !== "menu" && mode !== "lobby" && mode !== "playing" && mode !== "paused") {
+          const msg = e.reason && e.reason.message ? e.reason.message : String(e.reason);
+          showFatal(msg || "An unexpected error occurred.");
+        }
+      });
     }
   });
   require_main();

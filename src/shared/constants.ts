@@ -74,6 +74,13 @@ export const RECONNECT_WINDOW = 20;
 export const INPUT_RATE_MAX = 60;
 export const NAME_RATE_MAX = 5;
 
+// Lobby.
+export const LOBBY_READY_TIMEOUT = 120;
+export const LOBBY_RECONNECT_WINDOW = 5;
+export const READY_RATE_MAX = 4;
+export const HOST_MSG_RATE_MAX = 2;
+export const HOST_KICK_RATE_MAX = 4;
+
 export type LandmarkKind = "mesa" | "spire" | "tower" | "hangar";
 
 export interface Landmark {
