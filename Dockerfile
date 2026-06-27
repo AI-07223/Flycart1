@@ -1,6 +1,11 @@
 # --- build stage ---
 FROM node:22-alpine AS build
 WORKDIR /app
+# Pin npm to the dev/lockfile toolchain (npm 11.x). The base image bundles npm 10.9.8, which
+# strictly rejects this lockfile's nested tsx -> esbuild@0.28.1 optional-platform entries
+# ("npm ci can only install when package.json and package-lock.json are in sync"). npm 11
+# resolves the same lock cleanly, matching local dev — keep dev/prod npm in parity.
+RUN npm install -g npm@11.12.1
 COPY package*.json ./
 # Resilient install. The host's npm registry connection is flaky and intermittently fails the
 # WHOLE step (exit 152) beyond npm's own retries, so wrap it in a shell retry loop: up to 5 whole
