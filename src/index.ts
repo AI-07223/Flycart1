@@ -8,6 +8,7 @@ import crypto from "crypto";
 import { ArenaRoom } from "./rooms/ArenaRoom";
 import * as leaderboard from "./leaderboard";
 import { log } from "./logger";
+import { createSignalServer } from "./signal";
 
 // Initialize Sentry if DSN is provided (must be before other imports that might throw)
 if (process.env.SENTRY_DSN) {
@@ -101,6 +102,11 @@ const gameServer = new Server({
 // One room type. `filterBy(['code'])` groups joinOrCreate() requests by room
 // code: Quick Play uses code "PUBLIC", private rooms use a share code.
 gameServer.define("arena", ArenaRoom).filterBy(["code"]);
+
+// Wire the WebRTC signaling broker at ws://<host>/signal.
+// MUST be called after gameServer.define() so that Colyseus's upgrade listener
+// is already registered before createSignalServer() re-routes it.
+createSignalServer(server);
 
 server.listen(PORT, () => {
   log("info", "server started", { port: PORT });
