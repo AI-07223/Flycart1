@@ -18,3 +18,11 @@ dump.rdb
 .DS_Store
 .vscode/
 .idea/
+
+# stray agent / tooling artifacts — not part of the project
+.agents/
+.forge/
+.kilocode/
+.roo/
+skills-lock.json
+.claude/worktrees/

@@ -42,6 +42,7 @@ const Net = {
   client: null as any | null,
   room: null as any | null,
   sessionId: null as string | null,
+  serverOrigin: null as string | null,
   lastSent: { seq: 0, turn: 0, climb: 0, boost: false, fire: false },
   snaps: [] as Snapshot[],
   onKill: null as ((msg: any) => void) | null,
@@ -64,13 +65,20 @@ const Net = {
     ackSeq: 0,
   } as LocalPose,
 
-  endpoint(): string {
+  endpoint(origin: string | null = this.serverOrigin): string {
+    if (origin) {
+      const url = new URL(origin);
+      if (url.protocol === "http:") url.protocol = "ws:";
+      if (url.protocol === "https:") url.protocol = "wss:";
+      return url.origin;
+    }
     const proto = location.protocol === "https:" ? "wss" : "ws";
     return `${proto}://${location.host}`;
   },
 
-  async connect(name: string, code: string, skin: number): Promise<any> {
-    this.client = new (window as any).Colyseus.Client(this.endpoint());
+  async connect(name: string, code: string, skin: number, serverOrigin: string | null = null): Promise<any> {
+    this.serverOrigin = serverOrigin;
+    this.client = new (window as any).Colyseus.Client(this.endpoint(serverOrigin));
     const room = await this.client.joinOrCreate("arena", { name, code, skin });
     this._wire(room);
     return room;

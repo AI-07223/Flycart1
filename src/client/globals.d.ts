@@ -40,7 +40,7 @@ interface PowerupInfo {
 }
 
 interface Landmark {
-  kind: string;
+  kind: "mesa" | "spire" | "tower" | "hangar";
   x: number;
   z: number;
   radius: number;
@@ -178,19 +178,32 @@ interface NetAPI {
   client: any | null;
   room: any | null;
   sessionId: string | null;
+  serverOrigin: string | null;
   lastSent: { seq: number; turn: number; climb: number; boost: boolean; fire: boolean };
   snaps: Snapshot[];
   onKill: ((msg: any) => void) | null;
   onPickup: ((msg: any) => void) | null;
   onDisconnect: ((info: any) => void) | null;
   reconnectToken: string | null;
-  endpoint(): string;
-  connect(name: string, code: string, skin: number): Promise<any>;
+  endpoint(origin?: string | null): string;
+  connect(name: string, code: string, skin: number, serverOrigin?: string | null): Promise<any>;
   tryReconnect(): Promise<boolean>;
   sample(renderTime: number): Record<string, SnapshotPlayer>;
   sendInput(turn: number, climb: number, boost: boolean, fire: boolean): void;
   setName(name: string): void;
   leave(): void;
+}
+
+interface QRRenderOptions {
+  size?: number;
+  margin?: number;
+  foreground?: string;
+  background?: string;
+  errorCorrectionLevel?: "L" | "M" | "Q" | "H";
+}
+
+interface QRAPI {
+  render(canvas: HTMLCanvasElement, text: string, options?: QRRenderOptions): void;
 }
 
 interface RendererAPI {
@@ -221,6 +234,7 @@ declare interface Window {
   Assets: AssetsAPI;
   Input: InputAPI;
   Net: NetAPI;
+  QR: QRAPI;
   Renderer: RendererAPI;
   Colyseus: { Client: ColyseusClient };
 }

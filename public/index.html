@@ -57,41 +57,115 @@
     </div>
 
     <div id="share-bar" class="hidden">
-      <span>Invite friends:</span>
-      <input id="share-link" readonly />
-      <button id="copy-btn">Copy</button>
+      <div class="share-copy">
+        <span class="share-label">Invite friends:</span>
+        <input id="share-link" readonly />
+        <div class="share-actions">
+          <button id="qr-btn" class="secondary">Show QR</button>
+          <button id="copy-btn">Copy</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="share-qr-overlay" class="overlay hidden">
+      <div class="share-qr-card">
+        <div class="panel-head">
+          <div>
+            <p class="eyebrow">Room invite</p>
+            <h2 id="share-qr-room">Room</h2>
+          </div>
+          <button id="share-qr-close" class="secondary">Close</button>
+        </div>
+        <canvas id="share-qr-canvas" aria-label="Room invite QR code"></canvas>
+        <p id="share-qr-note" class="muted">Scan to join this room.</p>
+        <input id="share-qr-link" readonly />
+        <button id="share-qr-copy">Copy Link</button>
+      </div>
     </div>
 
     <div id="start-screen" class="overlay">
       <div class="menu-shell">
-        <h1>SMASH<span>CART</span></h1>
-        <p class="tagline">Slow, readable 3D dogfights over a flat open battlefield. Climb, dive, line up your shot, and stay alive.</p>
-        <input id="name-input" maxlength="14" placeholder="Call sign" />
-        <label class="switch"><input type="checkbox" id="bots-check" checked /> 🤖 Fill with bots</label>
-        <div id="plane-picker">
-          <span class="picker-label">Choose your plane</span>
-          <div id="plane-swatches"></div>
-        </div>
-        <div class="btn-row">
-          <button id="quickplay-btn">QUICK PLAY</button>
-          <button id="friends-btn" class="secondary">PLAY WITH FRIENDS</button>
-        </div>
-        <div class="controls-card">
-          <div class="controls-block">
-            <h2>Desktop</h2>
-            <p><kbd>A</kbd><kbd>D</kbd> steer</p>
-            <p><kbd>W</kbd><kbd>S</kbd> climb / dive</p>
-            <p><kbd>Shift</kbd> boost · <kbd>Space</kbd> fire</p>
-            <p><kbd>P</kbd> pause · <kbd>M</kbd> mute</p>
+        <div class="menu-hero">
+          <div class="hero-copy">
+            <p class="eyebrow">Flat-world air combat</p>
+            <h1>SMASH<span>CART</span></h1>
+            <p class="tagline">Slow, readable 3D dogfights over a flat battlefield. Climb, dive, line up your shot, and keep your room alive.</p>
+            <div class="hero-pills">
+              <span class="hero-pill">3D climb / dive</span>
+              <span class="hero-pill">Hotspot ready</span>
+              <span class="hero-pill">Server authoritative</span>
+            </div>
           </div>
-          <div class="controls-block touch-only">
-            <h2>Mobile</h2>
-            <p>Left / right to yaw</p>
-            <p>Up / down to climb and dive</p>
-            <p>BOOST for speed · FIRE to shoot</p>
-          </div>
+
+          <section class="menu-panel player-card">
+            <div class="panel-head">
+              <h2>Flight Deck</h2>
+              <span id="menu-server-badge" class="server-badge">Internet lobby</span>
+            </div>
+            <label class="field-label" for="name-input">Call sign</label>
+            <input id="name-input" maxlength="14" placeholder="Call sign" />
+            <label class="switch"><input type="checkbox" id="bots-check" checked /> 🤖 Fill empty seats with bots</label>
+            <div id="plane-picker">
+              <span class="picker-label">Choose your plane</span>
+              <div id="plane-swatches"></div>
+            </div>
+            <p id="orientation-note" class="muted menu-note">Landscape is recommended on touch devices.</p>
+          </section>
         </div>
-        <p id="status" class="muted"></p>
+
+        <div class="menu-grid">
+          <section class="menu-panel play-panel">
+            <h2>Quick Play</h2>
+            <p>Drop into the current server's public arena. Bots backfill open seats so rounds start fast.</p>
+            <button id="quickplay-btn">PLAY PUBLIC</button>
+            <p class="panel-foot">Best for instant dogfights.</p>
+          </section>
+
+          <section class="menu-panel play-panel">
+            <h2>Play with Friends</h2>
+            <p>Create a private room with a six-character code and share the invite link.</p>
+            <button id="friends-btn" class="secondary">CREATE ROOM</button>
+            <p id="friends-note" class="panel-foot">Room codes stay on the same server that created them.</p>
+          </section>
+
+          <section class="menu-panel play-panel lan-panel">
+            <div class="panel-head">
+              <h2>LAN Party</h2>
+              <span class="panel-chip">Low latency</span>
+            </div>
+            <p>Point the game at a server running on the hotspot host. For the cleanest latency, everyone should open the same local address.</p>
+            <label class="field-label" for="lan-server-input">Hotspot server</label>
+            <input id="lan-server-input" maxlength="120" placeholder="http://192.168.43.1:2567" />
+            <div class="btn-row btn-row-tight">
+              <button id="lan-quick-btn">LAN QUICK PLAY</button>
+              <button id="lan-friends-btn" class="secondary">LAN ROOM</button>
+            </div>
+            <p id="lan-hint" class="muted"></p>
+          </section>
+
+          <section class="menu-panel controls-panel">
+            <div class="panel-head">
+              <h2>Controls</h2>
+              <span id="room-code-chip" class="panel-chip subtle">Public</span>
+            </div>
+            <div class="controls-card">
+              <div class="controls-block">
+                <h3>Desktop</h3>
+                <p><kbd>A</kbd><kbd>D</kbd> steer</p>
+                <p><kbd>W</kbd><kbd>S</kbd> climb / dive</p>
+                <p><kbd>Shift</kbd> boost · <kbd>Space</kbd> fire</p>
+                <p><kbd>P</kbd> pause · <kbd>M</kbd> mute</p>
+              </div>
+              <div class="controls-block touch-only">
+                <h3>Mobile</h3>
+                <p>Left / right to yaw</p>
+                <p>Up / down to climb and dive</p>
+                <p>BOOST for speed · FIRE to shoot</p>
+              </div>
+            </div>
+            <p id="status" class="muted status-line"></p>
+          </section>
+        </div>
       </div>
     </div>
 
@@ -130,6 +204,7 @@
   <script src="js/assets.js"></script>
   <script src="js/input.js"></script>
   <script src="js/net.js"></script>
+  <script src="js/qr.js"></script>
   <script type="module" src="js/render3d.js"></script>
   <script src="js/main.js"></script>
   <script>

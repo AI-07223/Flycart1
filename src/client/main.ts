@@ -19,6 +19,14 @@ const els = {
   name: dollar("name-input") as HTMLInputElement,
   quick: dollar("quickplay-btn") as HTMLButtonElement,
   friends: dollar("friends-btn") as HTMLButtonElement,
+  lanServer: dollar("lan-server-input") as HTMLInputElement,
+  lanQuick: dollar("lan-quick-btn") as HTMLButtonElement,
+  lanFriends: dollar("lan-friends-btn") as HTMLButtonElement,
+  lanHint: dollar("lan-hint"),
+  serverBadge: dollar("menu-server-badge"),
+  roomChip: dollar("room-code-chip"),
+  orientationNote: dollar("orientation-note"),
+  friendsNote: dollar("friends-note"),
   status: dollar("status"),
   mute: dollar("mute-btn") as HTMLButtonElement,
   pause: dollar("pause-screen"),
@@ -26,7 +34,15 @@ const els = {
   pauseMenu: dollar("pause-menu-btn") as HTMLButtonElement,
   share: dollar("share-bar"),
   shareLink: dollar("share-link") as HTMLInputElement,
+  qrBtn: dollar("qr-btn") as HTMLButtonElement,
   copy: dollar("copy-btn") as HTMLButtonElement,
+  shareQrOverlay: dollar("share-qr-overlay"),
+  shareQrCanvas: dollar("share-qr-canvas") as HTMLCanvasElement,
+  shareQrRoom: dollar("share-qr-room"),
+  shareQrNote: dollar("share-qr-note"),
+  shareQrLink: dollar("share-qr-link") as HTMLInputElement,
+  shareQrCopy: dollar("share-qr-copy") as HTMLButtonElement,
+  shareQrClose: dollar("share-qr-close") as HTMLButtonElement,
   inter: dollar("intermission"),
   finalBoard: dollar("final-board"),
   interTime: dollar("inter-time"),
@@ -62,6 +78,9 @@ let lastFireSnd = 0;
 let engineStarted = false;
 let botsEnabled = true;
 let selectedSkin = 0;
+let inviteRoom: string | null = null;
+let inviteServer: string | null = null;
+let activeShareUrl: string | null = null;
 
 const SKINS = [0xff6b6b, 0x49c0ff, 0x8be34a, 0xffd24a, 0xc07bff];
 
@@ -90,10 +109,269 @@ function genCode(): string {
   return out;
 }
 
-function roomFromUrl(): string | null {
+function isPrivateHost(hostname: string): boolean {
+  const host = String(hostname || "").toLowerCase();
+  if (!host) return false;
+  if (host === "localhost" || host === "::1" || host.endsWith(".local")) return true;
+  if (/^127\./.test(host) || /^10\./.test(host) || /^192\.168\./.test(host)) return true;
+  const parts = host.split(".");
+  if (parts.length === 4 && parts[0] === "172") {
+    const second = Number(parts[1]);
+    if (second >= 16 && second <= 31) return true;
+  }
+  return false;
+}
+
+function toPageOrigin(origin: string): string {
+  const url = new URL(origin);
+  if (url.protocol === "ws:") url.protocol = "http:";
+  if (url.protocol === "wss:") url.protocol = "https:";
+  return url.origin;
+}
+
+function toSocketOrigin(origin: string): string {
+  const url = new URL(origin);
+  if (url.protocol === "http:") url.protocol = "ws:";
+  if (url.protocol === "https:") url.protocol = "wss:";
+  return url.origin;
+}
+
+function normalizeServerOrigin(raw: string | null | undefined): string | null {
+  const trimmed = String(raw || "").trim();
+  if (!trimmed) return null;
+  let candidate = trimmed;
+  if (!/^[a-z][a-z0-9+.-]*:\/\//i.test(candidate)) candidate = `http://${candidate}`;
+  try {
+    const url = new URL(candidate);
+    if (!["http:", "https:", "ws:", "wss:"].includes(url.protocol)) return null;
+    if (!url.hostname) return null;
+    url.username = "";
+    url.password = "";
+    url.pathname = "";
+    url.search = "";
+    url.hash = "";
+    if (!url.port && (url.protocol === "http:" || url.protocol === "ws:")) url.port = location.port || "2567";
+    return url.origin;
+  } catch {
+    return null;
+  }
+}
+
+function secureMismatch(origin: string): boolean {
+  return location.protocol === "https:" && toSocketOrigin(origin).startsWith("ws://");
+}
+
+function readInviteFromUrl(): void {
   const params = new URLSearchParams(location.search);
   const room = params.get("room");
-  return room ? room.toUpperCase().slice(0, 6) : null;
+  inviteRoom = room ? room.toUpperCase().slice(0, 6) : null;
+  inviteServer = normalizeServerOrigin(params.get("server"));
+}
+
+function loadSavedLanOrigin(): string {
+  try {
+    return localStorage.getItem("smashcart.lanServer") || "";
+  } catch {
+    return "";
+  }
+}
+
+function saveLanOrigin(origin: string | null): void {
+  try {
+    if (origin) localStorage.setItem("smashcart.lanServer", toPageOrigin(origin));
+    else localStorage.removeItem("smashcart.lanServer");
+  } catch {}
+}
+
+function setInviteState(code: string | null, serverOrigin: string | null): void {
+  inviteRoom = code;
+  inviteServer = code ? serverOrigin : null;
+  updateBrowserUrl(code, serverOrigin);
+}
+
+function updateBrowserUrl(code: string | null, serverOrigin: string | null): void {
+  const url = new URL(location.href);
+  url.searchParams.delete("room");
+  url.searchParams.delete("server");
+  if (code) {
+    url.searchParams.set("room", code);
+    if (serverOrigin && toPageOrigin(serverOrigin) !== location.origin) url.searchParams.set("server", toPageOrigin(serverOrigin));
+  }
+  const search = url.searchParams.toString();
+  history.replaceState(null, "", url.pathname + (search ? `?${search}` : ""));
+}
+
+function currentLanInputOrigin(): string | null {
+  return normalizeServerOrigin(els.lanServer.value);
+}
+
+function currentLanConnectOrigin(): string | null {
+  return currentLanInputOrigin() || (isPrivateHost(location.hostname) ? location.origin : null);
+}
+
+function buildShareUrl(code: string, serverOrigin: string | null): string {
+  const base = serverOrigin ? toPageOrigin(serverOrigin) : location.origin;
+  const url = new URL(location.pathname, base.endsWith("/") ? base : base + "/");
+  url.searchParams.set("room", code);
+  return url.toString();
+}
+
+function hideShareQr(): void {
+  els.shareQrOverlay.classList.add("hidden");
+}
+
+async function copyShareLink(): Promise<boolean> {
+  const value = activeShareUrl || els.shareLink.value;
+  if (!value) return false;
+  try { els.shareLink.select(); } catch {}
+  try { els.shareQrLink.select(); } catch {}
+  try {
+    if (navigator.clipboard) await navigator.clipboard.writeText(value);
+    else document.execCommand("copy");
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function updateShareInvite(code: string, serverOrigin: string | null): void {
+  const shareUrl = buildShareUrl(code, serverOrigin);
+  const shareHost = new URL(serverOrigin ? toPageOrigin(serverOrigin) : location.origin).host;
+  const shareHostname = new URL(shareUrl).hostname;
+  activeShareUrl = shareUrl;
+  els.shareLink.value = shareUrl;
+  els.shareQrLink.value = shareUrl;
+  els.shareQrRoom.textContent = `Room ${code}`;
+  els.shareQrNote.textContent = isPrivateHost(shareHostname)
+    ? `Scan on the same hotspot to join ${code} at ${shareHost}.`
+    : `Scan to open room ${code} on ${shareHost}.`;
+  els.copy.disabled = false;
+  els.shareQrCopy.disabled = false;
+  try {
+    window.QR.render(els.shareQrCanvas, shareUrl, {
+      size: window.Input.isTouchDevice() ? 220 : 256,
+      errorCorrectionLevel: "M",
+    });
+    els.qrBtn.disabled = false;
+  } catch {
+    els.qrBtn.disabled = true;
+    els.shareQrNote.textContent = `Copy the link to join ${code} on ${shareHost}.`;
+    els.shareQrCanvas.width = 0;
+    els.shareQrCanvas.height = 0;
+  }
+}
+
+function clearShareInvite(): void {
+  activeShareUrl = null;
+  els.shareLink.value = "";
+  els.shareQrLink.value = "";
+  els.shareQrRoom.textContent = "Room";
+  els.shareQrNote.textContent = "Scan to join this room.";
+  els.shareQrCanvas.width = 0;
+  els.shareQrCanvas.height = 0;
+  els.copy.disabled = true;
+  els.shareQrCopy.disabled = true;
+  els.qrBtn.disabled = true;
+  els.copy.textContent = "Copy";
+  els.shareQrCopy.textContent = "Copy Link";
+  hideShareQr();
+}
+
+function showShareQr(): void {
+  if (!activeShareUrl || els.qrBtn.disabled) return;
+  els.shareQrOverlay.classList.remove("hidden");
+}
+
+function setStatus(text = ""): void {
+  els.status.textContent = text;
+}
+
+function setBusy(busy: boolean): void {
+  els.quick.disabled = busy;
+  els.friends.disabled = busy;
+  els.lanQuick.disabled = busy;
+  els.lanFriends.disabled = busy;
+}
+
+function updateMenuMeta(preserveStatus = true): void {
+  const lanOrigin = currentLanConnectOrigin();
+  els.serverBadge.textContent = lanOrigin ? `LAN ${new URL(toPageOrigin(lanOrigin)).host}` : "Internet lobby";
+
+  const portrait = !!(window.matchMedia && window.matchMedia("(orientation: portrait)").matches);
+  if (!window.Input.isTouchDevice()) {
+    els.orientationNote.textContent = "Keyboard flight: A/D steer, W/S climb, Shift boost, Space fire.";
+  } else if (portrait) {
+    els.orientationNote.textContent = "Portrait is fine for setup. Rotate to landscape before you launch.";
+  } else {
+    els.orientationNote.textContent = "Landscape ready. Touch controls appear after launch.";
+  }
+
+  if (inviteRoom) {
+    els.quick.textContent = `JOIN ${inviteRoom}`;
+    els.roomChip.textContent = `Invite ${inviteRoom}`;
+    const inviteHost = inviteServer ? new URL(toPageOrigin(inviteServer)).host : location.host;
+    els.friendsNote.textContent = `Invite ready for room ${inviteRoom} on ${inviteHost}. Quick Play joins it directly.`;
+    if (!preserveStatus || !els.status.textContent) setStatus(`Invite ready: room ${inviteRoom}`);
+  } else {
+    els.quick.textContent = "PLAY PUBLIC";
+    els.roomChip.textContent = lanOrigin ? "LAN ready" : "Public";
+    els.friendsNote.textContent = "Room codes stay on the same server that created them.";
+    if (!preserveStatus) setStatus("");
+  }
+
+  const typed = els.lanServer.value.trim();
+  const lanInput = currentLanInputOrigin();
+  if (typed && !lanInput) {
+    els.lanHint.textContent = "Enter a valid server address like 192.168.1.10:2567 or http://192.168.1.10:2567.";
+  } else if (lanInput && secureMismatch(lanInput)) {
+    els.lanHint.textContent = "This page is HTTPS. Insecure LAN servers will be blocked here. Open the game from the hotspot host address instead.";
+  } else if (lanInput) {
+    const url = new URL(toPageOrigin(lanInput));
+    els.lanHint.textContent = isPrivateHost(url.hostname)
+      ? `LAN target ready: ${url.host}. Share that local address with everyone on the hotspot.`
+      : `Custom server selected: ${url.host}. Latency only improves if that server is on the same local network.`;
+  } else if (isPrivateHost(location.hostname)) {
+    els.lanHint.textContent = `This device is already serving the game locally at ${location.host}. Use the LAN buttons or share this address.`;
+  } else {
+    els.lanHint.textContent = "For hotspot play, run the game on the host device and enter its local address here.";
+  }
+}
+
+function primeLanInput(): void {
+  const preferred = inviteServer ? toPageOrigin(inviteServer) : loadSavedLanOrigin() || (isPrivateHost(location.hostname) ? location.origin : "");
+  els.lanServer.value = preferred;
+}
+
+function commitLanInput(): void {
+  const normalized = currentLanInputOrigin();
+  if (normalized) {
+    els.lanServer.value = toPageOrigin(normalized);
+    saveLanOrigin(normalized);
+  } else if (!els.lanServer.value.trim()) {
+    saveLanOrigin(null);
+  }
+  updateMenuMeta(true);
+}
+
+function resolveLanOrigin(): string | null {
+  const raw = els.lanServer.value.trim();
+  const normalized = currentLanInputOrigin();
+  if (raw && !normalized) {
+    setStatus("Enter a valid hotspot address, for example 192.168.1.10:2567.");
+    return null;
+  }
+  const origin = normalized || (isPrivateHost(location.hostname) ? location.origin : null);
+  if (!origin) {
+    setStatus("Enter the hotspot host address first, for example 192.168.1.10:2567.");
+    return null;
+  }
+  if (secureMismatch(origin)) {
+    setStatus("This HTTPS page cannot connect to that insecure LAN server. Open the game from the hotspot host address instead.");
+    return null;
+  }
+  els.lanServer.value = toPageOrigin(origin);
+  saveLanOrigin(origin);
+  return origin;
 }
 
 function fetchLeaderboard(): void {
@@ -128,23 +406,37 @@ function buildPlanePicker(): void {
   });
 }
 
-async function startGame(code: string): Promise<void> {
-  if (code === "PUBLIC" && !botsEnabled) code = "NOBOTS";
+async function startGame(code: string, serverOrigin: string | null = null): Promise<void> {
+  let roomCode = code;
+  if (roomCode === "PUBLIC" && !botsEnabled) roomCode = "NOBOTS";
+  if (serverOrigin) {
+    const normalized = normalizeServerOrigin(serverOrigin);
+    if (!normalized) {
+      setStatus("The selected server address is not valid.");
+      return;
+    }
+    if (secureMismatch(normalized)) {
+      setStatus("This HTTPS page cannot connect to that insecure LAN server. Open the game from the hotspot host address instead.");
+      return;
+    }
+    serverOrigin = normalized;
+    saveLanOrigin(serverOrigin);
+    els.lanServer.value = toPageOrigin(serverOrigin);
+  }
+
   window.SFX.unlock();
   enterImmersive();
   window.Renderer.startTakeoff && window.Renderer.startTakeoff();
 
   const name = (els.name.value || "Pilot").slice(0, 14);
-  els.status.textContent = "Connecting…";
-  els.quick.disabled = true;
-  els.friends.disabled = true;
+  setStatus("Connecting…");
+  setBusy(true);
 
   try {
-    await window.Net.connect(name, code, selectedSkin);
+    await window.Net.connect(name, roomCode, selectedSkin, serverOrigin);
   } catch (e: any) {
-    els.status.textContent = "Could not connect: " + (e && e.message ? e.message : e);
-    els.quick.disabled = false;
-    els.friends.disabled = false;
+    setStatus("Could not connect: " + (e && e.message ? e.message : e));
+    setBusy(false);
     return;
   }
 
@@ -157,7 +449,7 @@ async function startGame(code: string): Promise<void> {
   els.respawn.classList.add("hidden");
   els.inter.classList.add("hidden");
   els.connLost.classList.add("hidden");
-  els.status.textContent = "";
+  setStatus("");
   if (window.Input.isTouchDevice()) els.touch.classList.remove("hidden");
   if (!engineStarted) {
     window.SFX.startEngine();
@@ -166,13 +458,13 @@ async function startGame(code: string): Promise<void> {
   if (window.SFX.stopMenuAmbient) window.SFX.stopMenuAmbient();
   window.SFX.startMusic();
 
-  if (code !== "PUBLIC" && code !== "NOBOTS") {
-    const url = location.origin + location.pathname + "?room=" + code;
-    history.replaceState(null, "", "?room=" + code);
-    els.shareLink.value = url;
+  if (roomCode !== "PUBLIC" && roomCode !== "NOBOTS") {
+    setInviteState(roomCode, serverOrigin);
+    updateShareInvite(roomCode, serverOrigin);
     els.share.classList.remove("hidden");
   } else {
-    history.replaceState(null, "", location.pathname);
+    setInviteState(null, null);
+    clearShareInvite();
     els.share.classList.add("hidden");
   }
 }
@@ -370,15 +662,16 @@ function resetToMenu(): void {
   els.connLost.classList.add("hidden");
   els.respawn.classList.add("hidden");
   els.powerChip.classList.add("hidden");
-  els.quick.disabled = false;
-  els.friends.disabled = false;
-  els.status.textContent = "";
+  clearShareInvite();
+  setBusy(false);
   fetchLeaderboard();
+  setStatus("");
+  updateMenuMeta(false);
   updateRotateOverlay();
 }
 
 function onDisconnect(): void {
-  if (mode === "menu") return;
+  if (mode === "menu" || mode === "lost") return;
   mode = "lost";
   if (window.SFX.suspend) window.SFX.suspend();
   els.connMsg.textContent = "Reconnecting…";
@@ -414,9 +707,13 @@ function updateRotateOverlay(): void {
   const portrait = window.matchMedia && window.matchMedia("(orientation: portrait)").matches;
   const show = window.Input.isTouchDevice() && portrait && mode !== "menu";
   els.rotate.classList.toggle("show", !!show);
+  updateMenuMeta(true);
 }
 
 function init(): void {
+  readInviteFromUrl();
+  primeLanInput();
+
   window.Renderer.init(els.canvas);
   window.Input.attach();
   window.Assets.load();
@@ -435,26 +732,67 @@ function init(): void {
   fetchLeaderboard();
   setupTouchButtons();
   updateRotateOverlay();
+  updateMenuMeta(false);
+  clearShareInvite();
 
   if (window.SFX.startMenuAmbient) window.SFX.startMenuAmbient();
   if (window.Input.isTouchDevice()) document.body.classList.add("touch-device");
 
-  const urlCode = roomFromUrl();
-  if (urlCode) {
-    els.status.textContent = `Room ${urlCode} ready`;
-    els.quick.textContent = `JOIN ${urlCode}`;
-  }
-
-  els.quick.addEventListener("click", () => { window.SFX.uiClick(); startGame(urlCode || "PUBLIC"); });
-  els.friends.addEventListener("click", () => { window.SFX.uiClick(); startGame(genCode()); });
-  els.name.addEventListener("keydown", (e: KeyboardEvent) => {
-    if (e.key === "Enter") { e.preventDefault(); startGame(urlCode || "PUBLIC"); }
+  els.quick.addEventListener("click", () => {
+    window.SFX.uiClick();
+    startGame(inviteRoom || "PUBLIC", inviteRoom ? inviteServer : null);
   });
-  els.copy.addEventListener("click", () => {
-    els.shareLink.select();
-    navigator.clipboard && navigator.clipboard.writeText(els.shareLink.value);
-    els.copy.textContent = "Copied!";
-    setTimeout(() => (els.copy.textContent = "Copy"), 1200);
+  els.friends.addEventListener("click", () => {
+    window.SFX.uiClick();
+    startGame(genCode());
+  });
+  els.lanQuick.addEventListener("click", () => {
+    window.SFX.uiClick();
+    const origin = resolveLanOrigin();
+    if (origin) startGame("PUBLIC", origin);
+  });
+  els.lanFriends.addEventListener("click", () => {
+    window.SFX.uiClick();
+    const origin = resolveLanOrigin();
+    if (origin) startGame(genCode(), origin);
+  });
+  els.name.addEventListener("keydown", (e: KeyboardEvent) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      startGame(inviteRoom || "PUBLIC", inviteRoom ? inviteServer : null);
+    }
+  });
+  els.lanServer.addEventListener("input", () => updateMenuMeta(true));
+  els.lanServer.addEventListener("blur", () => commitLanInput());
+  els.lanServer.addEventListener("keydown", (e: KeyboardEvent) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      commitLanInput();
+      const origin = resolveLanOrigin();
+      if (origin) startGame(inviteRoom || "PUBLIC", origin);
+    }
+  });
+  els.qrBtn.addEventListener("click", () => {
+    window.SFX.uiClick();
+    showShareQr();
+  });
+  els.copy.addEventListener("click", async () => {
+    const copied = await copyShareLink();
+    if (copied) {
+      els.copy.textContent = "Copied!";
+      setTimeout(() => (els.copy.textContent = "Copy"), 1200);
+    }
+  });
+  els.shareQrCopy.addEventListener("click", async () => {
+    const copied = await copyShareLink();
+    if (copied) {
+      els.shareQrCopy.textContent = "Copied!";
+      setTimeout(() => (els.shareQrCopy.textContent = "Copy Link"), 1200);
+    }
+  });
+  els.shareQrClose.addEventListener("click", () => hideShareQr());
+  els.shareQrOverlay.addEventListener("click", (e: MouseEvent) => {
+    if (e.target === els.shareQrOverlay) hideShareQr();
   });
   els.mute.addEventListener("click", () => toggleMute());
   els.resume.addEventListener("click", () => togglePause());
@@ -482,12 +820,16 @@ function init(): void {
     if (document.hidden) {
       if (window.Net.room) window.Net.sendInput(0, 0, false, false);
       if (window.SFX.suspend) window.SFX.suspend();
+      hideShareQr();
     } else if (mode === "playing" && window.SFX.resume) {
       window.SFX.resume();
     }
   });
   window.addEventListener("orientationchange", updateRotateOverlay);
   window.addEventListener("resize", updateRotateOverlay);
+  document.addEventListener("keydown", (e: KeyboardEvent) => {
+    if (e.key === "Escape" && !els.shareQrOverlay.classList.contains("hidden")) hideShareQr();
+  });
 
   requestAnimationFrame((t) => { last = t; loop(t); });
 }

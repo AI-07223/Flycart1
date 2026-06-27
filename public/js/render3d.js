@@ -24,6 +24,7 @@ import * as THREE from "three";
   let ground;
   let grid;
   let boundary;
+  let landscapeRoot;
   let menuDemo = null;
   let particles = [];
 
@@ -159,8 +160,7 @@ import * as THREE from "three";
   }
 
   function orientTrail(obj, p, f) {
-    const pose = { p, f };
-    orientPlane(obj, pose, 0);
+    orientPlane(obj, { p, f }, 0);
   }
 
   function addParticle(pos, color) {
@@ -191,13 +191,130 @@ import * as THREE from "three";
     };
   }
 
-  function buildLandmark(landmark) {
+  function makeGroundTile(width, depth, color, y, x, z, rotY = 0, opacity = 1) {
+    const mesh = new THREE.Mesh(
+      new THREE.PlaneGeometry(width, depth),
+      new THREE.MeshStandardMaterial({ color, roughness: 1, transparent: opacity < 0.999, opacity })
+    );
+    mesh.rotation.x = -Math.PI / 2;
+    mesh.rotation.y = rotY;
+    mesh.position.set(x, y, z);
+    mesh.receiveShadow = true;
+    return mesh;
+  }
+
+  function addStrip(parent, x1, z1, x2, z2, width, color, y, opacity = 1) {
+    const dx = x2 - x1;
+    const dz = z2 - z1;
+    const length = Math.max(1, Math.hypot(dx, dz));
+    const mesh = makeGroundTile(width, length, color, y, (x1 + x2) / 2, (z1 + z2) / 2, Math.atan2(dx, dz), opacity);
+    parent.add(mesh);
+    return mesh;
+  }
+
+  function addPlaced(parent, object, x, y, z, rotY = 0) {
+    object.position.set(x, y, z);
+    object.rotation.y = rotY;
+    parent.add(object);
+    return object;
+  }
+
+  function makeRockField(count, spread, color, scale = 1) {
     const group = new THREE.Group();
+    const mat = new THREE.MeshStandardMaterial({ color, flatShading: true, roughness: 0.98 });
+    for (let i = 0; i < count; i++) {
+      const radius = (9 + (i % 4) * 4) * scale;
+      const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(radius, 0), mat);
+      const angle = (i / Math.max(1, count)) * Math.PI * 2 + (i % 2) * 0.33;
+      const dist = spread * (0.28 + ((i * 37) % 100) / 100 * 0.72);
+      rock.position.set(Math.cos(angle) * dist, radius * 0.72, Math.sin(angle) * dist);
+      rock.rotation.set(i * 0.31, i * 0.44, i * 0.18);
+      rock.castShadow = true;
+      rock.receiveShadow = true;
+      group.add(rock);
+    }
+    return group;
+  }
+
+  function makeScrubField(count, spread, color = 0x56794a, scale = 1) {
+    const group = new THREE.Group();
+    const mat = new THREE.MeshStandardMaterial({ color, flatShading: true, roughness: 1 });
+    for (let i = 0; i < count; i++) {
+      const bush = new THREE.Mesh(new THREE.ConeGeometry((5 + (i % 3) * 2) * scale, (14 + (i % 4) * 3) * scale, 5), mat);
+      const angle = (i / Math.max(1, count)) * Math.PI * 2 + i * 0.17;
+      const dist = spread * (0.25 + ((i * 19) % 100) / 100 * 0.75);
+      bush.position.set(Math.cos(angle) * dist, bush.geometry.parameters.height * 0.45, Math.sin(angle) * dist);
+      bush.rotation.y = angle * 0.7;
+      bush.castShadow = true;
+      bush.receiveShadow = true;
+      group.add(bush);
+    }
+    return group;
+  }
+
+  function makeOutpost(scale = 1) {
+    const group = new THREE.Group();
+    const steel = new THREE.MeshStandardMaterial({ color: 0x6e7882, flatShading: true, roughness: 0.9 });
+    const roof = new THREE.MeshStandardMaterial({ color: 0x404852, flatShading: true, roughness: 0.86 });
+    const accent = new THREE.MeshStandardMaterial({ color: 0xffd36e, emissive: 0x624314, flatShading: true, roughness: 0.5 });
+
+    const base = new THREE.Mesh(new THREE.BoxGeometry(64 * scale, 18 * scale, 42 * scale), steel);
+    base.position.y = 9 * scale;
+    base.castShadow = true;
+    base.receiveShadow = true;
+    group.add(base);
+
+    const canopy = new THREE.Mesh(new THREE.BoxGeometry(74 * scale, 4 * scale, 50 * scale), roof);
+    canopy.position.y = 21 * scale;
+    canopy.castShadow = true;
+    canopy.receiveShadow = true;
+    group.add(canopy);
+
+    const beacon = new THREE.Mesh(new THREE.CylinderGeometry(4 * scale, 5 * scale, 18 * scale, 6), accent);
+    beacon.position.set(24 * scale, 30 * scale, -12 * scale);
+    beacon.castShadow = true;
+    group.add(beacon);
+
+    const pad = new THREE.Mesh(new THREE.CylinderGeometry(16 * scale, 19 * scale, 3 * scale, 10), steel);
+    pad.position.set(-32 * scale, 1.6 * scale, 0);
+    pad.receiveShadow = true;
+    group.add(pad);
+
+    return group;
+  }
+
+  function buildLandmark(landmark, parent) {
+    const group = new THREE.Group();
+    const apron = new THREE.Mesh(
+      new THREE.CylinderGeometry(landmark.radius * 1.08, landmark.radius * 1.22, 8, 18),
+      new THREE.MeshStandardMaterial({ color: landmark.kind === "hangar" ? 0x66707a : 0x7b6a55, flatShading: true, roughness: 0.96 })
+    );
+    apron.position.y = 4;
+    apron.receiveShadow = true;
+    group.add(apron);
+
     if (landmark.kind === "tower") {
       const tower = new THREE.Mesh(new THREE.CylinderGeometry(18, 28, landmark.height, 12), new THREE.MeshStandardMaterial({ color: landmark.color, flatShading: true, roughness: 0.85 }));
       tower.position.y = landmark.height / 2;
       tower.castShadow = true;
+      tower.receiveShadow = true;
       group.add(tower);
+
+      const collar = new THREE.Mesh(new THREE.TorusGeometry(36, 4, 8, 24), new THREE.MeshStandardMaterial({ color: 0x3e4650, flatShading: true, roughness: 0.9 }));
+      collar.rotation.x = Math.PI / 2;
+      collar.position.y = landmark.height * 0.58;
+      group.add(collar);
+
+      for (let i = 0; i < 4; i++) {
+        const brace = new THREE.Mesh(new THREE.BoxGeometry(6, landmark.height * 0.55, 6), new THREE.MeshStandardMaterial({ color: 0x5b4a3f, flatShading: true, roughness: 0.95 }));
+        const angle = (i / 4) * Math.PI * 2;
+        brace.position.set(Math.cos(angle) * 34, landmark.height * 0.28, Math.sin(angle) * 34);
+        brace.rotation.z = Math.cos(angle) * 0.18;
+        brace.rotation.x = Math.sin(angle) * 0.12;
+        brace.castShadow = true;
+        group.add(brace);
+      }
+
       const beacon = new THREE.Mesh(new THREE.SphereGeometry(7, 10, 10), new THREE.MeshBasicMaterial({ color: 0xffe7a8 }));
       beacon.position.y = landmark.height + 6;
       group.add(beacon);
@@ -205,20 +322,124 @@ import * as THREE from "three";
       const mesa = new THREE.Mesh(new THREE.CylinderGeometry(landmark.radius * 0.72, landmark.radius, landmark.height, 10), new THREE.MeshStandardMaterial({ color: landmark.color, flatShading: true, roughness: 1 }));
       mesa.position.y = landmark.height / 2;
       mesa.castShadow = true;
+      mesa.receiveShadow = true;
       group.add(mesa);
+
+      const cap = new THREE.Mesh(new THREE.CylinderGeometry(landmark.radius * 0.68, landmark.radius * 0.74, 8, 10), new THREE.MeshStandardMaterial({ color: 0xd2bf8b, flatShading: true, roughness: 0.92 }));
+      cap.position.y = landmark.height + 4;
+      cap.receiveShadow = true;
+      group.add(cap);
+
+      group.add(makeRockField(8, landmark.radius * 0.9, 0x8c6f51, 0.9));
     } else if (landmark.kind === "spire") {
       const spire = new THREE.Mesh(new THREE.ConeGeometry(landmark.radius, landmark.height, 8), new THREE.MeshStandardMaterial({ color: landmark.color, flatShading: true, roughness: 0.7 }));
       spire.position.y = landmark.height / 2;
       spire.castShadow = true;
+      spire.receiveShadow = true;
       group.add(spire);
+
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(landmark.radius * 0.7, 2.4, 8, 24), new THREE.MeshStandardMaterial({ color: 0x375f87, flatShading: true, roughness: 0.82 }));
+      ring.rotation.x = Math.PI / 2;
+      ring.position.y = landmark.height * 0.42;
+      group.add(ring);
+
+      const beacon = new THREE.Mesh(new THREE.SphereGeometry(4.5, 8, 8), new THREE.MeshBasicMaterial({ color: 0xcde6ff }));
+      beacon.position.y = landmark.height + 3;
+      group.add(beacon);
     } else {
       const base = new THREE.Mesh(new THREE.BoxGeometry(landmark.radius * 1.8, landmark.height, landmark.radius * 1.2), new THREE.MeshStandardMaterial({ color: landmark.color, flatShading: true, roughness: 0.95 }));
       base.position.y = landmark.height / 2;
       base.castShadow = true;
+      base.receiveShadow = true;
       group.add(base);
+
+      const roof = new THREE.Mesh(new THREE.BoxGeometry(landmark.radius * 1.95, 4, landmark.radius * 1.32), new THREE.MeshStandardMaterial({ color: 0x424851, flatShading: true, roughness: 0.86 }));
+      roof.position.y = landmark.height + 2;
+      roof.castShadow = true;
+      group.add(roof);
+
+      addPlaced(group, makeOutpost(0.42), landmark.radius * 0.85, 0, -landmark.radius * 0.25, 0.4);
+      addPlaced(group, makeOutpost(0.34), -landmark.radius * 0.95, 0, landmark.radius * 0.2, -0.2);
     }
+
     group.position.set(landmark.x, 0, landmark.z);
-    scene.add(group);
+    parent.add(group);
+  }
+
+  function buildLandscape() {
+    if (landscapeRoot) {
+      scene.remove(landscapeRoot);
+      disposeObject(landscapeRoot);
+      landscapeRoot = null;
+    }
+
+    landscapeRoot = new THREE.Group();
+    landscapeRoot.name = "landscape";
+    scene.add(landscapeRoot);
+
+    ground = makeGroundTile(G.MAP_HALF * 2.8, G.MAP_HALF * 2.8, 0x688e5f, -0.06, 0, 0, 0);
+    landscapeRoot.add(ground);
+
+    landscapeRoot.add(makeGroundTile(G.MAP_HALF * 2.25, G.MAP_HALF * 2.25, 0x729c68, 0.01, 0, 0, 0, 0.96));
+    landscapeRoot.add(makeGroundTile(G.MAP_HALF * 2.05, G.MAP_HALF * 1.4, 0x7ea56c, 0.03, -120, 120, -0.12, 0.72));
+    landscapeRoot.add(makeGroundTile(1380, 640, 0x83926b, 0.06, -420, -820, 0.44, 0.88));
+    landscapeRoot.add(makeGroundTile(1100, 520, 0x5f7d53, 0.05, 980, 700, -0.24, 0.62));
+    landscapeRoot.add(makeGroundTile(920, 440, 0x8d8b63, 0.05, -980, 840, -0.18, 0.55));
+    landscapeRoot.add(makeGroundTile(660, 300, 0x7a8a58, 0.05, 720, -980, 0.58, 0.54));
+
+    grid = new THREE.GridHelper(G.MAP_HALF * 2, 48, 0xe3f0ff, 0x436b45);
+    grid.position.y = 0.22;
+    grid.material.opacity = 0.11;
+    grid.material.transparent = true;
+    landscapeRoot.add(grid);
+
+    const edgeShape = new THREE.Shape();
+    edgeShape.moveTo(-G.MAP_HALF, -G.MAP_HALF);
+    edgeShape.lineTo(G.MAP_HALF, -G.MAP_HALF);
+    edgeShape.lineTo(G.MAP_HALF, G.MAP_HALF);
+    edgeShape.lineTo(-G.MAP_HALF, G.MAP_HALF);
+    edgeShape.lineTo(-G.MAP_HALF, -G.MAP_HALF);
+    const points = edgeShape.getPoints();
+    const borderGeo = new THREE.BufferGeometry().setFromPoints(points.map((p) => new THREE.Vector3(p.x, 1, p.y)));
+    boundary = new THREE.Line(borderGeo, new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.22 }));
+    landscapeRoot.add(boundary);
+
+    addStrip(landscapeRoot, -1120, 86, 1120, 86, 220, 0x5e6661, 0.34, 0.98);
+    addStrip(landscapeRoot, -1120, 86, 1120, 86, 28, 0xc7c7b8, 0.36, 0.96);
+    addStrip(landscapeRoot, -1120, 32, 1120, 32, 10, 0x8e998f, 0.37, 0.78);
+    addStrip(landscapeRoot, -820, -520, 940, 620, 34, 0x515a54, 0.3, 0.8);
+    addStrip(landscapeRoot, -940, 80, -640, -260, 26, 0x59615b, 0.31, 0.72);
+    addStrip(landscapeRoot, 940, 80, 720, -460, 26, 0x59615b, 0.31, 0.72);
+    addStrip(landscapeRoot, 0, 0, -180, 860, 24, 0x60645a, 0.28, 0.64);
+    addStrip(landscapeRoot, 0, 0, 660, 660, 24, 0x60645a, 0.28, 0.64);
+
+    addPlaced(landscapeRoot, makeOutpost(1), -1180, 0, -280, 0.2);
+    addPlaced(landscapeRoot, makeOutpost(0.9), 1200, 0, 420, -0.42);
+    addPlaced(landscapeRoot, makeOutpost(0.78), -1260, 0, 1120, 1.1);
+    addPlaced(landscapeRoot, makeOutpost(0.82), 1180, 0, -980, -0.95);
+
+    addPlaced(landscapeRoot, makeRockField(10, 130, 0x876b4d, 1), -1290, 0, -980, 0.2);
+    addPlaced(landscapeRoot, makeRockField(9, 120, 0x8b6f50, 0.92), 1280, 0, 930, -0.2);
+    addPlaced(landscapeRoot, makeRockField(8, 110, 0x7d6549, 0.88), -260, 0, -1180, 0.7);
+    addPlaced(landscapeRoot, makeRockField(8, 100, 0x826a4d, 0.8), 940, 0, -1080, -0.5);
+
+    addPlaced(landscapeRoot, makeScrubField(18, 240, 0x56794a, 1), -980, 0, 980, 0.15);
+    addPlaced(landscapeRoot, makeScrubField(16, 210, 0x4e7444, 0.92), 860, 0, 860, -0.25);
+    addPlaced(landscapeRoot, makeScrubField(14, 190, 0x537647, 0.84), 1110, 0, -880, 0.45);
+    addPlaced(landscapeRoot, makeScrubField(14, 180, 0x4b6d41, 0.78), -1110, 0, -760, -0.35);
+
+    for (let i = -3; i <= 3; i++) {
+      const postNorth = new THREE.Mesh(new THREE.CylinderGeometry(6, 8, 48, 6), new THREE.MeshStandardMaterial({ color: 0x626d74, flatShading: true, roughness: 0.96 }));
+      postNorth.position.set(i * 420, 24, -G.MAP_HALF + 70);
+      postNorth.castShadow = true;
+      landscapeRoot.add(postNorth);
+
+      const postSouth = postNorth.clone();
+      postSouth.position.z = G.MAP_HALF - 70;
+      landscapeRoot.add(postSouth);
+    }
+
+    G.LANDMARKS.forEach((landmark) => buildLandmark(landmark, landscapeRoot));
   }
 
   function clearMenuDemo() {
@@ -236,7 +457,7 @@ import * as THREE from "three";
       renderer.shadowMap.type = THREE.PCFSoftShadowMap;
       scene = new THREE.Scene();
       scene.background = new THREE.Color(0x8cc8ff);
-      scene.fog = new THREE.Fog(0x8cc8ff, 800, 4200);
+      scene.fog = new THREE.Fog(0x8cc8ff, 900, 5000);
       camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 10000);
       camera.position.copy(camPos);
 
@@ -248,32 +469,7 @@ import * as THREE from "three";
       sun.shadow.mapSize.set(1024, 1024);
       scene.add(sun);
 
-      ground = new THREE.Mesh(
-        new THREE.PlaneGeometry(G.MAP_HALF * 2.5, G.MAP_HALF * 2.5),
-        new THREE.MeshStandardMaterial({ color: 0x6aa36f, roughness: 1 })
-      );
-      ground.rotation.x = -Math.PI / 2;
-      ground.receiveShadow = true;
-      scene.add(ground);
-
-      grid = new THREE.GridHelper(G.MAP_HALF * 2, 36, 0xffffff, 0x4f7a52);
-      grid.position.y = 0.2;
-      grid.material.opacity = 0.18;
-      grid.material.transparent = true;
-      scene.add(grid);
-
-      const edgeShape = new THREE.Shape();
-      edgeShape.moveTo(-G.MAP_HALF, -G.MAP_HALF);
-      edgeShape.lineTo(G.MAP_HALF, -G.MAP_HALF);
-      edgeShape.lineTo(G.MAP_HALF, G.MAP_HALF);
-      edgeShape.lineTo(-G.MAP_HALF, G.MAP_HALF);
-      edgeShape.lineTo(-G.MAP_HALF, -G.MAP_HALF);
-      const points = edgeShape.getPoints();
-      const borderGeo = new THREE.BufferGeometry().setFromPoints(points.map((p) => new THREE.Vector3(p.x, 1, p.y)));
-      boundary = new THREE.Line(borderGeo, new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.25 }));
-      scene.add(boundary);
-
-      G.LANDMARKS.forEach((landmark) => buildLandmark(landmark));
+      buildLandscape();
 
       minimap = document.createElement("canvas");
       minimap.id = "minimap";

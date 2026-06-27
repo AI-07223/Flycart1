@@ -70,6 +70,7 @@
         client: null,
         room: null,
         sessionId: null,
+        serverOrigin: null,
         lastSent: { seq: 0, turn: 0, climb: 0, boost: false, fire: false },
         snaps: [],
         onKill: null,
@@ -91,12 +92,19 @@
           alive: false,
           ackSeq: 0
         },
-        endpoint() {
+        endpoint(origin = this.serverOrigin) {
+          if (origin) {
+            const url = new URL(origin);
+            if (url.protocol === "http:") url.protocol = "ws:";
+            if (url.protocol === "https:") url.protocol = "wss:";
+            return url.origin;
+          }
           const proto = location.protocol === "https:" ? "wss" : "ws";
           return `${proto}://${location.host}`;
         },
-        async connect(name, code, skin) {
-          this.client = new window.Colyseus.Client(this.endpoint());
+        async connect(name, code, skin, serverOrigin = null) {
+          this.serverOrigin = serverOrigin;
+          this.client = new window.Colyseus.Client(this.endpoint(serverOrigin));
           const room = await this.client.joinOrCreate("arena", { name, code, skin });
           this._wire(room);
           return room;
