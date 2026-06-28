@@ -1635,7 +1635,7 @@
             };
             const proto = location.protocol === "https:" ? "wss" : "ws";
             const ws = new WebSocket(`${proto}://${location.host}/signal`);
-            const timer = setTimeout(() => done([]), 3e3);
+            const timer = setTimeout(() => done([]), 6e3);
             ws.onopen = () => {
               try {
                 ws.send(JSON.stringify({ type: "list" }));

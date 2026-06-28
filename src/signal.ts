@@ -116,14 +116,17 @@ function handleMessage(ws: WebSocket, rawData: Buffer | string): void {
   if (typeof type !== "string") return;
 
   // ── list: no room required — handle before getOrCreateRoom ──────────────
+  // NOTE: rooms are listed GLOBALLY (no public-IP scoping). On real mobile
+  // networks the "same hotspot = same public IP" assumption breaks (carriers
+  // use IPv6 → each phone gets a distinct address; CGNAT varies), which made
+  // rooms invisible to each other. The room NAME (host-assigned, shown on join)
+  // is the identifier instead. A future 4-digit room PIN can re-scope if needed.
   if (type === "list") {
-    const callerIP = (ws as any)._signalIP as string;
     const list: { code: string; name: string; hostName: string; count: number }[] = [];
     for (const [code, r] of rooms) {
       if (list.length >= 50) break;
       if (!r.host || r.host.readyState !== WebSocket.OPEN) continue;
       if (r.guests.size >= MAX_GUESTS_PER_ROOM) continue;
-      if (r.publicIP !== callerIP) continue;
       list.push({
         code,
         name: r.name ?? code,

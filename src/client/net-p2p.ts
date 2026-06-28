@@ -508,7 +508,7 @@ export class WebRtcTransport implements ITransport {
       const proto = location.protocol === "https:" ? "wss" : "ws";
       const ws    = new WebSocket(`${proto}://${location.host}/signal`);
 
-      const timer = setTimeout(() => done([]), 3000);
+      const timer = setTimeout(() => done([]), 6000);
 
       ws.onopen = () => {
         try { ws.send(JSON.stringify({ type: "list" })); } catch { done([]); }
