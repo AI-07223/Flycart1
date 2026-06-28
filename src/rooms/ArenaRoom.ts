@@ -192,6 +192,7 @@ export class ArenaRoom extends Room<ArenaState> {
         roomName: typeof data.roomName === "string" ? data.roomName : undefined,
         botsInRoom: typeof data.botsInRoom === "boolean" ? data.botsInRoom : undefined,
         mode: typeof data.mode === "string" ? data.mode : undefined,
+        botDifficulty: typeof data.botDifficulty === "string" ? data.botDifficulty : undefined,
       });
     });
 
@@ -360,6 +361,7 @@ export class ArenaRoom extends Room<ArenaState> {
     this.state.mode = state.mode;
     this.state.teamScore0 = state.teamScore0;
     this.state.teamScore1 = state.teamScore1;
+    this.state.botDifficulty = state.botDifficulty;
   }
 
   // ---------------------------------------------------------------------------

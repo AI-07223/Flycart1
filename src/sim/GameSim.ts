@@ -93,6 +93,7 @@ export class GameSim {
   mode: string;
   teamScore0: number;
   teamScore1: number;
+  botDifficulty: string;
   readonly botsEnabled: boolean;
   readonly isPublic: boolean;
 
@@ -108,6 +109,7 @@ export class GameSim {
     this.mode = "ffa";
     this.teamScore0 = 0;
     this.teamScore1 = 0;
+    this.botDifficulty = C.DEFAULT_BOT_DIFFICULTY;
 
     if (this.isPublic) {
       this.phase = "playing";
@@ -141,6 +143,7 @@ export class GameSim {
     this.mode         = snap.mode         ?? this.mode;
     this.teamScore0   = snap.teamScore0   ?? this.teamScore0;
     this.teamScore1   = snap.teamScore1   ?? this.teamScore1;
+    this.botDifficulty = snap.botDifficulty ?? this.botDifficulty;
 
     // Players — restore without calling addPlayer (which would overwrite stats)
     this.players.clear();
@@ -309,7 +312,7 @@ export class GameSim {
    * Update host-controlled room settings (round length, room name, and/or bots).
    * Silently ignores calls from non-hosts.
    */
-  setHostSettings(callerId: string, s: { roundLength?: number; roomName?: string; botsInRoom?: boolean; mode?: string }): void {
+  setHostSettings(callerId: string, s: { roundLength?: number; roomName?: string; botsInRoom?: boolean; mode?: string; botDifficulty?: string }): void {
     if (callerId !== this.hostId) return;
     if (typeof s.roundLength === "number" && Number.isFinite(s.roundLength)) {
       this.roundLength = Math.max(60, Math.min(300, Math.round(s.roundLength)));
@@ -328,6 +331,21 @@ export class GameSim {
     if (typeof s.mode === "string" && (s.mode === "ffa" || s.mode === "tdm")) {
       this.mode = s.mode;
     }
+    if (typeof s.botDifficulty === "string" &&
+        (s.botDifficulty === "easy" || s.botDifficulty === "medium" || s.botDifficulty === "high") &&
+        !this.isPublic) {
+      this.botDifficulty = s.botDifficulty;
+      for (const [, brain] of this.bots) this._applyDifficulty(brain);
+    }
+  }
+
+  private _applyDifficulty(brain: BotBrain): void {
+    const d = C.BOT_DIFFICULTY[this.botDifficulty as C.BotDifficulty] ?? C.BOT_DIFFICULTY[C.DEFAULT_BOT_DIFFICULTY];
+    brain.aimErr = d.aimErr;
+    brain.fireCone = d.fireCone;
+    brain.leadFactor = d.leadFactor;
+    brain.reactMin = d.reactMin;
+    brain.reactMax = d.reactMax;
   }
 
   /**
@@ -392,6 +410,7 @@ export class GameSim {
     mode: string;
     teamScore0: number;
     teamScore1: number;
+    botDifficulty: string;
   } {
     return {
       players: this.players,
@@ -406,6 +425,7 @@ export class GameSim {
       mode: this.mode,
       teamScore0: this.teamScore0,
       teamScore1: this.teamScore1,
+      botDifficulty: this.botDifficulty,
     };
   }
 
@@ -426,6 +446,7 @@ export class GameSim {
       mode: this.mode,
       teamScore0: this.teamScore0,
       teamScore1: this.teamScore1,
+      botDifficulty: this.botDifficulty,
     };
   }
 
@@ -946,7 +967,13 @@ export class GameSim {
     this.spawn(id, p);
     this.players.set(id, p);
     this.inputs.set(id, { ...ZERO_INPUT });
-    this.bots.set(id, { targetId: null, retargetAt: 0, wanderYaw: rand(-1, 1) });
+    const brain: BotBrain = {
+      targetId: null, retargetAt: 0, wanderYaw: rand(-1, 1),
+      aimErr: 0, fireCone: 0.15, leadFactor: 1, reactMin: 0.6, reactMax: 1.2, aimJitter: 0,
+    };
+    this._applyDifficulty(brain);
+    brain.aimJitter = rand(-brain.aimErr, brain.aimErr);
+    this.bots.set(id, brain);
   }
 
   private thinkBot(id: string, brain: BotBrain): void {
@@ -963,7 +990,8 @@ export class GameSim {
 
     if (this.now >= brain.retargetAt) {
       brain.targetId = this.pickBotTarget(id, getP(me));
-      brain.retargetAt = this.now + rand(0.6, 1.2);
+      brain.retargetAt = this.now + rand(brain.reactMin, brain.reactMax);
+      brain.aimJitter = rand(-brain.aimErr, brain.aimErr);
     }
 
     const myPos = getP(me);
@@ -980,16 +1008,17 @@ export class GameSim {
 
     if (target && target.alive) {
       const targetPos = getP(target);
-      const leadTime = S.distance(myPos, targetPos) / Math.max(C.BULLET_SPEED, 1) * 0.8;
+      const leadTime = S.distance(myPos, targetPos) / Math.max(C.BULLET_SPEED, 1) * 0.8 * brain.leadFactor;
       const leadPos = S.add(targetPos, S.scale(getF(target), target.speed * leadTime));
       desired = S.normalize(S.sub(leadPos, myPos));
+      desired = S.turn(myPos, desired, brain.aimJitter);
       if (me.hp < 35 && S.distance(myPos, targetPos) < 340) {
         desired = S.normalize(S.add(S.sub(myPos, targetPos), S.scale(normalizeHorizontal({ x: -myPos.x, y: 0, z: -myPos.z }), 0.6)));
         boost = true;
       }
       const aim = Math.abs(signedYaw(myFwd, desired));
       const altDelta = targetPos.y - myPos.y;
-      fire = aim < 0.15 && Math.abs(altDelta) < 70 && S.distance(myPos, targetPos) < 560;
+      fire = aim < brain.fireCone && Math.abs(altDelta) < 70 && S.distance(myPos, targetPos) < 560;
       boost = boost || S.distance(myPos, targetPos) > 520;
     } else {
       brain.wanderYaw += rand(-0.25, 0.25);

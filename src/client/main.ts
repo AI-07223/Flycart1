@@ -137,6 +137,7 @@ let lastKill = 0;
 let lastFireSnd = 0;
 let engineStarted = false;
 let botsEnabled = true;
+let botDifficulty: "easy" | "medium" | "high" = "medium";
 let selectedCosmetics: { color: number; bodyShape: number; accent: number; trail: number; livery: number } = { color: 0, bodyShape: 0, accent: 0, trail: 0, livery: 0 };
 let inviteRoom: string | null = null;
 let inviteServer: string | null = null;
@@ -214,6 +215,12 @@ try {
 } catch {}
 try {
   botsEnabled = localStorage.getItem("smashcart.bots") !== "0";
+} catch {}
+try {
+  const savedDiff = localStorage.getItem("smashcart.difficulty");
+  if (savedDiff === "easy" || savedDiff === "medium" || savedDiff === "high") {
+    botDifficulty = savedDiff;
+  }
 } catch {}
 
 // Persisted input inversion flags — loaded into Input after Input is available
@@ -698,6 +705,15 @@ function populateSettingsUI(): void {
   // Reflect control scheme
   const schemeRadios = document.querySelectorAll<HTMLInputElement>('input[name="ctrl-scheme"]');
   schemeRadios.forEach((r) => { r.checked = r.value === window.Input.controlScheme; });
+
+  // Reflect bot difficulty — prefer live room value, fall back to local pref
+  const liveDiff = (window.Net?.state as any)?.botDifficulty;
+  const activeDiff: string = (liveDiff === "easy" || liveDiff === "medium" || liveDiff === "high")
+    ? liveDiff
+    : botDifficulty;
+  document.querySelectorAll<HTMLInputElement>('input[name="difficulty"]').forEach((r) => {
+    r.checked = r.value === activeDiff;
+  });
 }
 
 function showSettings(): void {
@@ -1092,6 +1108,9 @@ async function joinLobby(code: string, serverOrigin: string | null = null): Prom
   // Initial roster render
   renderLobbyRoster();
 
+  // Send persisted difficulty so the room starts at the host's chosen tier
+  window.Net?.sendHostSettings?.({ botDifficulty });
+
   applyMode("lobby");
 
   // If the server already reports 'playing' by the time we connect (e.g. late
@@ -1171,6 +1190,8 @@ async function startP2PHost(): Promise<void> {
   transport.onStateChange = onLobbyStateChange;
   els.lobbyTitle.textContent = `P2P Room ${code}`;
   renderLobbyRoster();
+  // Send persisted difficulty so the P2P room starts at the host's chosen tier
+  window.Net?.sendHostSettings?.({ botDifficulty });
   applyMode("lobby");
 }
 
@@ -1549,16 +1570,24 @@ function onPickup(msg: any): void {
 
 function setupTouchButtons(): void {
   const bind = (el: HTMLElement, key: keyof typeof window.Input.touch) => {
-    const set = (value: boolean) => (e: Event) => {
+    let pid = -1;
+    const down = (e: PointerEvent) => {
       e.preventDefault();
-      window.Input.touch[key] = value;
-      el.classList.toggle("pressed", value);
-      if (value) buzz(8);
+      pid = e.pointerId;
+      try { el.setPointerCapture(e.pointerId); } catch {}
+      window.Input.touch[key] = true;
+      el.classList.add("pressed");
+      buzz(8);
     };
-    el.addEventListener("pointerdown", set(true));
-    el.addEventListener("pointerup", set(false));
-    el.addEventListener("pointercancel", set(false));
-    el.addEventListener("pointerleave", set(false));
+    const up = (e: PointerEvent) => {
+      if (e.pointerId !== pid) return;
+      pid = -1;
+      window.Input.touch[key] = false;
+      el.classList.remove("pressed");
+    };
+    el.addEventListener("pointerdown", down);
+    el.addEventListener("pointerup", up);
+    el.addEventListener("pointercancel", up);
   };
   bind(els.left, "left");
   bind(els.right, "right");
@@ -1723,7 +1752,9 @@ function enterImmersive(): void {
 
 function updateRotateOverlay(): void {
   const portrait = window.matchMedia && window.matchMedia("(orientation: portrait)").matches;
-  const show = window.Input.isTouchDevice() && portrait && mode !== "menu";
+  // Block portrait on ALL screens on touch devices — including the menu.
+  // This ensures a phone loading in portrait shows the overlay immediately.
+  const show = window.Input.isTouchDevice() && portrait;
   els.rotate.classList.toggle("show", !!show);
   updateMenuMeta(true);
 }
@@ -1994,6 +2025,22 @@ function init(): void {
     });
   }
 
+  // ─── BOT DIFFICULTY PICKER ────────────────────────────────────────────────
+  // Reflect persisted value into radios on boot
+  document.querySelectorAll<HTMLInputElement>('input[name="difficulty"]').forEach((r) => {
+    r.checked = r.value === botDifficulty;
+  });
+  // Wire change: persist + notify server (guarded — server ignores it for non-hosts)
+  document.querySelectorAll<HTMLInputElement>('input[name="difficulty"]').forEach((r) => {
+    r.addEventListener("change", () => {
+      if (!r.checked) return;
+      const val = r.value as "easy" | "medium" | "high";
+      botDifficulty = val;
+      try { localStorage.setItem("smashcart.difficulty", val); } catch {}
+      window.Net?.sendHostSettings?.({ botDifficulty: val });
+    });
+  });
+
   // ─── CONTROL SCHEME PICKER ────────────────────────────────────────────────
   // Load persisted scheme
   try {
@@ -2156,9 +2203,9 @@ function init(): void {
     if (Number.isFinite(v)) window.Net.sendHostSettings({ roundLength: v });
   });
 
-  // Host settings: bots toggle (immediate on change)
+  // Host settings: bots toggle (immediate on change) — also sends difficulty so room starts at chosen tier
   els.lobbyBotsCheck.addEventListener("change", () => {
-    window.Net.sendHostSettings({ botsInRoom: els.lobbyBotsCheck.checked });
+    window.Net.sendHostSettings({ botsInRoom: els.lobbyBotsCheck.checked, botDifficulty });
   });
 
   // Host settings: mode select (immediate on change)
@@ -2178,6 +2225,13 @@ function init(): void {
   });
   window.addEventListener("orientationchange", updateRotateOverlay);
   window.addEventListener("resize", updateRotateOverlay);
+  // matchMedia change listener catches portrait↔landscape without relying solely on orientationchange
+  try {
+    const portraitMq = window.matchMedia("(orientation: portrait)");
+    const mqHandler = () => updateRotateOverlay();
+    if (portraitMq.addEventListener) portraitMq.addEventListener("change", mqHandler);
+    else if ((portraitMq as any).addListener) (portraitMq as any).addListener(mqHandler); // Safari <14 fallback
+  } catch {}
   document.addEventListener("keydown", (e: KeyboardEvent) => {
     if (e.key === "Escape") {
       if (scannerOpen) { closeScanner(); return; }

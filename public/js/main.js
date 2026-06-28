@@ -9,7 +9,7 @@
   };
 
   // src/shared/constants.ts
-  var TICK_RATE, TICK_MS, CRUISE_SPEED, BOOST_SPEED, ACCEL, TURN_RATE, PITCH_RATE, PITCH_MAX, PLANE_RADIUS, MAX_HP, BULLET_SPEED, BULLET_DAMAGE, BULLET_LIFE, BULLET_RADIUS, FIRE_COOLDOWN, RESPAWN_DELAY, BULLET_HIT_RADIUS, AIM_ASSIST_CONE, AIM_ASSIST_RANGE, AIM_ASSIST_TURN, ROUND_SECONDS, ROUND_INTERMISSION, MIN_PLAYERS, MAP_HALF, MAP_EDGE_SOFT, GROUND_Y, MIN_ALT, SPAWN_ALT, MAX_ALT, PICKUP_ALT_MIN, PICKUP_ALT_MAX, PICKUP_FIELD_RADIUS, SPAWN_REROLL, BOT_NAMES, COLOR_COUNT, ACCENT_COUNT, TRAIL_COUNT, LIVERY_COUNT, SKIN_COUNT, PICKUP_MAX, PICKUP_INTERVAL, PICKUP_RADIUS, POWERUP_DURATION, SHIELD_CHARGES, RAPID_FACTOR, SPREAD_ANGLE, AFTERBURNER_FACTOR, HOMING_TURN, POWERUP_TYPES, POWERUP_WEIGHTS, SPAWN_INVULN, LOBBY_READY_TIMEOUT, TEAM_COUNT, LANDMARKS;
+  var TICK_RATE, TICK_MS, CRUISE_SPEED, BOOST_SPEED, ACCEL, TURN_RATE, PITCH_RATE, PITCH_MAX, PLANE_RADIUS, MAX_HP, BULLET_SPEED, BULLET_DAMAGE, BULLET_LIFE, BULLET_RADIUS, FIRE_COOLDOWN, RESPAWN_DELAY, BULLET_HIT_RADIUS, AIM_ASSIST_CONE, AIM_ASSIST_RANGE, AIM_ASSIST_TURN, ROUND_SECONDS, ROUND_INTERMISSION, MIN_PLAYERS, MAP_HALF, MAP_EDGE_SOFT, GROUND_Y, MIN_ALT, SPAWN_ALT, MAX_ALT, PICKUP_ALT_MIN, PICKUP_ALT_MAX, PICKUP_FIELD_RADIUS, SPAWN_REROLL, BOT_NAMES, COLOR_COUNT, ACCENT_COUNT, TRAIL_COUNT, LIVERY_COUNT, SKIN_COUNT, DEFAULT_BOT_DIFFICULTY, BOT_DIFFICULTY, PICKUP_MAX, PICKUP_INTERVAL, PICKUP_RADIUS, POWERUP_DURATION, SHIELD_CHARGES, RAPID_FACTOR, SPREAD_ANGLE, AFTERBURNER_FACTOR, HOMING_TURN, POWERUP_TYPES, POWERUP_WEIGHTS, SPAWN_INVULN, LOBBY_READY_TIMEOUT, TEAM_COUNT, LANDMARKS;
   var init_constants = __esm({
     "src/shared/constants.ts"() {
       "use strict";
@@ -63,9 +63,15 @@
       TRAIL_COUNT = 5;
       LIVERY_COUNT = 4;
       SKIN_COUNT = COLOR_COUNT;
+      DEFAULT_BOT_DIFFICULTY = "medium";
+      BOT_DIFFICULTY = {
+        easy: { aimErr: 0.3, fireCone: 0.12, leadFactor: 0.4, reactMin: 0.8, reactMax: 1.4 },
+        medium: { aimErr: 0.16, fireCone: 0.13, leadFactor: 0.7, reactMin: 0.6, reactMax: 1 },
+        high: { aimErr: 0.07, fireCone: 0.15, leadFactor: 0.9, reactMin: 0.4, reactMax: 0.8 }
+      };
       PICKUP_MAX = 6;
       PICKUP_INTERVAL = 5.5;
-      PICKUP_RADIUS = 24;
+      PICKUP_RADIUS = 44;
       POWERUP_DURATION = 10;
       SHIELD_CHARGES = 3;
       RAPID_FACTOR = 0.55;
@@ -330,6 +336,7 @@
           this.mode = "ffa";
           this.teamScore0 = 0;
           this.teamScore1 = 0;
+          this.botDifficulty = DEFAULT_BOT_DIFFICULTY;
           if (this.isPublic) {
             this.phase = "playing";
             this.timeLeft = ROUND_SECONDS;
@@ -358,6 +365,7 @@
           this.mode = snap.mode ?? this.mode;
           this.teamScore0 = snap.teamScore0 ?? this.teamScore0;
           this.teamScore1 = snap.teamScore1 ?? this.teamScore1;
+          this.botDifficulty = snap.botDifficulty ?? this.botDifficulty;
           this.players.clear();
           this.inputs.clear();
           const ZERO = { seq: 0, turn: 0, climb: 0, boost: false, fire: false };
@@ -522,6 +530,18 @@
           if (typeof s.mode === "string" && (s.mode === "ffa" || s.mode === "tdm")) {
             this.mode = s.mode;
           }
+          if (typeof s.botDifficulty === "string" && (s.botDifficulty === "easy" || s.botDifficulty === "medium" || s.botDifficulty === "high") && !this.isPublic) {
+            this.botDifficulty = s.botDifficulty;
+            for (const [, brain] of this.bots) this._applyDifficulty(brain);
+          }
+        }
+        _applyDifficulty(brain) {
+          const d = BOT_DIFFICULTY[this.botDifficulty] ?? BOT_DIFFICULTY[DEFAULT_BOT_DIFFICULTY];
+          brain.aimErr = d.aimErr;
+          brain.fireCone = d.fireCone;
+          brain.leadFactor = d.leadFactor;
+          brain.reactMin = d.reactMin;
+          brain.reactMax = d.reactMax;
         }
         /**
          * Validates and removes the target player from the sim.
@@ -579,7 +599,8 @@
             botsInRoom: this.botsInRoom,
             mode: this.mode,
             teamScore0: this.teamScore0,
-            teamScore1: this.teamScore1
+            teamScore1: this.teamScore1,
+            botDifficulty: this.botDifficulty
           };
         }
         /**
@@ -598,7 +619,8 @@
             botsInRoom: this.botsInRoom,
             mode: this.mode,
             teamScore0: this.teamScore0,
-            teamScore1: this.teamScore1
+            teamScore1: this.teamScore1,
+            botDifficulty: this.botDifficulty
           };
         }
         // ---------------------------------------------------------------------------
@@ -1074,7 +1096,20 @@
           this.spawn(id, p);
           this.players.set(id, p);
           this.inputs.set(id, { ...ZERO_INPUT });
-          this.bots.set(id, { targetId: null, retargetAt: 0, wanderYaw: rand(-1, 1) });
+          const brain = {
+            targetId: null,
+            retargetAt: 0,
+            wanderYaw: rand(-1, 1),
+            aimErr: 0,
+            fireCone: 0.15,
+            leadFactor: 1,
+            reactMin: 0.6,
+            reactMax: 1.2,
+            aimJitter: 0
+          };
+          this._applyDifficulty(brain);
+          brain.aimJitter = rand(-brain.aimErr, brain.aimErr);
+          this.bots.set(id, brain);
         }
         thinkBot(id, brain) {
           const me = this.players.get(id);
@@ -1089,7 +1124,8 @@
           }
           if (this.now >= brain.retargetAt) {
             brain.targetId = this.pickBotTarget(id, getP(me));
-            brain.retargetAt = this.now + rand(0.6, 1.2);
+            brain.retargetAt = this.now + rand(brain.reactMin, brain.reactMax);
+            brain.aimJitter = rand(-brain.aimErr, brain.aimErr);
           }
           const myPos = getP(me);
           const myFwd = getF(me);
@@ -1103,16 +1139,17 @@
           }
           if (target && target.alive) {
             const targetPos = getP(target);
-            const leadTime = distance(myPos, targetPos) / Math.max(BULLET_SPEED, 1) * 0.8;
+            const leadTime = distance(myPos, targetPos) / Math.max(BULLET_SPEED, 1) * 0.8 * brain.leadFactor;
             const leadPos = add(targetPos, scale(getF(target), target.speed * leadTime));
             desired = normalize(sub(leadPos, myPos));
+            desired = turn(myPos, desired, brain.aimJitter);
             if (me.hp < 35 && distance(myPos, targetPos) < 340) {
               desired = normalize(add(sub(myPos, targetPos), scale(normalizeHorizontal({ x: -myPos.x, y: 0, z: -myPos.z }), 0.6)));
               boost = true;
             }
             const aim = Math.abs(signedYaw(myFwd, desired));
             const altDelta = targetPos.y - myPos.y;
-            fire = aim < 0.15 && Math.abs(altDelta) < 70 && distance(myPos, targetPos) < 560;
+            fire = aim < brain.fireCone && Math.abs(altDelta) < 70 && distance(myPos, targetPos) < 560;
             boost = boost || distance(myPos, targetPos) > 520;
           } else {
             brain.wanderYaw += rand(-0.25, 0.25);
@@ -1316,6 +1353,7 @@
           this.mode = "ffa";
           this.teamScore0 = 0;
           this.teamScore1 = 0;
+          this.botDifficulty = "medium";
         }
       };
       HostTransportState = class {
@@ -1357,6 +1395,9 @@
         }
         get teamScore1() {
           return this.sim.teamScore1;
+        }
+        get botDifficulty() {
+          return this.sim.botDifficulty;
         }
       };
       SignalSocket = class {
@@ -1728,7 +1769,8 @@
                 roundLength: typeof msg.roundLength === "number" ? msg.roundLength : void 0,
                 roomName: typeof msg.roomName === "string" ? msg.roomName : void 0,
                 botsInRoom: typeof msg.botsInRoom === "boolean" ? msg.botsInRoom : void 0,
-                mode: typeof msg.mode === "string" ? msg.mode : void 0
+                mode: typeof msg.mode === "string" ? msg.mode : void 0,
+                botDifficulty: typeof msg.botDifficulty === "string" ? msg.botDifficulty : void 0
               });
               if (this.onStateChange) this.onStateChange();
             }
@@ -1905,7 +1947,8 @@
             botsInRoom: gs.botsInRoom,
             mode: gs.mode,
             teamScore0: gs.teamScore0,
-            teamScore1: gs.teamScore1
+            teamScore1: gs.teamScore1,
+            botDifficulty: gs.botDifficulty
           };
         }
         /**
@@ -2062,6 +2105,7 @@
             gs.roundLength = snap.roundLength ?? 150;
             gs.botsInRoom = snap.botsInRoom ?? false;
             gs.mode = snap.mode ?? "ffa";
+            gs.botDifficulty = snap.botDifficulty ?? "medium";
             gs.teamScore0 = snap.teamScore0 ?? 0;
             gs.teamScore1 = snap.teamScore1 ?? 0;
             gs.players.mergeFrom(snap.players);
@@ -2609,6 +2653,7 @@
       var lastFireSnd = 0;
       var engineStarted = false;
       var botsEnabled = true;
+      var botDifficulty = "medium";
       var selectedCosmetics = { color: 0, bodyShape: 0, accent: 0, trail: 0, livery: 0 };
       var inviteRoom = null;
       var inviteServer = null;
@@ -2688,6 +2733,13 @@
       }
       try {
         botsEnabled = localStorage.getItem("smashcart.bots") !== "0";
+      } catch {
+      }
+      try {
+        const savedDiff = localStorage.getItem("smashcart.difficulty");
+        if (savedDiff === "easy" || savedDiff === "medium" || savedDiff === "high") {
+          botDifficulty = savedDiff;
+        }
       } catch {
       }
       function loadInputPrefs() {
@@ -3101,6 +3153,11 @@
         schemeRadios.forEach((r) => {
           r.checked = r.value === window.Input.controlScheme;
         });
+        const liveDiff = window.Net?.state?.botDifficulty;
+        const activeDiff = liveDiff === "easy" || liveDiff === "medium" || liveDiff === "high" ? liveDiff : botDifficulty;
+        document.querySelectorAll('input[name="difficulty"]').forEach((r) => {
+          r.checked = r.value === activeDiff;
+        });
       }
       function showSettings() {
         settingsOpen = true;
@@ -3446,6 +3503,7 @@
         window.Net.onStateChange = onLobbyStateChange;
         els.lobbyTitle.textContent = `Room ${code}`;
         renderLobbyRoster();
+        window.Net?.sendHostSettings?.({ botDifficulty });
         applyMode("lobby");
         const phase = window.Net.getPhase();
         if (phase === "playing") {
@@ -3506,6 +3564,7 @@
         transport.onStateChange = onLobbyStateChange;
         els.lobbyTitle.textContent = `P2P Room ${code}`;
         renderLobbyRoster();
+        window.Net?.sendHostSettings?.({ botDifficulty });
         applyMode("lobby");
       }
       function buildP2PShareUrl(code) {
@@ -3815,16 +3874,27 @@
       }
       function setupTouchButtons() {
         const bind = (el, key) => {
-          const set = (value) => (e) => {
+          let pid = -1;
+          const down = (e) => {
             e.preventDefault();
-            window.Input.touch[key] = value;
-            el.classList.toggle("pressed", value);
-            if (value) buzz(8);
+            pid = e.pointerId;
+            try {
+              el.setPointerCapture(e.pointerId);
+            } catch {
+            }
+            window.Input.touch[key] = true;
+            el.classList.add("pressed");
+            buzz(8);
           };
-          el.addEventListener("pointerdown", set(true));
-          el.addEventListener("pointerup", set(false));
-          el.addEventListener("pointercancel", set(false));
-          el.addEventListener("pointerleave", set(false));
+          const up = (e) => {
+            if (e.pointerId !== pid) return;
+            pid = -1;
+            window.Input.touch[key] = false;
+            el.classList.remove("pressed");
+          };
+          el.addEventListener("pointerdown", down);
+          el.addEventListener("pointerup", up);
+          el.addEventListener("pointercancel", up);
         };
         bind(els.left, "left");
         bind(els.right, "right");
@@ -3978,7 +4048,7 @@
       }
       function updateRotateOverlay() {
         const portrait = window.matchMedia && window.matchMedia("(orientation: portrait)").matches;
-        const show = window.Input.isTouchDevice() && portrait && mode !== "menu";
+        const show = window.Input.isTouchDevice() && portrait;
         els.rotate.classList.toggle("show", !!show);
         updateMenuMeta(true);
       }
@@ -4250,6 +4320,21 @@
             }
           });
         }
+        document.querySelectorAll('input[name="difficulty"]').forEach((r) => {
+          r.checked = r.value === botDifficulty;
+        });
+        document.querySelectorAll('input[name="difficulty"]').forEach((r) => {
+          r.addEventListener("change", () => {
+            if (!r.checked) return;
+            const val = r.value;
+            botDifficulty = val;
+            try {
+              localStorage.setItem("smashcart.difficulty", val);
+            } catch {
+            }
+            window.Net?.sendHostSettings?.({ botDifficulty: val });
+          });
+        });
         try {
           const saved = localStorage.getItem("smashcart.controls");
           if (saved === "joystick" || saved === "tilt" || saved === "dpad") {
@@ -4387,7 +4472,7 @@
           if (Number.isFinite(v)) window.Net.sendHostSettings({ roundLength: v });
         });
         els.lobbyBotsCheck.addEventListener("change", () => {
-          window.Net.sendHostSettings({ botsInRoom: els.lobbyBotsCheck.checked });
+          window.Net.sendHostSettings({ botsInRoom: els.lobbyBotsCheck.checked, botDifficulty });
         });
         els.lobbyMode.addEventListener("change", () => {
           window.Net.sendHostSettings({ mode: els.lobbyMode.value });
@@ -4404,6 +4489,13 @@
         });
         window.addEventListener("orientationchange", updateRotateOverlay);
         window.addEventListener("resize", updateRotateOverlay);
+        try {
+          const portraitMq = window.matchMedia("(orientation: portrait)");
+          const mqHandler = () => updateRotateOverlay();
+          if (portraitMq.addEventListener) portraitMq.addEventListener("change", mqHandler);
+          else if (portraitMq.addListener) portraitMq.addListener(mqHandler);
+        } catch {
+        }
         document.addEventListener("keydown", (e) => {
           if (e.key === "Escape") {
             if (scannerOpen) {

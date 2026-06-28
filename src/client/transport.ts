@@ -31,6 +31,7 @@ export interface TransportState {
   mode?: string;
   teamScore0?: number;
   teamScore1?: number;
+  botDifficulty?: string;
 }
 
 /**
@@ -55,7 +56,7 @@ export interface ITransport {
   sendReady(): void;
   sendHostStart(): void;
   sendHostKick(targetId: string): void;
-  sendHostSettings(s: { roundLength?: number; roomName?: string; botsInRoom?: boolean; mode?: string }): void;
+  sendHostSettings(s: { roundLength?: number; roomName?: string; botsInRoom?: boolean; mode?: string; botDifficulty?: string }): void;
 
   getPhase(): string | null;
   getHostId(): string | null;

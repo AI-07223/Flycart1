@@ -62,10 +62,25 @@ export const LIVERY_COUNT = 4;
 // SKIN_COUNT aliases COLOR_COUNT — skin is the primary color index.
 export const SKIN_COUNT = COLOR_COUNT;
 
+// Bot difficulty tiers. aimErr = random yaw jitter (rad) added to a bot's desired heading
+// (re-rolled each retarget, so it's a steady aim offset, not per-tick noise); fireCone = max
+// aim error (rad) at which a bot will fire; leadFactor scales how far it leads a moving target;
+// reactMin/reactMax = retarget/reaction window (s). Even "high" keeps aimErr > 0 so bots are
+// never pinpoint and stay beatable by a skilled human.
+export type BotDifficulty = "easy" | "medium" | "high";
+export const DEFAULT_BOT_DIFFICULTY: BotDifficulty = "medium";
+export const BOT_DIFFICULTY: Record<BotDifficulty, {
+  aimErr: number; fireCone: number; leadFactor: number; reactMin: number; reactMax: number;
+}> = {
+  easy:   { aimErr: 0.30, fireCone: 0.12, leadFactor: 0.4, reactMin: 0.8, reactMax: 1.4 },
+  medium: { aimErr: 0.16, fireCone: 0.13, leadFactor: 0.7, reactMin: 0.6, reactMax: 1.0 },
+  high:   { aimErr: 0.07, fireCone: 0.15, leadFactor: 0.9, reactMin: 0.4, reactMax: 0.8 },
+};
+
 // Powerups.
 export const PICKUP_MAX = 6;
 export const PICKUP_INTERVAL = 5.5;
-export const PICKUP_RADIUS = 24;
+export const PICKUP_RADIUS = 44;
 export const POWERUP_DURATION = 10;
 export const SHIELD_CHARGES = 3;
 export const RAPID_FACTOR = 0.55;

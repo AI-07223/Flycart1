@@ -44,7 +44,7 @@
           if (this.controlScheme === "joystick") {
             const rawX = this._joystick.dx;
             const rawY = this._joystick.dy;
-            this.turn = this.invertSteer ? -rawX : rawX;
+            this.turn = this.invertSteer ? rawX : -rawX;
             const rawClimb2 = -rawY;
             this.climb = this.invertPitch ? -rawClimb2 : rawClimb2;
             this.boost = !!(keys["Shift"] || this.touch.boost);
@@ -64,7 +64,7 @@
               1,
               Math.sign(dBeta) * Math.max(0, (Math.abs(dBeta) - DEADZONE) / (RANGE - DEADZONE))
             ));
-            this.turn = this.invertSteer ? -rawX : rawX;
+            this.turn = this.invertSteer ? rawX : -rawX;
             const rawClimb2 = rawY;
             this.climb = this.invertPitch ? -rawClimb2 : rawClimb2;
             this.boost = !!(keys["Shift"] || this.touch.boost);
@@ -75,7 +75,7 @@
           const right = !!(keys["ArrowRight"] || keys["d"] || keys["D"] || this.touch.right);
           const climbUp = !!(keys["ArrowUp"] || keys["w"] || keys["W"] || this.touch.climb);
           const diveDown = !!(keys["ArrowDown"] || keys["s"] || keys["S"] || this.touch.dive);
-          const steer = (right ? 1 : 0) - (left ? 1 : 0);
+          const steer = (left ? 1 : 0) - (right ? 1 : 0);
           this.turn = this.invertSteer ? -steer : steer;
           const rawClimb = (climbUp ? 1 : 0) - (diveDown ? 1 : 0);
           this.climb = this.invertPitch ? -rawClimb : rawClimb;

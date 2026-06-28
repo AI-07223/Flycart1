@@ -96,6 +96,7 @@ class GuestTransportState implements TransportState {
   mode     = "ffa";
   teamScore0  = 0;
   teamScore1  = 0;
+  botDifficulty = "medium";
 }
 
 // ---------------------------------------------------------------------------
@@ -117,6 +118,7 @@ class HostTransportState implements TransportState {
   get mode(): string                { return this.sim.mode; }
   get teamScore0(): number          { return this.sim.teamScore0; }
   get teamScore1(): number          { return this.sim.teamScore1; }
+  get botDifficulty(): string       { return this.sim.botDifficulty; }
 }
 
 // ---------------------------------------------------------------------------
@@ -659,6 +661,7 @@ export class WebRtcTransport implements ITransport {
           roomName: typeof msg.roomName === "string" ? msg.roomName : undefined,
           botsInRoom: typeof msg.botsInRoom === "boolean" ? msg.botsInRoom : undefined,
           mode: typeof msg.mode === "string" ? msg.mode : undefined,
+          botDifficulty: typeof msg.botDifficulty === "string" ? msg.botDifficulty : undefined,
         });
         if (this.onStateChange) this.onStateChange();
       }
@@ -877,6 +880,7 @@ export class WebRtcTransport implements ITransport {
       mode:        gs.mode,
       teamScore0:  gs.teamScore0,
       teamScore1:  gs.teamScore1,
+      botDifficulty: gs.botDifficulty,
     };
   }
 
@@ -1080,6 +1084,7 @@ export class WebRtcTransport implements ITransport {
       gs.roundLength = snap.roundLength ?? 150;
       gs.botsInRoom  = snap.botsInRoom  ?? false;
       gs.mode        = snap.mode        ?? "ffa";
+      gs.botDifficulty = snap.botDifficulty ?? "medium";
       gs.teamScore0  = snap.teamScore0  ?? 0;
       gs.teamScore1  = snap.teamScore1  ?? 0;
       gs.players.mergeFrom(snap.players as Array<[string, any]>);
@@ -1182,7 +1187,7 @@ export class WebRtcTransport implements ITransport {
     }
   }
 
-  sendHostSettings(s: { roundLength?: number; roomName?: string; botsInRoom?: boolean; mode?: string }): void {
+  sendHostSettings(s: { roundLength?: number; roomName?: string; botsInRoom?: boolean; mode?: string; botDifficulty?: string }): void {
     if (this._isHost) {
       if (this._sim) { this._sim.setHostSettings("host", s); if (this.onStateChange) this.onStateChange(); }
     } else {

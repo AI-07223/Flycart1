@@ -63,7 +63,7 @@ const Input = {
       // Joystick: analog stick drives turn + climb; touch.boost/fire for right buttons
       const rawX = this._joystick.dx;
       const rawY = this._joystick.dy; // positive Y = stick down = dive
-      this.turn  = this.invertSteer ? -rawX : rawX;
+      this.turn  = this.invertSteer ? rawX : -rawX;
       // dy > 0 means stick pushed down (toward user) -> dive -> negative climb
       const rawClimb = -rawY;
       this.climb = this.invertPitch ? -rawClimb : rawClimb;
@@ -87,7 +87,7 @@ const Input = {
         Math.sign(dBeta) * Math.max(0, (Math.abs(dBeta) - DEADZONE) / (RANGE - DEADZONE))
       ));
 
-      this.turn  = this.invertSteer ? -rawX : rawX;
+      this.turn  = this.invertSteer ? rawX : -rawX;
       // tilt forward (positive beta) = climb
       const rawClimb = rawY;
       this.climb = this.invertPitch ? -rawClimb : rawClimb;
@@ -102,7 +102,9 @@ const Input = {
     const climbUp = !!(keys["ArrowUp"]    || keys["w"] || keys["W"] || this.touch.climb);
     const diveDown= !!(keys["ArrowDown"]  || keys["s"] || keys["S"] || this.touch.dive);
 
-    const steer = (right ? 1 : 0) - (left ? 1 : 0);
+    // Global handedness flip: right input → negative turn (left turn).
+    // "Invert Steer" in Settings is the escape hatch if this feels backwards.
+    const steer = (left ? 1 : 0) - (right ? 1 : 0);
     this.turn = this.invertSteer ? -steer : steer;
     const rawClimb = (climbUp ? 1 : 0) - (diveDown ? 1 : 0);
     this.climb = this.invertPitch ? -rawClimb : rawClimb;

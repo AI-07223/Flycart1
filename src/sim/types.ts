@@ -60,6 +60,12 @@ export interface BotBrain {
   targetId: string | null;
   retargetAt: number;
   wanderYaw: number;
+  aimErr: number;
+  fireCone: number;
+  leadFactor: number;
+  reactMin: number;
+  reactMax: number;
+  aimJitter: number;
 }
 
 export interface JoinOpts {
@@ -91,6 +97,7 @@ export interface SimStateSnapshot {
   mode: string;
   teamScore0: number;
   teamScore1: number;
+  botDifficulty: string;
 }
 
 export interface GameSimOpts {

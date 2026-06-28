@@ -560,6 +560,9 @@ kbd {
   inset: 0;
   pointer-events: none;
   z-index: 6;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
 }
 .touch-left,
 .touch-right {
@@ -582,6 +585,8 @@ kbd {
   background: radial-gradient(circle at 50% 30%, rgba(255,255,255,0.18), var(--glass) 72%);
   box-shadow: var(--shadow);
   touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
 }
 .tbtn.pressed { transform: scale(0.92); filter: brightness(1.2); }
 .tbtn.arrow, .tbtn.climb, .tbtn.dive {

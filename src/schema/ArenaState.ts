@@ -67,4 +67,6 @@ export class ArenaState extends Schema {
   @type("string") mode = "ffa";
   @type("number") teamScore0 = 0;
   @type("number") teamScore1 = 0;
+  /** Bot difficulty: 'easy' | 'medium' | 'high'. Appended last to preserve field order. */
+  @type("string") botDifficulty = "medium";
 }
