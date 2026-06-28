@@ -1781,3 +1781,399 @@ body.touch-device #share-bar {
   }
   .scan-card { padding: 14px 16px; gap: 10px; }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   MENU SCREEN ROUTER  (§F of the game-menu-screens design contract)
+   Targets: .menu-router, section.menu-screen, .screen-head, .screen-back,
+            .menu-nav-btn, .scan-cta, .hud-menu-btn, #pause-invite-btn
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Restyle #start-screen to be a plain full-cover anchor ─────────────── */
+/* The old rules added overflow-y:auto and flex centering; the router takes
+   over layout, so we reset to a plain positional container. */
+#start-screen {
+  justify-content: flex-start;
+  overflow: hidden;   /* router handles scroll internally */
+  padding: 0;
+  align-items: stretch;
+}
+
+/* ── Router shell: fills the safe-area of #start-screen ────────────────── */
+.menu-router {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  /* safe-area padding so content isn't under notches/home-bar */
+  padding: max(16px, env(safe-area-inset-top))
+           max(16px, env(safe-area-inset-right))
+           max(16px, env(safe-area-inset-bottom))
+           max(16px, env(safe-area-inset-left));
+  overflow: hidden;
+}
+
+/* ── Individual screens: absolute fill, fade+slide transition ───────────── */
+.menu-screen {
+  position: absolute;
+  inset: 0;
+  /* inherit the router's safe-area padding */
+  padding: max(16px, env(safe-area-inset-top))
+           max(20px, env(safe-area-inset-right))
+           max(16px, env(safe-area-inset-bottom))
+           max(20px, env(safe-area-inset-left));
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  /* hidden by default */
+  opacity: 0;
+  transform: translateX(12px);
+  pointer-events: none;
+  transition: opacity .2s ease, transform .2s ease;
+  overflow: hidden; /* no page scroll; lists scroll internally */
+}
+
+.menu-screen.active {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+}
+
+/* ── #screen-home layout adjustments ───────────────────────────────────── */
+#screen-home {
+  /* give a bit more room at top for the brand block */
+  gap: 10px;
+}
+
+/* Brand heading inside home */
+#screen-home h1 {
+  font-size: clamp(36px, 9vw, 72px);
+  letter-spacing: 4px;
+  line-height: 0.94;
+}
+#screen-home h1 span { color: var(--accent); }
+
+/* Top-right quick-action row (settings + server badge) */
+.home-quick-row {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 2px;
+}
+
+/* ── Screen header (non-home screens) ──────────────────────────────────── */
+.screen-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.screen-back {
+  /* ghost pill — no accent fill, just a rim */
+  background: rgba(255, 255, 255, 0.07);
+  color: #d6e4f5;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
+  padding: 8px 16px;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  box-shadow: none;
+  /* generous tap target */
+  min-height: 40px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+.screen-back:hover {
+  background: rgba(255, 255, 255, 0.13);
+  transform: none;
+  box-shadow: none;
+}
+.screen-back:active {
+  background: rgba(255, 255, 255, 0.06);
+  transform: none;
+  box-shadow: none;
+}
+
+.screen-title {
+  font-size: clamp(18px, 3.5vw, 26px);
+  font-weight: 900;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: #fff;
+}
+
+/* ── Navigation buttons ─────────────────────────────────────────────────── */
+.menu-nav-btn {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 56px;
+  padding: 12px 20px;
+  border-radius: 14px;
+  /* glassy using existing tokens */
+  background: rgba(24, 37, 55, 0.52);   /* --glass approximate */
+  border: 1px solid rgba(255, 255, 255, 0.18); /* --rim approximate */
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.12), /* bevel highlight */
+    0 8px 20px rgba(0, 0, 0, 0.32);           /* shadow */
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  color: #dce8f8;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  text-align: left;
+  width: 100%;
+  cursor: pointer;
+  transition:
+    background .12s ease,
+    border-color .12s ease,
+    transform .08s ease,
+    box-shadow .08s ease;
+}
+.menu-nav-btn:hover {
+  background: rgba(36, 54, 78, 0.72);
+  border-color: rgba(255, 255, 255, 0.28);
+  transform: translateY(-2px);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.18),
+    0 12px 28px rgba(0, 0, 0, 0.38);
+}
+.menu-nav-btn:active {
+  transform: translateY(2px);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 2px 6px rgba(0, 0, 0, 0.4);
+  background: rgba(18, 28, 44, 0.72);
+}
+
+/* Emoji / icon span inside nav buttons */
+.menu-nav-btn .nav-icon {
+  font-size: 22px;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+/* Sub-label / description text inside nav buttons */
+.menu-nav-btn .nav-desc {
+  font-size: 12px;
+  font-weight: 400;
+  color: #8fa3be;
+  letter-spacing: 0;
+  margin-top: 2px;
+}
+
+/* Stack icon and description vertically within the button */
+.menu-nav-btn .nav-label-group {
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Scan CTA emphasis ──────────────────────────────────────────────────── */
+.scan-cta {
+  border-color: rgba(255, 203, 5, 0.45);
+  background: rgba(255, 203, 5, 0.10);
+  color: #ffe28b;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.14),
+    0 0 16px rgba(255, 203, 5, 0.18),
+    0 8px 20px rgba(0, 0, 0, 0.32);
+}
+.scan-cta:hover {
+  background: rgba(255, 203, 5, 0.18);
+  border-color: rgba(255, 203, 5, 0.65);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.20),
+    0 0 28px rgba(255, 203, 5, 0.30),
+    0 12px 28px rgba(0, 0, 0, 0.38);
+  transform: translateY(-2px);
+}
+.scan-cta:active {
+  transform: translateY(2px);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 203, 5, 0.08),
+    0 0 8px rgba(255, 203, 5, 0.14),
+    0 2px 6px rgba(0, 0, 0, 0.4);
+}
+
+/* ── Nav button layout: stack on narrow, 2-col on wide landscape ────────── */
+.menu-nav-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex: 1;
+  overflow: hidden;  /* no overflow in landscape */
+}
+
+/* On screens wide enough for two columns (landscape phone ~568px+) */
+@media (min-width: 568px) and (orientation: landscape) {
+  .menu-nav-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    align-content: start;
+    gap: 10px;
+  }
+  /* Full-width span for a single featured button (e.g. scan-cta alone) */
+  .menu-nav-grid .scan-cta:only-child,
+  .menu-nav-grid .nav-full {
+    grid-column: 1 / -1;
+  }
+}
+
+/* ── Leaderboard list scrolls internally ────────────────────────────────── */
+#menu-leaderboard {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  max-height: calc(100vh - 160px); /* fallback for older browsers */
+  max-height: calc(100dvh - 160px);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  /* subtle scrollbar */
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,0.15) transparent;
+}
+
+/* ── #join-code-input inside #screen-join ───────────────────────────────── */
+/* It's a text input (not a button) — re-apply field styles for this context */
+#screen-join #join-code-input {
+  max-width: 100%;
+  font-size: 20px;
+  letter-spacing: 4px;
+  border-radius: 10px;
+  border: 2px solid rgba(255, 255, 255, 0.18);
+  background: rgba(0, 0, 0, 0.32);
+  color: #fff;
+  padding: 14px 18px;
+  width: 100%;
+  text-transform: uppercase;
+}
+#screen-join #join-code-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+/* ── In-game hamburger menu button ──────────────────────────────────────── */
+#ingame-menu-btn {
+  position: absolute;
+  top: max(10px, env(safe-area-inset-top));
+  left: max(10px, env(safe-area-inset-left));
+  z-index: 10;          /* above canvas (z-index:auto), below overlays */
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border-radius: 10px;
+  background: rgba(11, 19, 30, 0.58);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  color: #dce8f8;
+  font-size: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: auto;
+  touch-action: none;
+  cursor: pointer;
+  transition: background .1s ease, transform .08s ease, box-shadow .08s ease;
+}
+#ingame-menu-btn:hover {
+  background: rgba(24, 37, 55, 0.80);
+  border-color: rgba(255, 255, 255, 0.30);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.42);
+  transform: none; /* don't lift — it's a compact HUD btn */
+}
+#ingame-menu-btn:active {
+  transform: scale(0.92);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+}
+
+/* Keep the hud-menu-btn class alias available if needed */
+.hud-menu-btn {
+  position: absolute;
+  top: max(10px, env(safe-area-inset-top));
+  left: max(10px, env(safe-area-inset-left));
+  z-index: 10;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border-radius: 10px;
+  background: rgba(11, 19, 30, 0.58);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  color: #dce8f8;
+  font-size: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: auto;
+  touch-action: none;
+  cursor: pointer;
+  transition: background .1s ease, transform .08s ease, box-shadow .08s ease;
+}
+.hud-menu-btn:hover {
+  background: rgba(24, 37, 55, 0.80);
+  border-color: rgba(255, 255, 255, 0.30);
+}
+.hud-menu-btn:active {
+  transform: scale(0.92);
+}
+
+/* ── Pause invite button ────────────────────────────────────────────────── */
+/* #pause-invite-btn already has class .secondary so it inherits that style.
+   No extra rules needed — it sits in .btn-row and matches peers. */
+
+/* ── Landscape phone primary case ──────────────────────────────────────── */
+/* On short landscape screens reduce vertical gaps so everything still fits */
+@media (max-height: 440px) {
+  .menu-screen {
+    gap: 8px;
+    padding-top: max(8px, env(safe-area-inset-top));
+    padding-bottom: max(8px, env(safe-area-inset-bottom));
+  }
+  .screen-head {
+    padding-bottom: 6px;
+  }
+  .menu-nav-btn {
+    min-height: 46px;
+    padding: 8px 16px;
+    font-size: 14px;
+  }
+  .menu-nav-btn .nav-icon {
+    font-size: 18px;
+  }
+  #screen-home h1 {
+    font-size: clamp(28px, 7vw, 52px);
+  }
+}
+
+/* ── Desktop / wide layout ──────────────────────────────────────────────── */
+@media (min-width: 900px) {
+  .menu-screen {
+    /* Centre a max-width column on large screens */
+    max-width: 680px;
+    margin-left: auto;
+    margin-right: auto;
+    left: 0;
+    right: 0;
+  }
+  /* home screen can be wider to show the brand block prominently */
+  #screen-home {
+    max-width: 820px;
+  }
+}
+
+/* ── Old menu layout classes — now safe to leave (no markup uses them)
+      but neutralised to avoid leaking if a stale element persists ────────── */
+/* .menu-shell, .menu-hero, .menu-grid are removed from the new markup.
+   We leave their rules in place (harmless + safe) but override start-screen
+   overflow which conflicted with the router. See the #start-screen reset above. */

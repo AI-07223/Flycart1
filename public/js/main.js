@@ -2630,16 +2630,15 @@
         settingsCloseBtn: dollar("settings-close-btn"),
         settingsCloseBtn2: dollar("settings-close-btn2"),
         menuSettingsBtn: dollar("menu-settings-btn"),
-        joinCodeModal: dollar("join-code-modal"),
         joinCodeInput: dollar("join-code-input"),
         joinCodeSubmit: dollar("join-code-submit"),
-        joinCodeCancel: dollar("join-code-cancel"),
-        joinCodeOpenBtn: dollar("join-code-open-btn"),
         menuLeaderboard: dollar("menu-leaderboard"),
         hangarOverlay: dollar("hangar-overlay"),
         hangarBtn: dollar("hangar-btn"),
         hangarCloseBtn: dollar("hangar-close-btn"),
-        hangarDone: dollar("hangar-done")
+        hangarDone: dollar("hangar-done"),
+        ingameMenuBtn: dollar("ingame-menu-btn"),
+        pauseInviteBtn: dollar("pause-invite-btn")
       };
       var mode = "menu";
       var settingsOpen = false;
@@ -3041,13 +3040,13 @@
         }
         if (inviteRoom) {
           els.quick.textContent = `JOIN ${inviteRoom}`;
-          els.roomChip.textContent = `Invite ${inviteRoom}`;
+          if (els.roomChip) els.roomChip.textContent = `Invite ${inviteRoom}`;
           const inviteHost = inviteServer ? new URL(toPageOrigin(inviteServer)).host : location.host;
           els.friendsNote.textContent = `Invite ready for room ${inviteRoom} on ${inviteHost}. Quick Play joins it directly.`;
           if (!preserveStatus || !els.status.textContent) setStatus(`Invite ready: room ${inviteRoom}`);
         } else {
           els.quick.textContent = "PLAY PUBLIC";
-          els.roomChip.textContent = lanOrigin ? "LAN ready" : "Public";
+          if (els.roomChip) els.roomChip.textContent = lanOrigin ? "LAN ready" : "Public";
           els.friendsNote.textContent = "Room codes stay on the same server that created them.";
           if (!preserveStatus) setStatus("");
         }
@@ -3100,6 +3099,25 @@
         saveLanOrigin(origin);
         return origin;
       }
+      var navStack = ["home"];
+      function navShow(id) {
+        document.querySelectorAll(".menu-screen").forEach((s) => s.classList.toggle("active", s.id === `screen-${id}`));
+      }
+      function navGo(id) {
+        if (navStack[navStack.length - 1] === id) return;
+        navStack.push(id);
+        navShow(id);
+      }
+      function navBack() {
+        if (navStack.length > 1) {
+          navStack.pop();
+          navShow(navStack[navStack.length - 1]);
+        }
+      }
+      function navReset() {
+        navStack = ["home"];
+        navShow("home");
+      }
       function applyMode(nextMode) {
         mode = nextMode;
         const isMenu = mode === "menu";
@@ -3119,6 +3137,7 @@
         if (mode !== "playing") els.oobWarning.classList.add("hidden");
         els.hostLeftOverlay.classList.add("hidden");
         els.p2pMigratingOverlay.classList.add("hidden");
+        if (mode !== "lobby") els.share.classList.add("hidden");
       }
       function showHostLeftOverlay() {
         els.hostLeftOverlay.classList.remove("hidden");
@@ -3168,15 +3187,8 @@
         settingsOpen = false;
         els.settingsScreen.classList.add("hidden");
       }
-      function openJoinCode() {
-        joinCodeOpen = true;
-        els.joinCodeModal.classList.remove("hidden");
-        els.joinCodeInput.value = "";
-        els.joinCodeInput.focus();
-      }
       function closeJoinCode() {
         joinCodeOpen = false;
-        els.joinCodeModal.classList.add("hidden");
       }
       function stopScanCamera() {
         if (scanRafId !== null) {
@@ -3931,6 +3943,11 @@
           applyMode("paused");
           window.Net.sendInput(0, 0, false, false);
           window.SFX.setEngine(0, false);
+          if (activeShareUrl || els.shareLink.value) {
+            els.pauseInviteBtn.classList.remove("hidden");
+          } else {
+            els.pauseInviteBtn.classList.add("hidden");
+          }
         } else if (mode === "paused") {
           applyMode("playing");
         }
@@ -3988,6 +4005,7 @@
         els.hudTeamScore.classList.add("hidden");
         hideSettings();
         closeJoinCode();
+        navReset();
         closeScanner();
         hideShareQr();
         clearShareInvite();
@@ -4079,6 +4097,27 @@
         clearShareInvite();
         if (window.SFX.startMenuAmbient) window.SFX.startMenuAmbient();
         if (window.Input.isTouchDevice()) document.body.classList.add("touch-device");
+        document.querySelectorAll("[data-nav]").forEach((el) => {
+          el.addEventListener("click", () => {
+            window.SFX.uiClick();
+            navGo(el.dataset.nav);
+          });
+        });
+        document.querySelectorAll("[data-back]").forEach((el) => {
+          el.addEventListener("click", () => {
+            window.SFX.uiClick();
+            navBack();
+          });
+        });
+        navReset();
+        els.ingameMenuBtn.addEventListener("click", () => {
+          window.SFX.uiClick();
+          togglePause();
+        });
+        els.pauseInviteBtn.addEventListener("click", () => {
+          window.SFX.uiClick();
+          showShareQr();
+        });
         els.p2pHostBtn.addEventListener("click", () => {
           window.SFX.uiClick();
           startP2PHost();
@@ -4378,14 +4417,6 @@
           }
         };
         applyControlSchemeUI(window.Input.controlScheme);
-        els.joinCodeOpenBtn.addEventListener("click", () => {
-          window.SFX.uiClick();
-          openJoinCode();
-        });
-        els.joinCodeCancel.addEventListener("click", () => {
-          window.SFX.uiClick();
-          closeJoinCode();
-        });
         els.scanOpenBtn.addEventListener("click", () => {
           window.SFX.uiClick();
           openScanner();
@@ -4427,7 +4458,6 @@
           const code = resolveJoinInput();
           if (!code) return;
           window.SFX.uiClick();
-          closeJoinCode();
           startGame(code, null);
         });
         els.joinCodeInput.addEventListener("keydown", (e) => {
@@ -4436,12 +4466,8 @@
             const code = resolveJoinInput();
             if (!code) return;
             window.SFX.uiClick();
-            closeJoinCode();
             startGame(code, null);
           }
-        });
-        els.joinCodeModal.addEventListener("click", (e) => {
-          if (e.target === els.joinCodeModal) closeJoinCode();
         });
         els.interLeave.addEventListener("click", () => {
           window.SFX.uiClick();
@@ -4514,8 +4540,8 @@
               hideSettings();
               return;
             }
-            if (joinCodeOpen) {
-              closeJoinCode();
+            if (mode === "menu" && navStack.length > 1) {
+              navBack();
               return;
             }
           }

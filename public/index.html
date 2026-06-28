@@ -53,6 +53,7 @@
     <div id="oob-warning" class="hidden" aria-live="assertive">⚠ OUT OF BOUNDS — TURN BACK</div>
 
     <div id="hud" class="hidden">
+      <button id="ingame-menu-btn" class="hud-menu-btn" title="Menu" aria-label="Menu">☰</button>
       <div class="hud-row">
         <div class="hud-item">SCORE <span id="hud-score">0</span></div>
         <div class="hud-item">TIME <span id="hud-time">--</span></div>
@@ -134,56 +135,74 @@
     </div>
 
     <div id="start-screen" class="overlay">
-      <div class="menu-shell">
-        <div class="menu-shell-head">
-        <button id="menu-settings-btn" class="icon-btn" title="Settings">⚙</button>
-      </div>
+      <div class="menu-router">
 
-      <div class="menu-hero">
-          <div class="hero-copy">
-            <p class="eyebrow">Flat-world air combat</p>
-            <h1>SMASH<span>CART</span></h1>
-            <p class="tagline">Slow, readable 3D dogfights over a flat battlefield. Climb, dive, line up your shot, and keep your room alive.</p>
-            <div class="hero-pills">
-              <span class="hero-pill">3D climb / dive</span>
-              <span class="hero-pill">Hotspot ready</span>
-              <span class="hero-pill">Server authoritative</span>
+        <!-- HOME SCREEN -->
+        <section class="menu-screen active" id="screen-home">
+          <div class="screen-home-top">
+            <div class="screen-home-brand">
+              <h1>SMASH<span>CART</span></h1>
+              <p class="tagline">Flat-world air combat</p>
+            </div>
+            <div class="screen-home-actions">
+              <span id="menu-server-badge" class="server-badge">Internet lobby</span>
+              <button id="menu-settings-btn" class="icon-btn" title="Settings" aria-label="Settings">⚙</button>
             </div>
           </div>
 
-          <section class="menu-panel player-card">
-            <div class="panel-head">
-              <h2>Flight Deck</h2>
-              <span id="menu-server-badge" class="server-badge">Internet lobby</span>
-            </div>
-            <label class="field-label" for="name-input">Call sign</label>
-            <input id="name-input" maxlength="14" placeholder="Call sign" />
+          <div class="screen-home-inputs">
+            <input id="name-input" maxlength="14" placeholder="Call sign" aria-label="Call sign" />
             <label class="switch"><input type="checkbox" id="bots-check" checked /> 🤖 Fill empty seats with bots</label>
-            <!-- Hangar button replaces the old #plane-picker / #plane-swatches block -->
-            <button id="hangar-btn" class="secondary hangar-open-btn">✈ HANGAR</button>
-            <p id="orientation-note" class="muted menu-note">Landscape is recommended on touch devices.</p>
-          </section>
-        </div>
+          </div>
 
-        <div class="menu-grid">
-          <section class="menu-panel play-panel">
-            <h2>Quick Play</h2>
-            <p>Drop into the current server's public arena. Bots backfill open seats so rounds start fast.</p>
-            <button id="quickplay-btn">PLAY PUBLIC</button>
-            <p class="panel-foot">Best for instant dogfights.</p>
-          </section>
+          <nav class="screen-home-nav">
+            <button class="menu-nav-btn" data-nav="play">▶ PLAY</button>
+            <button class="menu-nav-btn" id="hangar-btn">✈ HANGAR</button>
+            <button class="menu-nav-btn" data-nav="leaders">🏆 LEADERBOARD</button>
+          </nav>
 
-          <section class="menu-panel play-panel">
-            <h2>Play with Friends</h2>
-            <p>Create a private room with a six-character code and share the invite link.</p>
-            <button id="friends-btn" class="secondary">CREATE ROOM</button>
-            <button id="join-code-open-btn" class="secondary">HAVE A CODE?</button>
-            <p id="friends-note" class="panel-foot">Room codes stay on the same server that created them.</p>
-          </section>
+          <p id="orientation-note" class="muted">Landscape is recommended on touch devices.</p>
+          <p id="status" class="muted status-line"></p>
+        </section>
 
-          <section class="menu-panel play-panel lan-panel">
+        <!-- PLAY SCREEN -->
+        <section class="menu-screen" id="screen-play">
+          <header class="screen-head">
+            <button class="screen-back" data-back aria-label="Back">‹ Back</button>
+            <h2 class="screen-title">Play</h2>
+          </header>
+          <nav class="screen-nav">
+            <button class="menu-nav-btn" id="quickplay-btn">⚡ QUICK PLAY<span class="nav-btn-sub">Drop into the public arena</span></button>
+            <button class="menu-nav-btn" id="friends-btn">🔒 CREATE PRIVATE ROOM<span class="nav-btn-sub">Share a code with friends</span></button>
+            <button class="menu-nav-btn" data-nav="join">🔑 JOIN A ROOM<span class="nav-btn-sub">Enter a code or scan QR</span></button>
+            <button class="menu-nav-btn" data-nav="lan">📡 LAN / LOCAL<span class="nav-btn-sub">Hotspot or P2P — no server</span></button>
+          </nav>
+          <p id="friends-note" class="muted"></p>
+        </section>
+
+        <!-- JOIN SCREEN -->
+        <section class="menu-screen" id="screen-join">
+          <header class="screen-head">
+            <button class="screen-back" data-back aria-label="Back">‹ Back</button>
+            <h2 class="screen-title">Join a Room</h2>
+          </header>
+          <div class="screen-join-body">
+            <button id="scan-open-btn" class="menu-nav-btn scan-cta">📷 SCAN QR</button>
+            <p class="muted join-helper">Enter a 6-char code, paste an invite link, or scan a QR.</p>
+            <input id="join-code-input" maxlength="200" placeholder="ABCDEF or paste link" autocomplete="off" spellcheck="false" aria-label="Room code or invite link" />
+            <button id="join-code-submit" class="menu-nav-btn">JOIN</button>
+          </div>
+        </section>
+
+        <!-- LAN / LOCAL SCREEN -->
+        <section class="menu-screen" id="screen-lan">
+          <header class="screen-head">
+            <button class="screen-back" data-back aria-label="Back">‹ Back</button>
+            <h2 class="screen-title">LAN / Local</h2>
+          </header>
+          <div class="lan-panel">
             <div class="panel-head">
-              <h2>LAN Party</h2>
+              <h3>LAN Party</h3>
               <span class="panel-chip">Low latency</span>
             </div>
             <p>Point the game at a server running on the hotspot host. For the cleanest latency, everyone should open the same local address.</p>
@@ -211,40 +230,20 @@
                 <button id="p2p-answer-submit" class="secondary">Connect</button>
               </div>
             </div>
-          </section>
+          </div>
+        </section>
 
-          <section class="menu-panel menu-lb-panel">
-            <div class="panel-head">
-              <h2>All-Time Leaders</h2>
-            </div>
-            <div id="menu-leaderboard">
-              <div class="lb-row muted">Loading…</div>
-            </div>
-          </section>
+        <!-- LEADERS SCREEN -->
+        <section class="menu-screen" id="screen-leaders">
+          <header class="screen-head">
+            <button class="screen-back" data-back aria-label="Back">‹ Back</button>
+            <h2 class="screen-title">All-Time Leaders</h2>
+          </header>
+          <div id="menu-leaderboard">
+            <div class="lb-row muted">Loading…</div>
+          </div>
+        </section>
 
-          <section class="menu-panel controls-panel">
-            <div class="panel-head">
-              <h2>Controls</h2>
-              <span id="room-code-chip" class="panel-chip subtle">Public</span>
-            </div>
-            <div class="controls-card">
-              <div class="controls-block">
-                <h3>Desktop</h3>
-                <p><kbd>A</kbd><kbd>D</kbd> steer</p>
-                <p><kbd>W</kbd><kbd>S</kbd> climb / dive</p>
-                <p><kbd>Shift</kbd> boost · <kbd>Space</kbd> fire</p>
-                <p><kbd>P</kbd> pause · <kbd>M</kbd> mute</p>
-              </div>
-              <div class="controls-block touch-only">
-                <h3>Mobile</h3>
-                <p>Left / right to yaw</p>
-                <p>Up / down to climb and dive</p>
-                <p>BOOST for speed · FIRE to shoot</p>
-              </div>
-            </div>
-            <p id="status" class="muted status-line"></p>
-          </section>
-        </div>
       </div>
     </div>
 
@@ -262,6 +261,7 @@
       <p class="muted">Your plane keeps drifting forward. Resume or return to the menu.</p>
       <div class="btn-row">
         <button id="resume-btn">RESUME</button>
+        <button id="pause-invite-btn" class="secondary hidden">📨 INVITE</button>
         <button id="pause-settings-btn" class="secondary">⚙ SETTINGS</button>
         <button id="pause-menu-btn" class="secondary">MAIN MENU</button>
       </div>
@@ -485,20 +485,6 @@
       <!-- Preview zone: clear right column where the 3D plane rotates -->
       <div class="hangar-preview-zone" aria-hidden="true">
         <p class="hangar-preview-label">Live preview</p>
-      </div>
-    </div>
-
-    <!-- JOIN-BY-CODE MODAL: shown over menu via "Have a code?" trigger -->
-    <div id="join-code-modal" class="overlay hidden" role="dialog" aria-labelledby="join-code-title">
-      <div class="join-code-card">
-        <h2 id="join-code-title">Join by Code</h2>
-        <p class="muted">Enter the 6-character room code, paste the invite link, or scan the QR.</p>
-        <input id="join-code-input" maxlength="200" placeholder="ABCDEF or paste link" autocomplete="off" spellcheck="false" />
-        <div class="btn-row">
-          <button id="join-code-submit">JOIN</button>
-          <button id="scan-open-btn" class="secondary">SCAN QR</button>
-          <button id="join-code-cancel" class="secondary">Cancel</button>
-        </div>
       </div>
     </div>
 

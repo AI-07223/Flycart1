@@ -113,16 +113,15 @@ const els = {
   settingsCloseBtn: dollar("settings-close-btn") as HTMLButtonElement,
   settingsCloseBtn2: dollar("settings-close-btn2") as HTMLButtonElement,
   menuSettingsBtn: dollar("menu-settings-btn") as HTMLButtonElement,
-  joinCodeModal: dollar("join-code-modal"),
   joinCodeInput: dollar("join-code-input") as HTMLInputElement,
   joinCodeSubmit: dollar("join-code-submit") as HTMLButtonElement,
-  joinCodeCancel: dollar("join-code-cancel") as HTMLButtonElement,
-  joinCodeOpenBtn: dollar("join-code-open-btn") as HTMLButtonElement,
   menuLeaderboard: dollar("menu-leaderboard"),
   hangarOverlay: dollar("hangar-overlay"),
   hangarBtn: dollar("hangar-btn") as HTMLButtonElement,
   hangarCloseBtn: dollar("hangar-close-btn") as HTMLButtonElement,
   hangarDone: dollar("hangar-done") as HTMLButtonElement,
+  ingameMenuBtn: dollar("ingame-menu-btn") as HTMLButtonElement,
+  pauseInviteBtn: dollar("pause-invite-btn") as HTMLButtonElement,
 };
 
 let mode: "menu" | "lobby" | "playing" | "paused" | "lost" | "error" = "menu";
@@ -565,13 +564,13 @@ function updateMenuMeta(preserveStatus = true): void {
 
   if (inviteRoom) {
     els.quick.textContent = `JOIN ${inviteRoom}`;
-    els.roomChip.textContent = `Invite ${inviteRoom}`;
+    if (els.roomChip) els.roomChip.textContent = `Invite ${inviteRoom}`;
     const inviteHost = inviteServer ? new URL(toPageOrigin(inviteServer)).host : location.host;
     els.friendsNote.textContent = `Invite ready for room ${inviteRoom} on ${inviteHost}. Quick Play joins it directly.`;
     if (!preserveStatus || !els.status.textContent) setStatus(`Invite ready: room ${inviteRoom}`);
   } else {
     els.quick.textContent = "PLAY PUBLIC";
-    els.roomChip.textContent = lanOrigin ? "LAN ready" : "Public";
+    if (els.roomChip) els.roomChip.textContent = lanOrigin ? "LAN ready" : "Public";
     els.friendsNote.textContent = "Room codes stay on the same server that created them.";
     if (!preserveStatus) setStatus("");
   }
@@ -631,6 +630,26 @@ function resolveLanOrigin(): string | null {
   return origin;
 }
 
+// ─── MENU SCREEN ROUTER ──────────────────────────────────────────────────────
+// Operates ONLY over the .menu-screen sections inside #start-screen.
+// Does NOT disturb mode/applyMode — those control top-level screen visibility.
+const MENU_SCREENS = ["home", "play", "join", "lan", "leaders"] as const;
+let navStack: string[] = ["home"];
+
+function navShow(id: string): void {
+  document.querySelectorAll(".menu-screen").forEach((s) =>
+    s.classList.toggle("active", s.id === `screen-${id}`));
+}
+function navGo(id: string): void {
+  if (navStack[navStack.length - 1] === id) return;
+  navStack.push(id);
+  navShow(id);
+}
+function navBack(): void {
+  if (navStack.length > 1) { navStack.pop(); navShow(navStack[navStack.length - 1]); }
+}
+function navReset(): void { navStack = ["home"]; navShow("home"); }
+
 // ─── STATE MACHINE ───────────────────────────────────────────────────────────
 // applyMode() is the single source of truth for which top-level screens are
 // visible. Sub-state overlays (settings, join-code, share-qr, intermission,
@@ -661,6 +680,8 @@ function applyMode(nextMode: typeof mode): void {
   els.hostLeftOverlay.classList.add("hidden");
   // P2P migrating overlay: always hide on mode transitions
   els.p2pMigratingOverlay.classList.add("hidden");
+  // §D: gate the share bar — visible only in lobby; hide on every other mode
+  if (mode !== "lobby") els.share.classList.add("hidden");
 }
 
 function showHostLeftOverlay(): void {
@@ -727,17 +748,16 @@ function hideSettings(): void {
   els.settingsScreen.classList.add("hidden");
 }
 
-// ─── JOIN-BY-CODE MODAL ───────────────────────────────────────────────────────
+// ─── JOIN-BY-CODE MODAL (now a screen, not a modal — these become no-ops) ────
 function openJoinCode(): void {
-  joinCodeOpen = true;
-  els.joinCodeModal.classList.remove("hidden");
-  els.joinCodeInput.value = "";
-  els.joinCodeInput.focus();
+  // #join-code-modal removed; join is now #screen-join inside the nav router.
+  // Kept to avoid breaking any remaining call sites; navGo("join") is the new entry point.
+  joinCodeOpen = false;
 }
 
 function closeJoinCode(): void {
+  // No-op: modal no longer exists. navBack() handles back-navigation from the join screen.
   joinCodeOpen = false;
-  els.joinCodeModal.classList.add("hidden");
 }
 
 // ─── CAMERA QR SCANNER ────────────────────────────────────────────────────────
@@ -1630,6 +1650,12 @@ function togglePause(): void {
     applyMode("paused");
     window.Net.sendInput(0, 0, false, false);
     window.SFX.setEngine(0, false);
+    // §E: show pause-invite-btn only when there is an active invite URL
+    if (activeShareUrl || els.shareLink.value) {
+      els.pauseInviteBtn.classList.remove("hidden");
+    } else {
+      els.pauseInviteBtn.classList.add("hidden");
+    }
   } else if (mode === "paused") {
     applyMode("playing");
   }
@@ -1692,6 +1718,7 @@ function resetToMenu(): void {
   els.hudTeamScore.classList.add("hidden");
   hideSettings();
   closeJoinCode();
+  navReset();
   closeScanner();
   hideShareQr();
   clearShareInvite();
@@ -1787,6 +1814,35 @@ function init(): void {
 
   if (window.SFX.startMenuAmbient) window.SFX.startMenuAmbient();
   if (window.Input.isTouchDevice()) document.body.classList.add("touch-device");
+
+  // ─── MENU NAV ROUTER WIRING ───────────────────────────────────────────────
+  // Wire all [data-nav] buttons to navGo and all [data-back] buttons to navBack
+  document.querySelectorAll<HTMLElement>("[data-nav]").forEach((el) => {
+    el.addEventListener("click", () => {
+      window.SFX.uiClick();
+      navGo(el.dataset.nav!);
+    });
+  });
+  document.querySelectorAll<HTMLElement>("[data-back]").forEach((el) => {
+    el.addEventListener("click", () => {
+      window.SFX.uiClick();
+      navBack();
+    });
+  });
+  // Ensure menu always opens on Home screen
+  navReset();
+
+  // ─── IN-GAME MENU BUTTON (§E) ─────────────────────────────────────────────
+  els.ingameMenuBtn.addEventListener("click", () => {
+    window.SFX.uiClick();
+    togglePause();
+  });
+
+  // ─── PAUSE INVITE BUTTON (§E) ─────────────────────────────────────────────
+  els.pauseInviteBtn.addEventListener("click", () => {
+    window.SFX.uiClick();
+    showShareQr();
+  });
 
   // P2P host button
   els.p2pHostBtn.addEventListener("click", () => {
@@ -2095,15 +2151,8 @@ function init(): void {
   // Apply initial scheme UI
   applyControlSchemeUI(window.Input.controlScheme);
 
-  // Join-by-code modal
-  els.joinCodeOpenBtn.addEventListener("click", () => {
-    window.SFX.uiClick();
-    openJoinCode();
-  });
-  els.joinCodeCancel.addEventListener("click", () => {
-    window.SFX.uiClick();
-    closeJoinCode();
-  });
+  // Join screen — scan and submit (moved from #join-code-modal to #screen-join)
+  // #join-code-open-btn and #join-code-cancel no longer exist; their listeners are removed.
   els.scanOpenBtn.addEventListener("click", () => {
     window.SFX.uiClick();
     openScanner();
@@ -2148,7 +2197,6 @@ function init(): void {
     const code = resolveJoinInput();
     if (!code) return;
     window.SFX.uiClick();
-    closeJoinCode();
     startGame(code, null);
   });
   els.joinCodeInput.addEventListener("keydown", (e: KeyboardEvent) => {
@@ -2157,13 +2205,8 @@ function init(): void {
       const code = resolveJoinInput();
       if (!code) return;
       window.SFX.uiClick();
-      closeJoinCode();
       startGame(code, null);
     }
-  });
-  // Click-outside to close join modal
-  els.joinCodeModal.addEventListener("click", (e: MouseEvent) => {
-    if (e.target === els.joinCodeModal) closeJoinCode();
   });
 
   // Intermission leave button
@@ -2238,7 +2281,8 @@ function init(): void {
       if (!els.shareQrOverlay.classList.contains("hidden")) { hideShareQr(); return; }
       if (hangarOpen) { hideHangar(); return; }
       if (settingsOpen) { hideSettings(); return; }
-      if (joinCodeOpen) { closeJoinCode(); return; }
+      // §C: nav back within menu (modal closes take priority above)
+      if (mode === "menu" && navStack.length > 1) { navBack(); return; }
     }
   });
 
