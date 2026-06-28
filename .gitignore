@@ -26,3 +26,4 @@ dump.rdb
 .roo/
 skills-lock.json
 .claude/worktrees/
+.chrome-ui-review-escalated/

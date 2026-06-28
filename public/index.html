@@ -145,7 +145,8 @@
               <p class="tagline">Flat-world air combat</p>
             </div>
             <div class="screen-home-actions">
-              <span id="menu-server-badge" class="server-badge">Internet lobby</span>
+              <span id="menu-server-badge" class="server-badge">Local play</span>
+              <button id="join-qr-btn" class="icon-btn" data-nav="join" title="Join / QR" aria-label="Join a game by code or QR">📷</button>
               <button id="menu-settings-btn" class="icon-btn" title="Settings" aria-label="Settings">⚙</button>
             </div>
           </div>
@@ -172,11 +173,10 @@
             <h2 class="screen-title">Play</h2>
           </header>
           <nav class="screen-nav">
-            <button class="menu-nav-btn" id="quickplay-btn">⚡ QUICK PLAY<span class="nav-btn-sub">Drop into the public arena</span></button>
-            <button class="menu-nav-btn" id="friends-btn">🔒 CREATE PRIVATE ROOM<span class="nav-btn-sub">Share a code with friends</span></button>
-            <button class="menu-nav-btn" data-nav="join">🔑 JOIN A ROOM<span class="nav-btn-sub">Enter a code or scan QR</span></button>
-            <button class="menu-nav-btn" data-nav="lan">📡 LAN / LOCAL<span class="nav-btn-sub">Hotspot or P2P — no server</span></button>
+            <button class="menu-nav-btn" id="p2p-host-btn">🎮 HOST LOCAL GAME<span class="nav-btn-sub">Host on this device — friends join over Wi-Fi</span></button>
+            <button class="menu-nav-btn" data-nav="lan">📡 LAN PARTY<span class="nav-btn-sub">Connect to a hotspot server on your network</span></button>
           </nav>
+          <p class="muted join-helper">Joining a friend? Tap 📷 on the home screen to scan their QR or enter a code.</p>
           <p id="friends-note" class="muted"></p>
         </section>
 
@@ -216,9 +216,8 @@
 
             <hr class="panel-divider" />
             <h3 class="panel-subhead">P2P (No Server)</h3>
-            <p class="muted">Host the game right in your browser — no server needed. Guests connect via peer-to-peer on the same Wi-Fi.</p>
+            <p class="muted">No hotspot server? Use <strong>🎮 Host Local Game</strong> on the Play screen — the host runs in your browser and guests connect peer-to-peer on the same Wi-Fi. Below is manual offline signaling for when auto-connect fails.</p>
             <div class="btn-row btn-row-tight">
-              <button id="p2p-host-btn">PLAY LOCAL (P2P)</button>
               <button id="p2p-offline-btn" class="secondary">Offline QR</button>
             </div>
             <div id="p2p-offline-section" class="hidden">

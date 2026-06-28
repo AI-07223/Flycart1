@@ -21,8 +21,6 @@ const els = {
   respawn: dollar("respawn"),
   start: dollar("start-screen"),
   name: dollar("name-input") as HTMLInputElement,
-  quick: dollar("quickplay-btn") as HTMLButtonElement,
-  friends: dollar("friends-btn") as HTMLButtonElement,
   lanServer: dollar("lan-server-input") as HTMLInputElement,
   lanQuick: dollar("lan-quick-btn") as HTMLButtonElement,
   lanFriends: dollar("lan-friends-btn") as HTMLButtonElement,
@@ -543,15 +541,13 @@ function setStatus(text = ""): void {
 }
 
 function setBusy(busy: boolean): void {
-  els.quick.disabled = busy;
-  els.friends.disabled = busy;
   els.lanQuick.disabled = busy;
   els.lanFriends.disabled = busy;
 }
 
 function updateMenuMeta(preserveStatus = true): void {
   const lanOrigin = currentLanConnectOrigin();
-  els.serverBadge.textContent = lanOrigin ? `LAN ${new URL(toPageOrigin(lanOrigin)).host}` : "Internet lobby";
+  els.serverBadge.textContent = lanOrigin ? `LAN ${new URL(toPageOrigin(lanOrigin)).host}` : "Local play";
 
   const portrait = !!(window.matchMedia && window.matchMedia("(orientation: portrait)").matches);
   if (!window.Input.isTouchDevice()) {
@@ -563,15 +559,13 @@ function updateMenuMeta(preserveStatus = true): void {
   }
 
   if (inviteRoom) {
-    els.quick.textContent = `JOIN ${inviteRoom}`;
     if (els.roomChip) els.roomChip.textContent = `Invite ${inviteRoom}`;
     const inviteHost = inviteServer ? new URL(toPageOrigin(inviteServer)).host : location.host;
-    els.friendsNote.textContent = `Invite ready for room ${inviteRoom} on ${inviteHost}. Quick Play joins it directly.`;
+    if (els.friendsNote) els.friendsNote.textContent = `Invite ready for room ${inviteRoom} on ${inviteHost}. Tap 📷 on the home screen to join.`;
     if (!preserveStatus || !els.status.textContent) setStatus(`Invite ready: room ${inviteRoom}`);
   } else {
-    els.quick.textContent = "PLAY PUBLIC";
-    if (els.roomChip) els.roomChip.textContent = lanOrigin ? "LAN ready" : "Public";
-    els.friendsNote.textContent = "Room codes stay on the same server that created them.";
+    if (els.roomChip) els.roomChip.textContent = lanOrigin ? "LAN ready" : "Local";
+    if (els.friendsNote) els.friendsNote.textContent = "";
     if (!preserveStatus) setStatus("");
   }
 
@@ -1891,14 +1885,6 @@ function init(): void {
     resetToMenu();
   });
 
-  els.quick.addEventListener("click", () => {
-    window.SFX.uiClick();
-    startGame(inviteRoom || "PUBLIC", inviteRoom ? inviteServer : null);
-  });
-  els.friends.addEventListener("click", () => {
-    window.SFX.uiClick();
-    startGame(genCode());
-  });
   els.lanQuick.addEventListener("click", () => {
     window.SFX.uiClick();
     const origin = resolveLanOrigin();
@@ -1925,7 +1911,7 @@ function init(): void {
     if (e.key === "Enter") {
       e.preventDefault();
       try { localStorage.setItem("smashcart.name", els.name.value); } catch {}
-      startGame(inviteRoom || "PUBLIC", inviteRoom ? inviteServer : null);
+      navGo("play");
     }
   });
   els.lanServer.addEventListener("input", () => updateMenuMeta(true));

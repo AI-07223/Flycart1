@@ -2538,8 +2538,6 @@
         respawn: dollar("respawn"),
         start: dollar("start-screen"),
         name: dollar("name-input"),
-        quick: dollar("quickplay-btn"),
-        friends: dollar("friends-btn"),
         lanServer: dollar("lan-server-input"),
         lanQuick: dollar("lan-quick-btn"),
         lanFriends: dollar("lan-friends-btn"),
@@ -3022,14 +3020,12 @@
         els.status.textContent = text;
       }
       function setBusy(busy) {
-        els.quick.disabled = busy;
-        els.friends.disabled = busy;
         els.lanQuick.disabled = busy;
         els.lanFriends.disabled = busy;
       }
       function updateMenuMeta(preserveStatus = true) {
         const lanOrigin = currentLanConnectOrigin();
-        els.serverBadge.textContent = lanOrigin ? `LAN ${new URL(toPageOrigin(lanOrigin)).host}` : "Internet lobby";
+        els.serverBadge.textContent = lanOrigin ? `LAN ${new URL(toPageOrigin(lanOrigin)).host}` : "Local play";
         const portrait = !!(window.matchMedia && window.matchMedia("(orientation: portrait)").matches);
         if (!window.Input.isTouchDevice()) {
           els.orientationNote.textContent = "Keyboard flight: A/D steer, W/S climb, Shift boost, Space fire.";
@@ -3039,15 +3035,13 @@
           els.orientationNote.textContent = "Landscape ready. Touch controls appear after launch.";
         }
         if (inviteRoom) {
-          els.quick.textContent = `JOIN ${inviteRoom}`;
           if (els.roomChip) els.roomChip.textContent = `Invite ${inviteRoom}`;
           const inviteHost = inviteServer ? new URL(toPageOrigin(inviteServer)).host : location.host;
-          els.friendsNote.textContent = `Invite ready for room ${inviteRoom} on ${inviteHost}. Quick Play joins it directly.`;
+          if (els.friendsNote) els.friendsNote.textContent = `Invite ready for room ${inviteRoom} on ${inviteHost}. Tap \u{1F4F7} on the home screen to join.`;
           if (!preserveStatus || !els.status.textContent) setStatus(`Invite ready: room ${inviteRoom}`);
         } else {
-          els.quick.textContent = "PLAY PUBLIC";
-          if (els.roomChip) els.roomChip.textContent = lanOrigin ? "LAN ready" : "Public";
-          els.friendsNote.textContent = "Room codes stay on the same server that created them.";
+          if (els.roomChip) els.roomChip.textContent = lanOrigin ? "LAN ready" : "Local";
+          if (els.friendsNote) els.friendsNote.textContent = "";
           if (!preserveStatus) setStatus("");
         }
         const typed = els.lanServer.value.trim();
@@ -4155,14 +4149,6 @@
           window.SFX.uiClick();
           resetToMenu();
         });
-        els.quick.addEventListener("click", () => {
-          window.SFX.uiClick();
-          startGame(inviteRoom || "PUBLIC", inviteRoom ? inviteServer : null);
-        });
-        els.friends.addEventListener("click", () => {
-          window.SFX.uiClick();
-          startGame(genCode());
-        });
         els.lanQuick.addEventListener("click", () => {
           window.SFX.uiClick();
           const origin = resolveLanOrigin();
@@ -4197,7 +4183,7 @@
               localStorage.setItem("smashcart.name", els.name.value);
             } catch {
             }
-            startGame(inviteRoom || "PUBLIC", inviteRoom ? inviteServer : null);
+            navGo("play");
           }
         });
         els.lanServer.addEventListener("input", () => updateMenuMeta(true));
