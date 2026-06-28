@@ -200,6 +200,21 @@
             <button class="screen-back" data-back aria-label="Back">‹ Back</button>
             <h2 class="screen-title">LAN / Local</h2>
           </header>
+
+          <!-- LOCAL WI-FI PARTY: above the hotspot-server + Offline-QR fallbacks -->
+          <div class="local-wifi">
+            <h3 class="panel-subhead">Local Wi-Fi Party</h3>
+            <p class="muted">Everyone on one Wi-Fi hotspot. Host creates a room; others scan and tap to join. Everyone-kills-everyone, join or leave anytime.</p>
+            <div class="local-create">
+              <input id="local-room-name" maxlength="20" placeholder="Room name" aria-label="Room name" />
+              <button id="local-create-btn">CREATE ROOM</button>
+            </div>
+            <div class="local-scan">
+              <button id="local-scan-btn" class="secondary">🔍 SCAN ROOMS</button>
+              <div id="local-room-list" class="local-room-list"><p class="muted">Tap "Scan rooms" to find games on your hotspot.</p></div>
+            </div>
+          </div>
+
           <div class="lan-panel">
             <div class="panel-head">
               <h3>LAN Party</h3>

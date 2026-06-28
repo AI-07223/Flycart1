@@ -44,6 +44,9 @@ interface RoomState {
   lastActivity: number;
   /** True while we are mid-migration: host slot is vacant but room is not pruned yet. */
   migrating?: boolean;
+  name?: string;
+  hostName?: string;
+  publicIP?: string;
 }
 
 // ─── In-memory state ─────────────────────────────────────────────────────────
@@ -79,6 +82,14 @@ function pruneRooms(): void {
   }
 }
 
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+function clientIP(req: http.IncomingMessage): string {
+  const xff = req.headers["x-forwarded-for"];
+  if (typeof xff === "string" && xff.length) return xff.split(",")[0].trim();
+  return req.socket.remoteAddress ?? "";
+}
+
 // ─── Message handling ────────────────────────────────────────────────────────
 
 function send(ws: WebSocket, payload: unknown): void {
@@ -102,7 +113,29 @@ function handleMessage(ws: WebSocket, rawData: Buffer | string): void {
   }
 
   const { type, room: roomCode } = msg;
-  if (typeof type !== "string" || typeof roomCode !== "string") return;
+  if (typeof type !== "string") return;
+
+  // ── list: no room required — handle before getOrCreateRoom ──────────────
+  if (type === "list") {
+    const callerIP = (ws as any)._signalIP as string;
+    const list: { code: string; name: string; hostName: string; count: number }[] = [];
+    for (const [code, r] of rooms) {
+      if (list.length >= 50) break;
+      if (!r.host || r.host.readyState !== WebSocket.OPEN) continue;
+      if (r.guests.size >= MAX_GUESTS_PER_ROOM) continue;
+      if (r.publicIP !== callerIP) continue;
+      list.push({
+        code,
+        name: r.name ?? code,
+        hostName: r.hostName ?? "",
+        count: r.guests.size + 1,
+      });
+    }
+    send(ws, { type: "rooms", rooms: list });
+    return;
+  }
+
+  if (typeof roomCode !== "string") return;
 
   const r = getOrCreateRoom(roomCode);
   if (!r) {
@@ -122,6 +155,10 @@ function handleMessage(ws: WebSocket, rawData: Buffer | string): void {
       const wasMigrating = !!r.migrating;
       r.host = ws;
       r.migrating = false;
+      r.publicIP = (ws as any)._signalIP;
+      // Keep existing name/hostName if not provided (preserves across host-migration).
+      if (typeof msg.name === "string" && msg.name.length > 0) r.name = msg.name;
+      if (typeof msg.hostName === "string" && msg.hostName.length > 0) r.hostName = msg.hostName;
       (ws as any)._signalRole = "host";
       (ws as any)._signalRoom = roomCode;
       // Include current peer list so the new host can proactively offer to everyone.
@@ -270,7 +307,8 @@ function handleClose(ws: WebSocket): void {
 export function createSignalServer(server: http.Server): void {
   const signalWss = new WebSocketServer({ noServer: true });
 
-  signalWss.on("connection", (ws) => {
+  signalWss.on("connection", (ws, req) => {
+    (ws as any)._signalIP = clientIP(req);
     ws.on("message", (data) => {
       handleMessage(ws, data as Buffer | string);
     });

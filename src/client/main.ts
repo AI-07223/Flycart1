@@ -120,6 +120,11 @@ const els = {
   hangarDone: dollar("hangar-done") as HTMLButtonElement,
   ingameMenuBtn: dollar("ingame-menu-btn") as HTMLButtonElement,
   pauseInviteBtn: dollar("pause-invite-btn") as HTMLButtonElement,
+  // Local Wi-Fi Party
+  localRoomName: dollar("local-room-name") as HTMLInputElement,
+  localCreateBtn: dollar("local-create-btn") as HTMLButtonElement,
+  localScanBtn: dollar("local-scan-btn") as HTMLButtonElement,
+  localRoomList: dollar("local-room-list"),
 };
 
 let mode: "menu" | "lobby" | "playing" | "paused" | "lost" | "error" = "menu";
@@ -160,6 +165,8 @@ let _isP2PSession = false;
 // Scanner state
 let scannerOpen = false;
 let scanRafId: number | null = null;
+// Local Wi-Fi auto-scan interval
+let _localScanInterval: ReturnType<typeof setInterval> | null = null;
 
 const SKINS = [0xff6b6b, 0x49c0ff, 0x8be34a, 0xffd24a, 0xc07bff];
 
@@ -1215,8 +1222,176 @@ function buildP2PShareUrl(code: string): string {
   return url.toString();
 }
 
+// ─── LOCAL WI-FI ROOM NAME PREFILL ───────────────────────────────────────────
+const LOCAL_ROOM_ADJECTIVES = ["Ace", "Bolt", "Cobalt", "Dusk", "Echo", "Flare", "Ghost", "Hyper", "Iron", "Jade", "Keen", "Laser", "Mach", "Nova", "Orbit", "Pixel", "Quick", "Red", "Solar", "Turbo", "Ultra", "Venom", "Wild", "Xenon", "Zero"];
+const LOCAL_ROOM_NOUNS      = ["Arena", "Base", "Circuit", "Dome", "Engine", "Field", "Grid", "Haven", "Isle", "Junction", "Lair", "Mesa", "Nexus", "Orbit", "Peak", "Range", "Sector", "Tower", "Vault", "Wing", "Zone"];
+
+function randomLocalRoomName(): string {
+  const adj  = LOCAL_ROOM_ADJECTIVES[Math.floor(Math.random() * LOCAL_ROOM_ADJECTIVES.length)];
+  const noun = LOCAL_ROOM_NOUNS[Math.floor(Math.random() * LOCAL_ROOM_NOUNS.length)];
+  return `${adj} ${noun}`;
+}
+
+// ─── LOCAL WI-FI HOST PATH ────────────────────────────────────────────────────
+// Like startP2PHost() but starts continuous FFA immediately (no lobby ready-up gate)
+// and broadcasts a human-readable room name so guests can pick it from the list.
+async function startLocalRoom(): Promise<void> {
+  window.SFX.unlock();
+  enterImmersive();
+
+  const name     = (els.name.value || "Pilot").slice(0, 14);
+  const code     = "P-" + genCode();
+  const roomName = (els.localRoomName.value.trim() || els.localRoomName.placeholder || randomLocalRoomName()).slice(0, 20);
+
+  // Save Colyseus Net before swapping
+  if (!_isP2PSession) {
+    _colyseusNet = (window as any).Net;
+  }
+
+  const transport = new WebRtcTransport();
+  (window as any).Net = transport;
+  _isP2PSession = true;
+
+  transport.onKill       = onKill;
+  transport.onPickup     = onPickup;
+  transport.onDisconnect = onP2PDisconnect;
+
+  setStatus("Starting local room…");
+  setBusy(true);
+
+  try {
+    await (transport as any).startHost(name, code, selectedCosmetics, { roomName, continuous: true });
+  } catch (e: any) {
+    setStatus("Could not start local room: " + (e && e.message ? e.message : e));
+    setBusy(false);
+    (window as any).Net = _colyseusNet;
+    _colyseusNet  = null;
+    _isP2PSession = false;
+    return;
+  }
+
+  setStatus("");
+  setBusy(false);
+
+  currentLobbyCode   = code;
+  currentLobbyServer = null;
+
+  // Show share bar with P2P join URL
+  const p2pUrl = buildP2PShareUrl(code);
+  activeShareUrl          = p2pUrl;
+  els.shareLink.value     = p2pUrl;
+  els.shareQrLink.value   = p2pUrl;
+  els.shareQrRoom.textContent = roomName;
+  els.shareQrCode.textContent = code;
+  els.shareQrNote.textContent = `Scan on the same Wi-Fi to join "${roomName}".`;
+  els.copy.disabled           = false;
+  els.shareQrCopy.disabled    = false;
+  try {
+    window.QR.render(els.shareQrCanvas, p2pUrl, {
+      size: window.Input.isTouchDevice() ? 220 : 256,
+      errorCorrectionLevel: "M",
+    });
+    els.qrBtn.disabled = false;
+  } catch {
+    els.qrBtn.disabled = true;
+    els.shareQrCanvas.width = 0;
+  }
+  els.share.classList.remove("hidden");
+
+  // Show the room name prominently in the lobby header so the host can read it out
+  els.lobbyTitle.textContent = roomName;
+
+  transport.onStateChange = onLobbyStateChange;
+  renderLobbyRoster();
+  window.Net?.sendHostSettings?.({ botDifficulty });
+  applyMode("lobby");
+}
+
+// ─── LOCAL WI-FI SCAN ROOMS ───────────────────────────────────────────────────
+function stopLocalScanInterval(): void {
+  if (_localScanInterval !== null) {
+    clearInterval(_localScanInterval);
+    _localScanInterval = null;
+  }
+}
+
+async function runLocalScan(): Promise<void> {
+  els.localRoomList.innerHTML = '<p class="muted">Scanning…</p>';
+  let rooms: Array<{ code: string; name: string; hostName: string; count: number }> = [];
+  try {
+    rooms = await WebRtcTransport.listRooms();
+  } catch {
+    rooms = [];
+  }
+
+  if (!rooms.length) {
+    els.localRoomList.innerHTML =
+      '<p class="muted local-empty">No rooms found on your network — make sure everyone is on the host\'s hotspot.</p>' +
+      '<button class="local-rescan-btn secondary" id="local-rescan-btn">Re-scan</button>';
+    const rescan = document.getElementById("local-rescan-btn");
+    if (rescan) rescan.addEventListener("click", () => { window.SFX.uiClick(); runLocalScan(); });
+    return;
+  }
+
+  els.localRoomList.innerHTML = rooms.map((r) =>
+    `<div class="local-room-row" data-room="${escapeHtml(r.code)}" role="button" tabindex="0" aria-label="Join ${escapeHtml(r.name || r.code)}">
+      <div class="local-room-row-info">
+        <span class="local-room-row-name">${escapeHtml(r.name || r.code)}</span>
+        <span class="local-room-row-meta">${escapeHtml(r.hostName || "Unknown")} · ${r.count} player${r.count !== 1 ? "s" : ""}</span>
+      </div>
+      <button class="local-room-join-btn" data-room="${escapeHtml(r.code)}">JOIN</button>
+    </div>`
+  ).join("") + '<button class="local-rescan-btn secondary" id="local-rescan-btn">Re-scan</button>';
+
+  // Wire row taps and join buttons
+  els.localRoomList.querySelectorAll<HTMLElement>(".local-room-row").forEach((row) => {
+    const joinHandler = () => {
+      const roomCode = row.dataset.room;
+      if (!roomCode) return;
+      const matchedRoom = rooms.find((r) => r.code === roomCode);
+      const friendlyName = matchedRoom ? (matchedRoom.name || roomCode) : undefined;
+      stopLocalScanInterval();
+      window.SFX.uiClick();
+      joinP2PAsGuest(roomCode, friendlyName);
+    };
+    row.addEventListener("click", joinHandler);
+    row.addEventListener("keydown", (e: KeyboardEvent) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); joinHandler(); } });
+  });
+
+  // Join buttons inside rows — stop propagation so they don't double-fire
+  els.localRoomList.querySelectorAll<HTMLElement>(".local-room-join-btn").forEach((btn) => {
+    btn.addEventListener("click", (e: MouseEvent) => {
+      e.stopPropagation();
+      const roomCode = btn.dataset.room;
+      if (!roomCode) return;
+      const matchedRoom = rooms.find((r) => r.code === roomCode);
+      const friendlyName = matchedRoom ? (matchedRoom.name || roomCode) : undefined;
+      stopLocalScanInterval();
+      window.SFX.uiClick();
+      joinP2PAsGuest(roomCode, friendlyName);
+    });
+  });
+
+  const rescan = document.getElementById("local-rescan-btn");
+  if (rescan) rescan.addEventListener("click", () => { window.SFX.uiClick(); runLocalScan(); });
+}
+
+function startLocalScanWithAutoRefresh(): void {
+  runLocalScan();
+  stopLocalScanInterval();
+  // Auto-refresh every 3s while #screen-lan is the active screen
+  _localScanInterval = setInterval(() => {
+    const lanScreen = document.getElementById("screen-lan");
+    if (!lanScreen || !lanScreen.classList.contains("active")) {
+      stopLocalScanInterval();
+      return;
+    }
+    runLocalScan();
+  }, 3000);
+}
+
 // ─── P2P GUEST PATH ──────────────────────────────────────────────────────────
-async function joinP2PAsGuest(code: string): Promise<void> {
+async function joinP2PAsGuest(code: string, friendlyName?: string): Promise<void> {
   window.SFX.unlock();
   enterImmersive();
 
@@ -1262,7 +1437,7 @@ async function joinP2PAsGuest(code: string): Promise<void> {
   els.share.classList.remove("hidden");
 
   transport.onStateChange = onLobbyStateChange;
-  els.lobbyTitle.textContent = `P2P Room ${code}`;
+  els.lobbyTitle.textContent = friendlyName || `P2P Room ${code}`;
   renderLobbyRoster();
   applyMode("lobby");
 
@@ -1714,6 +1889,7 @@ function resetToMenu(): void {
   closeJoinCode();
   navReset();
   closeScanner();
+  stopLocalScanInterval();
   hideShareQr();
   clearShareInvite();
   setBusy(false);
@@ -1809,6 +1985,11 @@ function init(): void {
   if (window.SFX.startMenuAmbient) window.SFX.startMenuAmbient();
   if (window.Input.isTouchDevice()) document.body.classList.add("touch-device");
 
+  // ─── LOCAL WI-FI PREFILL ─────────────────────────────────────────────────
+  // Seed the room-name input with a fun random default on every load
+  els.localRoomName.placeholder = randomLocalRoomName();
+  els.localRoomName.value = "";
+
   // ─── MENU NAV ROUTER WIRING ───────────────────────────────────────────────
   // Wire all [data-nav] buttons to navGo and all [data-back] buttons to navBack
   document.querySelectorAll<HTMLElement>("[data-nav]").forEach((el) => {
@@ -1883,6 +2064,26 @@ function init(): void {
   els.hostLeftMenuBtn.addEventListener("click", () => {
     window.SFX.uiClick();
     resetToMenu();
+  });
+
+  // ─── LOCAL WI-FI PARTY WIRING ─────────────────────────────────────────────
+  els.localCreateBtn.addEventListener("click", () => {
+    window.SFX.uiClick();
+    startLocalRoom();
+  });
+  els.localRoomName.addEventListener("keydown", (e: KeyboardEvent) => {
+    if (e.key === "Enter") { e.preventDefault(); window.SFX.uiClick(); startLocalRoom(); }
+  });
+  els.localScanBtn.addEventListener("click", () => {
+    window.SFX.uiClick();
+    startLocalScanWithAutoRefresh();
+  });
+  // Stop auto-scan when navigating away from the LAN screen
+  document.querySelectorAll<HTMLElement>("[data-back]").forEach((el) => {
+    el.addEventListener("click", stopLocalScanInterval);
+  });
+  document.querySelectorAll<HTMLElement>("[data-nav]").forEach((el) => {
+    if (el.dataset.nav !== "lan") el.addEventListener("click", stopLocalScanInterval);
   });
 
   els.lanQuick.addEventListener("click", () => {

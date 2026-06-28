@@ -1296,7 +1296,7 @@
       return false;
     }).join("\n");
   }
-  var DT_MAX, STATE_HZ, INPUT_HZ, SNAP_BUFFER_MS, MAX_EXTRAP_MS, SNAP_DISTANCE, MAX_GUESTS, ICE_SERVER, StableMap, GuestTransportState, HostTransportState, SignalSocket, WebRtcTransport;
+  var DT_MAX, STATE_HZ, INPUT_HZ, SNAP_BUFFER_MS, MAX_EXTRAP_MS, SNAP_DISTANCE, MAX_GUESTS, ICE_SERVER, STUN_ICE, StableMap, GuestTransportState, HostTransportState, SignalSocket, WebRtcTransport;
   var init_net_p2p = __esm({
     "src/client/net-p2p.ts"() {
       "use strict";
@@ -1309,6 +1309,7 @@
       SNAP_DISTANCE = 140;
       MAX_GUESTS = 6;
       ICE_SERVER = "stun:stun.l.google.com:19302";
+      STUN_ICE = [{ urls: ICE_SERVER }];
       StableMap = class {
         constructor() {
           this._m = /* @__PURE__ */ new Map();
@@ -1421,7 +1422,10 @@
             this.ws = ws;
             ws.onopen = () => {
               if (role === "host") {
-                this.send({ type: "host", room });
+                const hostMsg = { type: "host", room };
+                if (this.hostRoomName !== void 0) hostMsg.name = this.hostRoomName;
+                if (this.hostCallSign !== void 0) hostMsg.hostName = this.hostCallSign;
+                this.send(hostMsg);
               } else {
                 this.send({ type: "join", room, peerId });
               }
@@ -1569,17 +1573,22 @@
         // ── HOST MODE ──────────────────────────────────────────────────────────────
         /**
          * Start as P2P host.
-         * `name` = player name, `code` = P- room code (with prefix),
+         * `name` = player call sign, `code` = P- room code (with prefix),
          * `cosmetics` = selected cosmetics.
-         * Returns immediately (no async needed; signaling is fire-and-forget).
+         * `opts.roomName` = room display name shown in the LAN browser (defaults to `code`).
+         * `opts.continuous` = when true, starts as a live FFA match immediately (no lobby).
+         * Backward-compat: existing callers omit opts and get the original lobby behaviour.
          */
-        async startHost(name, code, cosmetics) {
+        async startHost(name, code, cosmetics, opts) {
           this._isHost = true;
           this._room = code;
           this.sessionId = "host";
+          const continuous = opts?.continuous ?? false;
+          const roomName = opts?.roomName ?? code;
           const sim = new GameSim({
             botsEnabled: false,
-            isPublic: false,
+            // Continuous local rooms start in playing/ffa state immediately (same as isPublic).
+            isPublic: continuous,
             onEvent: (e) => this._onSimEvent(e)
           });
           this._sim = sim;
@@ -1593,6 +1602,8 @@
             livery: cosmetics.livery
           });
           const sig = new SignalSocket();
+          sig.hostRoomName = roomName;
+          sig.hostCallSign = name;
           this._signal = sig;
           sig.onMessage = (msg) => this._onSignalHost(msg);
           sig.onClose = () => {
@@ -1603,6 +1614,54 @@
           }
           this._startHostLoop();
           if (this.onStateChange) this.onStateChange();
+        }
+        /**
+         * List rooms visible from this client's network by querying the broker's
+         * `{type:"list"}` message. Returns an empty array on any error or timeout.
+         * This is a static method so callers can use `WebRtcTransport.listRooms()`
+         * without needing an instance.
+         */
+        static listRooms() {
+          return new Promise((resolve) => {
+            let settled = false;
+            const done = (rooms) => {
+              if (settled) return;
+              settled = true;
+              try {
+                ws.close();
+              } catch {
+              }
+              resolve(rooms);
+            };
+            const proto = location.protocol === "https:" ? "wss" : "ws";
+            const ws = new WebSocket(`${proto}://${location.host}/signal`);
+            const timer = setTimeout(() => done([]), 3e3);
+            ws.onopen = () => {
+              try {
+                ws.send(JSON.stringify({ type: "list" }));
+              } catch {
+                done([]);
+              }
+            };
+            ws.onmessage = (ev) => {
+              try {
+                const msg = JSON.parse(ev.data);
+                if (msg.type === "rooms") {
+                  clearTimeout(timer);
+                  done(Array.isArray(msg.rooms) ? msg.rooms : []);
+                }
+              } catch {
+              }
+            };
+            ws.onerror = () => {
+              clearTimeout(timer);
+              done([]);
+            };
+            ws.onclose = () => {
+              clearTimeout(timer);
+              done([]);
+            };
+          });
         }
         _onSimEvent(e) {
           if (e.type === "kill") {
@@ -1677,7 +1736,7 @@
           if (msg.type === "peer-joined") {
             const peerId = msg.peerId;
             if (this._peers.size >= MAX_GUESTS) return;
-            const pc = makePeerConnection([{ urls: ICE_SERVER }]);
+            const pc = makePeerConnection(STUN_ICE);
             const stateCh = pc.createDataChannel("state", { ordered: true, maxRetransmits: 0 });
             const inputsCh = pc.createDataChannel("inputs", { ordered: false, maxRetransmits: 0 });
             const eventsCh = pc.createDataChannel("events", { ordered: true });
@@ -1814,7 +1873,7 @@
           this._savedCosmetics = { ...cosmetics };
           const sig = new SignalSocket();
           this._signal = sig;
-          const pc = makePeerConnection([{ urls: ICE_SERVER }]);
+          const pc = makePeerConnection(STUN_ICE);
           this._guestPc = pc;
           this._wireGuestPc(pc, peerId, code, sig);
           sig.onMessage = async (msg) => {
@@ -2049,7 +2108,7 @@
           const room = this._room;
           const peerId = this._peerId;
           const sig = this._signal;
-          const pc = makePeerConnection([{ urls: ICE_SERVER }]);
+          const pc = makePeerConnection(STUN_ICE);
           this._guestPc = pc;
           this._guestInputCh = null;
           this._guestEventCh = null;
@@ -2636,7 +2695,12 @@
         hangarCloseBtn: dollar("hangar-close-btn"),
         hangarDone: dollar("hangar-done"),
         ingameMenuBtn: dollar("ingame-menu-btn"),
-        pauseInviteBtn: dollar("pause-invite-btn")
+        pauseInviteBtn: dollar("pause-invite-btn"),
+        // Local Wi-Fi Party
+        localRoomName: dollar("local-room-name"),
+        localCreateBtn: dollar("local-create-btn"),
+        localScanBtn: dollar("local-scan-btn"),
+        localRoomList: dollar("local-room-list")
       };
       var mode = "menu";
       var settingsOpen = false;
@@ -2667,6 +2731,7 @@
       var _isP2PSession = false;
       var scannerOpen = false;
       var scanRafId = null;
+      var _localScanInterval = null;
       var COLORS_HEX = [
         "#ff6b6b",
         // 0 Scarlet
@@ -3578,7 +3643,151 @@
         url.searchParams.set("p2p", code);
         return url.toString();
       }
-      async function joinP2PAsGuest(code) {
+      var LOCAL_ROOM_ADJECTIVES = ["Ace", "Bolt", "Cobalt", "Dusk", "Echo", "Flare", "Ghost", "Hyper", "Iron", "Jade", "Keen", "Laser", "Mach", "Nova", "Orbit", "Pixel", "Quick", "Red", "Solar", "Turbo", "Ultra", "Venom", "Wild", "Xenon", "Zero"];
+      var LOCAL_ROOM_NOUNS = ["Arena", "Base", "Circuit", "Dome", "Engine", "Field", "Grid", "Haven", "Isle", "Junction", "Lair", "Mesa", "Nexus", "Orbit", "Peak", "Range", "Sector", "Tower", "Vault", "Wing", "Zone"];
+      function randomLocalRoomName() {
+        const adj = LOCAL_ROOM_ADJECTIVES[Math.floor(Math.random() * LOCAL_ROOM_ADJECTIVES.length)];
+        const noun = LOCAL_ROOM_NOUNS[Math.floor(Math.random() * LOCAL_ROOM_NOUNS.length)];
+        return `${adj} ${noun}`;
+      }
+      async function startLocalRoom() {
+        window.SFX.unlock();
+        enterImmersive();
+        const name = (els.name.value || "Pilot").slice(0, 14);
+        const code = "P-" + genCode();
+        const roomName = (els.localRoomName.value.trim() || els.localRoomName.placeholder || randomLocalRoomName()).slice(0, 20);
+        if (!_isP2PSession) {
+          _colyseusNet = window.Net;
+        }
+        const transport = new WebRtcTransport();
+        window.Net = transport;
+        _isP2PSession = true;
+        transport.onKill = onKill;
+        transport.onPickup = onPickup;
+        transport.onDisconnect = onP2PDisconnect;
+        setStatus("Starting local room\u2026");
+        setBusy(true);
+        try {
+          await transport.startHost(name, code, selectedCosmetics, { roomName, continuous: true });
+        } catch (e) {
+          setStatus("Could not start local room: " + (e && e.message ? e.message : e));
+          setBusy(false);
+          window.Net = _colyseusNet;
+          _colyseusNet = null;
+          _isP2PSession = false;
+          return;
+        }
+        setStatus("");
+        setBusy(false);
+        currentLobbyCode = code;
+        currentLobbyServer = null;
+        const p2pUrl = buildP2PShareUrl(code);
+        activeShareUrl = p2pUrl;
+        els.shareLink.value = p2pUrl;
+        els.shareQrLink.value = p2pUrl;
+        els.shareQrRoom.textContent = roomName;
+        els.shareQrCode.textContent = code;
+        els.shareQrNote.textContent = `Scan on the same Wi-Fi to join "${roomName}".`;
+        els.copy.disabled = false;
+        els.shareQrCopy.disabled = false;
+        try {
+          window.QR.render(els.shareQrCanvas, p2pUrl, {
+            size: window.Input.isTouchDevice() ? 220 : 256,
+            errorCorrectionLevel: "M"
+          });
+          els.qrBtn.disabled = false;
+        } catch {
+          els.qrBtn.disabled = true;
+          els.shareQrCanvas.width = 0;
+        }
+        els.share.classList.remove("hidden");
+        els.lobbyTitle.textContent = roomName;
+        transport.onStateChange = onLobbyStateChange;
+        renderLobbyRoster();
+        window.Net?.sendHostSettings?.({ botDifficulty });
+        applyMode("lobby");
+      }
+      function stopLocalScanInterval() {
+        if (_localScanInterval !== null) {
+          clearInterval(_localScanInterval);
+          _localScanInterval = null;
+        }
+      }
+      async function runLocalScan() {
+        els.localRoomList.innerHTML = '<p class="muted">Scanning\u2026</p>';
+        let rooms = [];
+        try {
+          rooms = await WebRtcTransport.listRooms();
+        } catch {
+          rooms = [];
+        }
+        if (!rooms.length) {
+          els.localRoomList.innerHTML = `<p class="muted local-empty">No rooms found on your network \u2014 make sure everyone is on the host's hotspot.</p><button class="local-rescan-btn secondary" id="local-rescan-btn">Re-scan</button>`;
+          const rescan2 = document.getElementById("local-rescan-btn");
+          if (rescan2) rescan2.addEventListener("click", () => {
+            window.SFX.uiClick();
+            runLocalScan();
+          });
+          return;
+        }
+        els.localRoomList.innerHTML = rooms.map(
+          (r) => `<div class="local-room-row" data-room="${escapeHtml(r.code)}" role="button" tabindex="0" aria-label="Join ${escapeHtml(r.name || r.code)}">
+      <div class="local-room-row-info">
+        <span class="local-room-row-name">${escapeHtml(r.name || r.code)}</span>
+        <span class="local-room-row-meta">${escapeHtml(r.hostName || "Unknown")} \xB7 ${r.count} player${r.count !== 1 ? "s" : ""}</span>
+      </div>
+      <button class="local-room-join-btn" data-room="${escapeHtml(r.code)}">JOIN</button>
+    </div>`
+        ).join("") + '<button class="local-rescan-btn secondary" id="local-rescan-btn">Re-scan</button>';
+        els.localRoomList.querySelectorAll(".local-room-row").forEach((row) => {
+          const joinHandler = () => {
+            const roomCode = row.dataset.room;
+            if (!roomCode) return;
+            const matchedRoom = rooms.find((r) => r.code === roomCode);
+            const friendlyName = matchedRoom ? matchedRoom.name || roomCode : void 0;
+            stopLocalScanInterval();
+            window.SFX.uiClick();
+            joinP2PAsGuest(roomCode, friendlyName);
+          };
+          row.addEventListener("click", joinHandler);
+          row.addEventListener("keydown", (e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              joinHandler();
+            }
+          });
+        });
+        els.localRoomList.querySelectorAll(".local-room-join-btn").forEach((btn) => {
+          btn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            const roomCode = btn.dataset.room;
+            if (!roomCode) return;
+            const matchedRoom = rooms.find((r) => r.code === roomCode);
+            const friendlyName = matchedRoom ? matchedRoom.name || roomCode : void 0;
+            stopLocalScanInterval();
+            window.SFX.uiClick();
+            joinP2PAsGuest(roomCode, friendlyName);
+          });
+        });
+        const rescan = document.getElementById("local-rescan-btn");
+        if (rescan) rescan.addEventListener("click", () => {
+          window.SFX.uiClick();
+          runLocalScan();
+        });
+      }
+      function startLocalScanWithAutoRefresh() {
+        runLocalScan();
+        stopLocalScanInterval();
+        _localScanInterval = setInterval(() => {
+          const lanScreen = document.getElementById("screen-lan");
+          if (!lanScreen || !lanScreen.classList.contains("active")) {
+            stopLocalScanInterval();
+            return;
+          }
+          runLocalScan();
+        }, 3e3);
+      }
+      async function joinP2PAsGuest(code, friendlyName) {
         window.SFX.unlock();
         enterImmersive();
         const name = (els.name.value || "Pilot").slice(0, 14);
@@ -3612,7 +3821,7 @@
         els.shareLink.value = p2pUrl;
         els.share.classList.remove("hidden");
         transport.onStateChange = onLobbyStateChange;
-        els.lobbyTitle.textContent = `P2P Room ${code}`;
+        els.lobbyTitle.textContent = friendlyName || `P2P Room ${code}`;
         renderLobbyRoster();
         applyMode("lobby");
         const phase = transport.getPhase();
@@ -4001,6 +4210,7 @@
         closeJoinCode();
         navReset();
         closeScanner();
+        stopLocalScanInterval();
         hideShareQr();
         clearShareInvite();
         setBusy(false);
@@ -4091,6 +4301,8 @@
         clearShareInvite();
         if (window.SFX.startMenuAmbient) window.SFX.startMenuAmbient();
         if (window.Input.isTouchDevice()) document.body.classList.add("touch-device");
+        els.localRoomName.placeholder = randomLocalRoomName();
+        els.localRoomName.value = "";
         document.querySelectorAll("[data-nav]").forEach((el) => {
           el.addEventListener("click", () => {
             window.SFX.uiClick();
@@ -4148,6 +4360,27 @@
         els.hostLeftMenuBtn.addEventListener("click", () => {
           window.SFX.uiClick();
           resetToMenu();
+        });
+        els.localCreateBtn.addEventListener("click", () => {
+          window.SFX.uiClick();
+          startLocalRoom();
+        });
+        els.localRoomName.addEventListener("keydown", (e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            window.SFX.uiClick();
+            startLocalRoom();
+          }
+        });
+        els.localScanBtn.addEventListener("click", () => {
+          window.SFX.uiClick();
+          startLocalScanWithAutoRefresh();
+        });
+        document.querySelectorAll("[data-back]").forEach((el) => {
+          el.addEventListener("click", stopLocalScanInterval);
+        });
+        document.querySelectorAll("[data-nav]").forEach((el) => {
+          if (el.dataset.nav !== "lan") el.addEventListener("click", stopLocalScanInterval);
         });
         els.lanQuick.addEventListener("click", () => {
           window.SFX.uiClick();

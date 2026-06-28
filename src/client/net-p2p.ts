@@ -26,6 +26,7 @@ const MAX_EXTRAP_MS   = 120;
 const SNAP_DISTANCE   = 140;
 const MAX_GUESTS      = 6;
 const ICE_SERVER      = "stun:stun.l.google.com:19302";
+const STUN_ICE: RTCIceServer[] = [{ urls: ICE_SERVER }];
 const DC_OPEN_TIMEOUT = 2000;          // ms — iOS DataChannel open watchdog
 
 // ---------------------------------------------------------------------------
@@ -126,7 +127,7 @@ class HostTransportState implements TransportState {
 // ---------------------------------------------------------------------------
 
 type SignalMsg =
-  | { type: "host";           room: string }
+  | { type: "host";           room: string; name?: string; hostName?: string }
   | { type: "join";           room: string; peerId: string }
   | { type: "peer-joined";    peerId: string }
   | { type: "hosted";         room: string; peers?: string[] }
@@ -143,6 +144,10 @@ class SignalSocket {
   onMessage: ((msg: SignalMsg) => void) | null = null;
   onClose: (() => void) | null = null;
 
+  /** Set before open() to include room display name and host call sign in the host registration. */
+  hostRoomName?: string;
+  hostCallSign?: string;
+
   open(room: string, role: "host" | "join", peerId?: string): Promise<void> {
     // Close any existing socket before re-opening (migration re-connect path)
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
@@ -156,7 +161,10 @@ class SignalSocket {
 
       ws.onopen = () => {
         if (role === "host") {
-          this.send({ type: "host", room });
+          const hostMsg: SignalMsg = { type: "host", room };
+          if (this.hostRoomName !== undefined) (hostMsg as any).name = this.hostRoomName;
+          if (this.hostCallSign !== undefined) (hostMsg as any).hostName = this.hostCallSign;
+          this.send(hostMsg);
         } else {
           this.send({ type: "join", room, peerId: peerId! });
         }
@@ -423,22 +431,29 @@ export class WebRtcTransport implements ITransport {
 
   /**
    * Start as P2P host.
-   * `name` = player name, `code` = P- room code (with prefix),
+   * `name` = player call sign, `code` = P- room code (with prefix),
    * `cosmetics` = selected cosmetics.
-   * Returns immediately (no async needed; signaling is fire-and-forget).
+   * `opts.roomName` = room display name shown in the LAN browser (defaults to `code`).
+   * `opts.continuous` = when true, starts as a live FFA match immediately (no lobby).
+   * Backward-compat: existing callers omit opts and get the original lobby behaviour.
    */
   async startHost(
     name: string,
     code: string,
     cosmetics: { color: number; bodyShape: number; accent: number; trail: number; livery: number },
+    opts?: { roomName?: string; continuous?: boolean },
   ): Promise<void> {
     this._isHost  = true;
     this._room    = code;
     this.sessionId = "host";
 
+    const continuous = opts?.continuous ?? false;
+    const roomName   = opts?.roomName   ?? code;
+
     const sim = new GameSim({
       botsEnabled: false,
-      isPublic: false,
+      // Continuous local rooms start in playing/ffa state immediately (same as isPublic).
+      isPublic: continuous,
       onEvent: (e) => this._onSimEvent(e),
     });
     this._sim = sim;
@@ -454,8 +469,10 @@ export class WebRtcTransport implements ITransport {
       livery:    cosmetics.livery,
     });
 
-    // Wire signaling
+    // Wire signaling — carry room display name and host call sign to broker
     const sig = new SignalSocket();
+    sig.hostRoomName = roomName;
+    sig.hostCallSign = name;
     this._signal = sig;
     sig.onMessage = (msg) => this._onSignalHost(msg);
     sig.onClose   = () => {/* signaling dropped — peers already connected via DC */};
@@ -470,6 +487,46 @@ export class WebRtcTransport implements ITransport {
 
     // Trigger initial state change so the lobby UI renders
     if (this.onStateChange) this.onStateChange();
+  }
+
+  /**
+   * List rooms visible from this client's network by querying the broker's
+   * `{type:"list"}` message. Returns an empty array on any error or timeout.
+   * This is a static method so callers can use `WebRtcTransport.listRooms()`
+   * without needing an instance.
+   */
+  static listRooms(): Promise<Array<{ code: string; name: string; hostName: string; count: number }>> {
+    return new Promise((resolve) => {
+      let settled = false;
+      const done = (rooms: Array<{ code: string; name: string; hostName: string; count: number }>) => {
+        if (settled) return;
+        settled = true;
+        try { ws.close(); } catch {}
+        resolve(rooms);
+      };
+
+      const proto = location.protocol === "https:" ? "wss" : "ws";
+      const ws    = new WebSocket(`${proto}://${location.host}/signal`);
+
+      const timer = setTimeout(() => done([]), 3000);
+
+      ws.onopen = () => {
+        try { ws.send(JSON.stringify({ type: "list" })); } catch { done([]); }
+      };
+
+      ws.onmessage = (ev) => {
+        try {
+          const msg = JSON.parse(ev.data);
+          if (msg.type === "rooms") {
+            clearTimeout(timer);
+            done(Array.isArray(msg.rooms) ? msg.rooms : []);
+          }
+        } catch { /* ignore non-JSON */ }
+      };
+
+      ws.onerror = () => { clearTimeout(timer); done([]); };
+      ws.onclose = () => { clearTimeout(timer); done([]); };
+    });
   }
 
   private _onSimEvent(e: SimEvent): void {
@@ -551,7 +608,7 @@ export class WebRtcTransport implements ITransport {
       const peerId: string = msg.peerId;
       if (this._peers.size >= MAX_GUESTS) return;
 
-      const pc = makePeerConnection([{ urls: ICE_SERVER }]);
+      const pc = makePeerConnection(STUN_ICE);
       const stateCh  = pc.createDataChannel("state",  { ordered: true,  maxRetransmits: 0 });
       const inputsCh = pc.createDataChannel("inputs", { ordered: false, maxRetransmits: 0 });
       const eventsCh = pc.createDataChannel("events", { ordered: true });
@@ -711,7 +768,7 @@ export class WebRtcTransport implements ITransport {
     const sig = new SignalSocket();
     this._signal = sig;
 
-    const pc = makePeerConnection([{ urls: ICE_SERVER }]);
+    const pc = makePeerConnection(STUN_ICE);
     this._guestPc = pc;
 
     this._wireGuestPc(pc, peerId, code, sig);
@@ -1018,7 +1075,7 @@ export class WebRtcTransport implements ITransport {
     const peerId  = this._peerId;
     const sig     = this._signal!;
 
-    const pc = makePeerConnection([{ urls: ICE_SERVER }]);
+    const pc = makePeerConnection(STUN_ICE);
     this._guestPc      = pc;
     this._guestInputCh = null;
     this._guestEventCh = null;
