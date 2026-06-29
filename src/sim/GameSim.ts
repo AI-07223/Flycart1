@@ -489,25 +489,15 @@ export class GameSim {
     this.timeLeft = Math.max(0, this.timeLeft - dt);
     if (this.timeLeft > 0) return;
 
-    if (this.isPublic) {
-      // Public rooms: auto-restart into playing.
-      for (const [id, p] of this.players) {
-        p.score = 0;
-        this.spawn(id, p);
-      }
-      this.phase = "playing";
-      this.timeLeft = C.ROUND_SECONDS;
-    } else {
-      // Private rooms: return to lobby so players can ready up again.
-      for (const [, p] of this.players) {
-        p.score = 0;
-        p.ready = false;
-        p.alive = false;
-      }
-      this.lobbyElapsed = 0;
-      this.phase = "lobby";
-      this.timeLeft = 0;
+    // All rooms auto-restart into a fresh round — continuous play with automatic
+    // respawn in every mode (public, private, LAN, P2P). No return-to-lobby stall:
+    // players stay in the fight and rounds keep cycling.
+    for (const [id, p] of this.players) {
+      p.score = 0;
+      this.spawn(id, p);
     }
+    this.phase = "playing";
+    this.timeLeft = C.ROUND_SECONDS;
   }
 
   private stepPlane(id: string, p: SimPlayer, dt: number, playing: boolean): void {

@@ -20,7 +20,7 @@ export const BULLET_DAMAGE = 25;
 export const BULLET_LIFE = 2.3;  // was 2.1 — scaled up so effective range is similar at higher speed
 export const BULLET_RADIUS = 4;
 export const FIRE_COOLDOWN = 0.34;
-export const RESPAWN_DELAY = 2.5;
+export const RESPAWN_DELAY = 1.2;
 
 // Larger hit radius for bullet-vs-plane detection only (not plane-vs-landmark).
 // ~1.6× PLANE_RADIUS so shots feel forgiving without changing collision geometry.

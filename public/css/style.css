@@ -3206,15 +3206,20 @@ select {
 .hud-cluster {
   display: inline-flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 12px 14px;
-  border-radius: 18px;
-  background: linear-gradient(180deg, rgba(7, 15, 25, 0.84), rgba(14, 27, 42, 0.72));
-  border: 1px solid rgba(210, 231, 248, 0.12);
-  box-shadow: 0 20px 36px rgba(0, 0, 0, 0.28);
+  gap: 6px;
+  padding: 8px 10px;
+  border-radius: 14px;
+  background: linear-gradient(180deg, rgba(7, 15, 25, 0.6), rgba(14, 27, 42, 0.46));
+  border: 1px solid rgba(210, 231, 248, 0.1);
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.2);
   width: max-content;
   max-width: min(760px, calc(100vw - 28px));
 }
+/* ── De-clutter pass: on phones, drop secondary stats + the live leaderboard
+   so the play area stays clear. Score is still in the cluster; full standings
+   appear at round end. Desktop keeps the full HUD. ── */
+body.touch-device .hud-item--secondary { display: none; }
+body.touch-device #leaderboard { display: none; }
 .hud-cluster-head {
   display: flex;
   align-items: center;
