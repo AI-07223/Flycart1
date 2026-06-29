@@ -177,6 +177,9 @@ const els = {
   localCreateBtn: menuDollar("arcade-local-create-btn", "local-create-btn") as HTMLButtonElement,
   localScanBtn: menuDollar("arcade-local-scan-btn", "local-scan-btn") as HTMLButtonElement,
   localRoomList: menuDollar("arcade-local-room-list", "local-room-list"),
+  toast: dollar("toast"),
+  respawnBy: dollar("respawn-by"),
+  respawnCount: dollar("respawn-count"),
 };
 
 type SceneMode = "preflight" | "customize" | "lobby" | "results" | "playing" | "paused";
@@ -188,9 +191,21 @@ let joinCodeOpen = false;
 let last = 0;
 let prevPhase = "playing";
 let prevHp = G.MAX_HP;
-let streak = 0;
-let lastKill = 0;
 let lastFireSnd = 0;
+
+// ── Smash-tracking state (replaces old streak/lastKill) ──────────────────
+const smashTrack = new Map<string, { streak: number; last: number; rapid: number }>();
+function getTrack(id: string): { streak: number; last: number; rapid: number } {
+  let t = smashTrack.get(id);
+  if (!t) { t = { streak: 0, last: 0, rapid: 0 }; smashTrack.set(id, t); }
+  return t;
+}
+
+// Last killer name — used by the kill/death card
+let lastKiller = "";
+
+// Leader-change tracking
+let prevLeader = "";
 let engineStarted = false;
 let botsEnabled = true;
 let botDifficulty: "easy" | "medium" | "high" = "medium";
@@ -1687,7 +1702,7 @@ function updateHud(state: any, myId: string): void {
   if (me) {
     els.healthfill.style.width = Math.max(0, (me.hp / G.MAX_HP) * 100) + "%";
 
-    // Respawn countdown
+    // Respawn countdown (kill/death card)
     if (!me.alive) {
       // Detect alive->dead transition
       if (wasAlive) {
@@ -1696,9 +1711,8 @@ function updateHud(state: any, myId: string): void {
       }
       const elapsed = performance.now() / 1000 - deathTime;
       const remaining = Math.max(0, Math.ceil(G.RESPAWN_DELAY - elapsed));
-      els.respawn.textContent = remaining > 0
-        ? `Shot down — respawning in ${remaining}…`
-        : "Shot down — respawning…";
+      els.respawnBy.textContent = lastKiller ? ("by " + lastKiller) : "";
+      els.respawnCount.textContent = remaining > 0 ? ("Respawning in " + remaining + "…") : "Respawning…";
       els.respawn.classList.remove("hidden");
     } else {
       wasAlive = true;
@@ -1746,12 +1760,24 @@ function updateHud(state: any, myId: string): void {
   const list: Array<{ id: string; name: string; score: number; bot: boolean; team: number }> = [];
   state.players.forEach((p: any, id: string) => list.push({ id, name: p.name, score: p.score, bot: p.bot, team: p.team ?? -1 }));
   list.sort((a, b) => b.score - a.score);
-  els.leaderboard.innerHTML = list.slice(0, 5).map((p, i) => {
-    const teamDot = isTdm && p.team >= 0
-      ? `<span class="lb-team-dot" style="background:${p.team === 0 ? "#4aa3ff" : "#ff5a5a"}"></span>`
-      : "";
-    return `<div class="lb-row ${p.id === myId ? "me" : ""}"><span>${teamDot}${i + 1}. ${escapeHtml(p.name)}${p.bot ? " 🤖" : ""}</span><span>${p.score}</span></div>`;
-  }).join("");
+  const top5 = list.slice(0, 5);
+  els.leaderboard.innerHTML =
+    `<div class="lb-header">SMASHES</div>` +
+    top5.map((p, i) => {
+      const teamDot = isTdm && p.team >= 0
+        ? `<span class="lb-team-dot" style="background:${p.team === 0 ? "#4aa3ff" : "#ff5a5a"}"></span>`
+        : "";
+      return `<div class="lb-row ${p.id === myId ? "me" : ""}"><span>${teamDot}${i + 1}. ${escapeHtml(p.name)}${p.bot ? " 🤖" : ""}</span><span>${p.score}</span></div>`;
+    }).join("");
+
+  // Leader-change toast (game-wide)
+  if (list.length >= 2 && list.filter(p => p.score > 0).length >= 2) {
+    const leaderId = list[0].id;
+    if (prevLeader !== "" && prevLeader !== leaderId) {
+      pushToast(list[0].name + " takes the lead!", "leader");
+    }
+    prevLeader = leaderId;
+  }
 
   // Phase transition detection
   if (state.phase !== prevPhase) {
@@ -1800,6 +1826,26 @@ function updateHud(state: any, myId: string): void {
   }
 }
 
+// ── Toast / announcement system ─────────────────────────────────────────────
+function pushToast(text: string, kind: "streak" | "multi" | "leader"): void {
+  // Cap at 3 visible toasts — remove oldest
+  while (els.toast.children.length >= 3) {
+    els.toast.firstChild?.remove();
+  }
+  const item = document.createElement("div");
+  item.className = `toast-item toast--${kind}`;
+  item.textContent = text;
+  els.toast.appendChild(item);
+  // Force reflow then add .show for CSS transition
+  void item.offsetWidth;
+  item.classList.add("show");
+  // Auto-remove after 2600ms
+  setTimeout(() => {
+    item.classList.remove("show");
+    setTimeout(() => item.remove(), 200);
+  }, 2600);
+}
+
 function showCallout(text: string): void {
   els.callout.textContent = text;
   els.callout.classList.remove("show");
@@ -1837,31 +1883,74 @@ function runCountdown(): void {
   showStep();
 }
 
-function streakName(streakSize: number): string {
-  return streakSize >= 6 ? "GODLIKE!" : streakSize >= 5 ? "UNSTOPPABLE!" : streakSize >= 4 ? "RAMPAGE!" : streakSize >= 3 ? "TRIPLE HIT!" : "DOUBLE HIT!";
-}
-
 function onKill(msg: any): void {
   const myId = window.Net.sessionId;
   const mine = msg.killer === myId;
   const victimIsMe = msg.victim === myId;
 
+  // ── Kill feed row ─────────────────────────────────────────────────────────
   const row = document.createElement("div");
   row.className = "kill-msg" + (mine ? " mine" : "");
-  row.innerHTML = `${escapeHtml(mine ? "You" : msg.killerName)} 💥 <span class="vic">${escapeHtml(victimIsMe ? "You" : msg.victimName)}</span>`;
+  row.innerHTML = `${escapeHtml(mine ? "You" : msg.killerName)} <span class="kf-verb">smashed</span> <span class="vic">${escapeHtml(victimIsMe ? "You" : msg.victimName)}</span>`;
   els.killfeed.appendChild(row);
   setTimeout(() => row.remove(), 3600);
   while (els.killfeed.children.length > 5) els.killfeed.firstChild?.remove();
 
+  // ── Local kill juice ─────────────────────────────────────────────────────
   window.Renderer.killPopup(msg.killer, mine);
-  if (victimIsMe) window.SFX.explosion();
+  if (victimIsMe) {
+    window.SFX.explosion();
+    // Record who killed us for the death card
+    lastKiller = (msg.killer && msg.killer !== msg.victim && msg.killerName) ? msg.killerName : "";
+  }
   if (mine) {
     window.SFX.kill();
     window.Renderer.hitStop(80);
+  }
+
+  // ── Game-wide smash tracking ──────────────────────────────────────────────
+  // Victim's streak resets
+  const tv = getTrack(msg.victim);
+  tv.streak = 0;
+  tv.rapid = 0;
+
+  if (msg.killer && msg.killer !== msg.victim) {
+    const t = getTrack(msg.killer);
     const now = performance.now() / 1000;
-    streak = now - lastKill < 3 ? streak + 1 : 1;
-    lastKill = now;
-    if (streak >= 2) showCallout(streakName(streak));
+    t.rapid = (now - t.last < 3.0) ? t.rapid + 1 : 1;
+    t.last = now;
+    t.streak += 1;
+
+    // Determine announcement: MULTI has priority over STREAK
+    let toastText = "";
+    let toastKind: "multi" | "streak" = "multi";
+
+    if (t.rapid >= 2) {
+      // Multi-kill tier
+      const multiLabel = t.rapid >= 4 ? "MULTI MEGA SMASH"
+        : t.rapid === 3 ? "MULTI SMASH"
+        : "DOUBLE SMASH";
+      toastText = mine ? `${multiLabel}!` : `${msg.killerName} — ${multiLabel}`;
+      toastKind = "multi";
+    } else {
+      // Streak tier — only announce at these thresholds
+      const streakTiers: Array<[number, string]> = [
+        [3, "SMASH STREAK"],
+        [5, "SMASHTACULAR STREAK"],
+        [7, "SMASHOSAURUS STREAK"],
+        [10, "SMASHLVANIA STREAK"],
+        [15, "MONSTER SMASH STREAK"],
+        [20, "SMASH POTATO BURGER STREAK"],
+      ];
+      const tier = streakTiers.find(([n]) => t.streak === n);
+      if (tier) {
+        const streakLabel = tier[1];
+        toastText = mine ? `${streakLabel}!` : `${msg.killerName} — ${streakLabel}`;
+        toastKind = "streak";
+      }
+    }
+
+    if (toastText) pushToast(toastText, toastKind);
   }
 }
 
@@ -1980,6 +2069,9 @@ function resetToMenu(): void {
   // Reset respawn / countdown tracking
   wasAlive = true;
   deathTime = -1;
+  lastKiller = "";
+  prevLeader = "";
+  smashTrack.clear();
   countdownActive = false;
   boostLevel = 0;
   oobShownUntil = 0;

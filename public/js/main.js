@@ -28,7 +28,7 @@
       BULLET_LIFE = 2.3;
       BULLET_RADIUS = 4;
       FIRE_COOLDOWN = 0.34;
-      RESPAWN_DELAY = 2.5;
+      RESPAWN_DELAY = 1.2;
       BULLET_HIT_RADIUS = 26;
       AIM_ASSIST_CONE = 0.35;
       AIM_ASSIST_RANGE = 700;
@@ -652,23 +652,12 @@
           }
           this.timeLeft = Math.max(0, this.timeLeft - dt);
           if (this.timeLeft > 0) return;
-          if (this.isPublic) {
-            for (const [id, p] of this.players) {
-              p.score = 0;
-              this.spawn(id, p);
-            }
-            this.phase = "playing";
-            this.timeLeft = ROUND_SECONDS;
-          } else {
-            for (const [, p] of this.players) {
-              p.score = 0;
-              p.ready = false;
-              p.alive = false;
-            }
-            this.lobbyElapsed = 0;
-            this.phase = "lobby";
-            this.timeLeft = 0;
+          for (const [id, p] of this.players) {
+            p.score = 0;
+            this.spawn(id, p);
           }
+          this.phase = "playing";
+          this.timeLeft = ROUND_SECONDS;
         }
         stepPlane(id, p, dt, playing) {
           const input = this.inputs.get(id) ?? ZERO_INPUT;
@@ -3363,7 +3352,10 @@
         localRoomName: menuDollar("arcade-local-room-name", "local-room-name"),
         localCreateBtn: menuDollar("arcade-local-create-btn", "local-create-btn"),
         localScanBtn: menuDollar("arcade-local-scan-btn", "local-scan-btn"),
-        localRoomList: menuDollar("arcade-local-room-list", "local-room-list")
+        localRoomList: menuDollar("arcade-local-room-list", "local-room-list"),
+        toast: dollar("toast"),
+        respawnBy: dollar("respawn-by"),
+        respawnCount: dollar("respawn-count")
       };
       var mode = "menu";
       var sceneMode = "preflight";
@@ -3372,9 +3364,18 @@
       var last = 0;
       var prevPhase = "playing";
       var prevHp = G.MAX_HP;
-      var streak = 0;
-      var lastKill = 0;
       var lastFireSnd = 0;
+      var smashTrack = /* @__PURE__ */ new Map();
+      function getTrack(id) {
+        let t = smashTrack.get(id);
+        if (!t) {
+          t = { streak: 0, last: 0, rapid: 0 };
+          smashTrack.set(id, t);
+        }
+        return t;
+      }
+      var lastKiller = "";
+      var prevLeader = "";
       var engineStarted = false;
       var botsEnabled = true;
       var botDifficulty = "medium";
@@ -4640,7 +4641,8 @@
             }
             const elapsed = performance.now() / 1e3 - deathTime;
             const remaining = Math.max(0, Math.ceil(G.RESPAWN_DELAY - elapsed));
-            els.respawn.textContent = remaining > 0 ? `Shot down \u2014 respawning in ${remaining}\u2026` : "Shot down \u2014 respawning\u2026";
+            els.respawnBy.textContent = lastKiller ? "by " + lastKiller : "";
+            els.respawnCount.textContent = remaining > 0 ? "Respawning in " + remaining + "\u2026" : "Respawning\u2026";
             els.respawn.classList.remove("hidden");
           } else {
             wasAlive = true;
@@ -4680,10 +4682,18 @@
         const list = [];
         state.players.forEach((p, id) => list.push({ id, name: p.name, score: p.score, bot: p.bot, team: p.team ?? -1 }));
         list.sort((a, b) => b.score - a.score);
-        els.leaderboard.innerHTML = list.slice(0, 5).map((p, i) => {
+        const top5 = list.slice(0, 5);
+        els.leaderboard.innerHTML = `<div class="lb-header">SMASHES</div>` + top5.map((p, i) => {
           const teamDot = isTdm && p.team >= 0 ? `<span class="lb-team-dot" style="background:${p.team === 0 ? "#4aa3ff" : "#ff5a5a"}"></span>` : "";
           return `<div class="lb-row ${p.id === myId ? "me" : ""}"><span>${teamDot}${i + 1}. ${escapeHtml(p.name)}${p.bot ? " \u{1F916}" : ""}</span><span>${p.score}</span></div>`;
         }).join("");
+        if (list.length >= 2 && list.filter((p) => p.score > 0).length >= 2) {
+          const leaderId = list[0].id;
+          if (prevLeader !== "" && prevLeader !== leaderId) {
+            pushToast(list[0].name + " takes the lead!", "leader");
+          }
+          prevLeader = leaderId;
+        }
         if (state.phase !== prevPhase) {
           if (state.phase === "intermission") {
             window.SFX.explosion();
@@ -4723,6 +4733,21 @@
         } else {
           els.inter.classList.add("hidden");
         }
+      }
+      function pushToast(text, kind) {
+        while (els.toast.children.length >= 3) {
+          els.toast.firstChild?.remove();
+        }
+        const item = document.createElement("div");
+        item.className = `toast-item toast--${kind}`;
+        item.textContent = text;
+        els.toast.appendChild(item);
+        void item.offsetWidth;
+        item.classList.add("show");
+        setTimeout(() => {
+          item.classList.remove("show");
+          setTimeout(() => item.remove(), 200);
+        }, 2600);
       }
       function showCallout(text) {
         els.callout.textContent = text;
@@ -4765,28 +4790,57 @@
         }
         showStep();
       }
-      function streakName(streakSize) {
-        return streakSize >= 6 ? "GODLIKE!" : streakSize >= 5 ? "UNSTOPPABLE!" : streakSize >= 4 ? "RAMPAGE!" : streakSize >= 3 ? "TRIPLE HIT!" : "DOUBLE HIT!";
-      }
       function onKill(msg) {
         const myId = window.Net.sessionId;
         const mine = msg.killer === myId;
         const victimIsMe = msg.victim === myId;
         const row = document.createElement("div");
         row.className = "kill-msg" + (mine ? " mine" : "");
-        row.innerHTML = `${escapeHtml(mine ? "You" : msg.killerName)} \u{1F4A5} <span class="vic">${escapeHtml(victimIsMe ? "You" : msg.victimName)}</span>`;
+        row.innerHTML = `${escapeHtml(mine ? "You" : msg.killerName)} <span class="kf-verb">smashed</span> <span class="vic">${escapeHtml(victimIsMe ? "You" : msg.victimName)}</span>`;
         els.killfeed.appendChild(row);
         setTimeout(() => row.remove(), 3600);
         while (els.killfeed.children.length > 5) els.killfeed.firstChild?.remove();
         window.Renderer.killPopup(msg.killer, mine);
-        if (victimIsMe) window.SFX.explosion();
+        if (victimIsMe) {
+          window.SFX.explosion();
+          lastKiller = msg.killer && msg.killer !== msg.victim && msg.killerName ? msg.killerName : "";
+        }
         if (mine) {
           window.SFX.kill();
           window.Renderer.hitStop(80);
+        }
+        const tv = getTrack(msg.victim);
+        tv.streak = 0;
+        tv.rapid = 0;
+        if (msg.killer && msg.killer !== msg.victim) {
+          const t = getTrack(msg.killer);
           const now = performance.now() / 1e3;
-          streak = now - lastKill < 3 ? streak + 1 : 1;
-          lastKill = now;
-          if (streak >= 2) showCallout(streakName(streak));
+          t.rapid = now - t.last < 3 ? t.rapid + 1 : 1;
+          t.last = now;
+          t.streak += 1;
+          let toastText = "";
+          let toastKind = "multi";
+          if (t.rapid >= 2) {
+            const multiLabel = t.rapid >= 4 ? "MULTI MEGA SMASH" : t.rapid === 3 ? "MULTI SMASH" : "DOUBLE SMASH";
+            toastText = mine ? `${multiLabel}!` : `${msg.killerName} \u2014 ${multiLabel}`;
+            toastKind = "multi";
+          } else {
+            const streakTiers = [
+              [3, "SMASH STREAK"],
+              [5, "SMASHTACULAR STREAK"],
+              [7, "SMASHOSAURUS STREAK"],
+              [10, "SMASHLVANIA STREAK"],
+              [15, "MONSTER SMASH STREAK"],
+              [20, "SMASH POTATO BURGER STREAK"]
+            ];
+            const tier = streakTiers.find(([n]) => t.streak === n);
+            if (tier) {
+              const streakLabel = tier[1];
+              toastText = mine ? `${streakLabel}!` : `${msg.killerName} \u2014 ${streakLabel}`;
+              toastKind = "streak";
+            }
+          }
+          if (toastText) pushToast(toastText, toastKind);
         }
       }
       function onPickup(msg) {
@@ -4894,6 +4948,9 @@
         }
         wasAlive = true;
         deathTime = -1;
+        lastKiller = "";
+        prevLeader = "";
+        smashTrack.clear();
         countdownActive = false;
         boostLevel = 0;
         oobShownUntil = 0;
