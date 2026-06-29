@@ -37,7 +37,7 @@ import * as THREE from "three";
   let boundary;
   let landscapeRoot;
   let menuDemo = null;
-  let hangarOpen = false;
+  let sceneMode = "preflight";
   let particles = [];
 
   const camPos = new THREE.Vector3(0, 90, 160);
@@ -664,12 +664,24 @@ import * as THREE from "three";
     menuDemo = null;
   }
 
+  function applySceneModeChrome() {
+    const showCombatChrome = sceneMode === "playing";
+    if (minimap) minimap.style.display = showCombatChrome ? "block" : "none";
+    if (popupLayer) popupLayer.style.display = showCombatChrome ? "block" : "none";
+    if (nameLabelsLayer) nameLabelsLayer.style.display = showCombatChrome ? "block" : "none";
+    if (leadReticle && !showCombatChrome) leadReticle.style.display = "none";
+    if (!showCombatChrome) {
+      for (const [, div] of nameLabelPool) div.style.display = "none";
+      if (mmctx && minimap) mmctx.clearRect(0, 0, minimap.width, minimap.height);
+    }
+  }
+
   const Renderer = {
     init(canvas) {
       canvasEl = canvas;
       renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: "high-performance" });
       renderer.shadowMap.enabled = true;
-      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+      renderer.shadowMap.type = THREE.PCFShadowMap;
       scene = new THREE.Scene();
       scene.background = new THREE.Color(0x8cc8ff);
       scene.fog = new THREE.Fog(0x8cc8ff, 900, 5000);
@@ -890,11 +902,14 @@ import * as THREE from "three";
     },
 
     draw(state, myId) {
+      applySceneModeChrome();
       this._updateCamera(myId);
       renderer.render(scene, camera);
-      this._drawMinimap(state, myId);
-      this._updateNameLabels(state, myId);
-      this._updateLeadReticle(state, myId);
+      if (sceneMode === "playing") {
+        this._drawMinimap(state, myId);
+        this._updateNameLabels(state, myId);
+        this._updateLeadReticle(state, myId);
+      }
     },
 
     // drawMenu(dt, cosmetic): cosmetic can be {color,bodyShape,accent,trail,livery} or bare number
@@ -915,10 +930,11 @@ import * as THREE from "three";
         scene.add(menuDemo);
       }
 
-      // Hangar mode: slow the rotation and pull the camera closer for a clear showcase
-      const radius = hangarOpen ? 160 : 360;
-      const rotSpeed = hangarOpen ? 0.07 : 0.18;
-      const bobAmp = hangarOpen ? 6 : 12;
+      applySceneModeChrome();
+      const isCustomize = sceneMode === "customize";
+      const radius = isCustomize ? 170 : 300;
+      const rotSpeed = isCustomize ? 0.07 : 0.14;
+      const bobAmp = isCustomize ? 5 : 10;
       const angle = time * rotSpeed;
       const pos = { x: Math.cos(angle) * radius, y: 85 + Math.sin(time * 0.8) * bobAmp, z: Math.sin(angle) * radius };
       const fwd = SP.normalize({ x: -Math.sin(angle), y: Math.cos(time * 0.8) * 0.08, z: Math.cos(angle) });
@@ -934,16 +950,13 @@ import * as THREE from "three";
         exhaust.visible = true;
       }
 
-      // Hangar mode: camera pulls back less and shifts left to frame the plane
-      // in the right portion of the screen (hangar card sits on the left side)
-      const camPullBack = hangarOpen ? 70 : 110;
-      const camUp = hangarOpen ? 30 : 42;
-      const camLookAhead = hangarOpen ? 80 : 140;
-      const lerpSpeed = hangarOpen ? 0.10 : 0.06;
+      const camPullBack = isCustomize ? 74 : 118;
+      const camUp = isCustomize ? 28 : 44;
+      const camLookAhead = isCustomize ? 84 : 148;
+      const lerpSpeed = isCustomize ? 0.10 : 0.065;
 
-      // Lateral offset: shift camera right when hangar open so plane is left-of-center
       const right = new THREE.Vector3(-fwd.z, 0, fwd.x).normalize();
-      const lateralShift = hangarOpen ? 60 : 0;
+      const lateralShift = isCustomize ? 104 : 72;
       const desired = new THREE.Vector3(
         pos.x - fwd.x * camPullBack + right.x * lateralShift,
         pos.y + camUp,
@@ -1288,12 +1301,19 @@ import * as THREE from "three";
     showMenu() {},
     hideMenu() {},
 
-    // Called by main.ts when the hangar overlay opens/closes.
-    // Switches drawMenu into a zoomed, slower showcase framing.
+    setSceneMode(mode) {
+      sceneMode = mode || "preflight";
+      applySceneModeChrome();
+    },
+
     setHangarOpen(open) {
-      hangarOpen = !!open;
+      sceneMode = open ? "customize" : "preflight";
+      applySceneModeChrome();
     },
   };
 
   window.Renderer = Renderer;
 })();
+
+
+

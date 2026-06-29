@@ -2569,11 +2569,658 @@
     }
   });
 
+  // src/client/arcadeMenu.ts
+  function arcadeScreenId(screen2) {
+    return `arcade-screen-${screen2}`;
+  }
+  function mountArcadeMenu() {
+    const host = document.getElementById(ARCADE_MENU_HOST_ID);
+    if (!(host instanceof HTMLElement)) return null;
+    if (!host.dataset.mounted) {
+      host.innerHTML = getArcadeMenuMarkup();
+      host.dataset.mounted = "1";
+    }
+    host.classList.remove("hidden");
+    document.body.classList.add("arcade-menu-enabled");
+    return host;
+  }
+  function getArcadeMenuMarkup() {
+    return `
+    <div class="arcade-menu-shell">
+      <div class="arcade-menu-router">
+        <section class="${ARCADE_MENU_SCREEN_CLASS} active" id="${arcadeScreenId("home")}">
+          <div class="arcade-home-hero">
+            <div class="arcade-title-block">
+              <p class="arcade-kicker">Sky League // Carrier Deck</p>
+              <h1>SMASHCART</h1>
+              <p class="arcade-tagline">Pick the mission, arm the plane, and launch from a menu that finally feels like a combat game.</p>
+            </div>
+            <div class="arcade-hero-console">
+              <div class="arcade-chip-cluster">
+                <span id="arcade-room-code-chip" class="signal-chip signal-chip--ready">Deck local</span>
+                <span id="arcade-menu-server-badge" class="server-badge">Local play</span>
+              </div>
+              <div class="arcade-hero-actions">
+                <button type="button" class="arcade-meta-btn" data-arcade-nav="join">Join Invite</button>
+                <button type="button" id="arcade-menu-settings-btn" class="arcade-meta-btn arcade-meta-btn--secondary">Settings</button>
+              </div>
+              <p class="arcade-hero-copy">Fast entry, local hotspot support, and a full hangar customization pass all live on the same deck.</p>
+            </div>
+          </div>
+
+          <div class="arcade-home-grid">
+            <section class="arcade-panel arcade-loadout-panel">
+              <div class="arcade-panel-header">
+                <div>
+                  <p class="arcade-panel-kicker">Active Aircraft</p>
+                  <h2 id="arcade-selected-plane-name" class="arcade-panel-title">Viper Fighter</h2>
+                </div>
+                <button type="button" id="arcade-customize-open-btn" class="arcade-panel-action" data-arcade-nav="customize">Open Hangar</button>
+              </div>
+              <p id="arcade-selected-plane-summary" class="arcade-panel-copy">Scarlet paint, Midnight accent, Clean livery, White Smoke trail</p>
+              <div id="arcade-selected-plane-chips" class="arcade-chip-strip"></div>
+              <div class="arcade-field-row">
+                <label class="arcade-field">
+                  <span class="arcade-field-label">Call Sign</span>
+                  <input id="arcade-name-input" class="arcade-input" maxlength="14" placeholder="Pilot name" aria-label="Call sign" />
+                </label>
+                <label class="arcade-switch" for="arcade-bots-check">
+                  <input type="checkbox" id="arcade-bots-check" checked />
+                  <span>Fill empty seats with bots</span>
+                </label>
+              </div>
+            </section>
+
+            <section class="arcade-panel arcade-mission-panel">
+              <div class="arcade-panel-header">
+                <div>
+                  <p class="arcade-panel-kicker">Mission Select</p>
+                  <h2 class="arcade-panel-title">Choose Your Route</h2>
+                </div>
+                <span class="arcade-panel-badge">Ready</span>
+              </div>
+              <div class="arcade-command-stack">
+                <button type="button" class="arcade-command-btn arcade-command-btn--major" data-arcade-nav="play">
+                  <span class="arcade-command-icon">01</span>
+                  <span class="arcade-command-copy">
+                    <strong>Launch Match</strong>
+                    <span>Public, private, and hotspot dogfights branch from one proper start screen.</span>
+                  </span>
+                  <span class="arcade-command-tag">Primary</span>
+                </button>
+                <button type="button" class="arcade-command-btn" data-arcade-nav="join">
+                  <span class="arcade-command-icon">02</span>
+                  <span class="arcade-command-copy">
+                    <strong>Join Invite</strong>
+                    <span>Scan a QR, paste a link, or enter a room code without hunting through utility UI.</span>
+                  </span>
+                  <span class="arcade-command-tag">Fast</span>
+                </button>
+                <button type="button" class="arcade-command-btn" data-arcade-nav="lan">
+                  <span class="arcade-command-icon">03</span>
+                  <span class="arcade-command-copy">
+                    <strong>Local Wi-Fi Ops</strong>
+                    <span>Host on one device, scan on nearby phones, and keep hotspot matches one tap away.</span>
+                  </span>
+                  <span class="arcade-command-tag">OpsX</span>
+                </button>
+                <button type="button" class="arcade-command-btn" data-arcade-nav="leaders">
+                  <span class="arcade-command-icon">04</span>
+                  <span class="arcade-command-copy">
+                    <strong>Leaderboard</strong>
+                    <span>Check the all-time aces before rolling out to the runway.</span>
+                  </span>
+                  <span class="arcade-command-tag">Aces</span>
+                </button>
+              </div>
+            </section>
+          </div>
+        </section>
+
+        <section class="${ARCADE_MENU_SCREEN_CLASS}" id="${arcadeScreenId("play")}">
+          <header class="arcade-screen-header">
+            <button type="button" class="arcade-back-btn" data-arcade-back>Back</button>
+            <div class="arcade-screen-title-wrap">
+              <p class="arcade-panel-kicker">Launch Bay</p>
+              <h2 class="arcade-screen-title">Pick A Match Type</h2>
+              <p class="arcade-screen-copy">Your aircraft stays armed. Choose the room style that matches how people are joining.</p>
+            </div>
+          </header>
+
+          <div class="arcade-banner">
+            <span class="arcade-banner-label">Current loadout</span>
+            <p id="arcade-play-loadout-summary">Viper Fighter - Scarlet - Clean - White Smoke</p>
+          </div>
+
+          <div class="arcade-mode-grid">
+            <button type="button" id="arcade-quick-play-btn" class="arcade-command-btn arcade-command-btn--major">
+              <span class="arcade-command-icon">A</span>
+              <span class="arcade-command-copy">
+                <strong>Public Scramble</strong>
+                <span>Instant action. Launch straight into the live public fight with your current plane.</span>
+              </span>
+              <span class="arcade-command-tag">Fastest</span>
+            </button>
+            <button type="button" id="arcade-private-room-btn" class="arcade-command-btn">
+              <span class="arcade-command-icon">B</span>
+              <span class="arcade-command-copy">
+                <strong>Private Squad Room</strong>
+                <span>Create an invite code, wait in the lobby, and launch when your squad is ready.</span>
+              </span>
+              <span class="arcade-command-tag">Invite</span>
+            </button>
+            <button type="button" class="arcade-command-btn" data-arcade-nav="lan">
+              <span class="arcade-command-icon">C</span>
+              <span class="arcade-command-copy">
+                <strong>Local Wi-Fi Field Play</strong>
+                <span>For couch sessions and hotspot matches. One host creates the room, everyone else scans.</span>
+              </span>
+              <span class="arcade-command-tag">Nearby</span>
+            </button>
+          </div>
+
+          <section class="arcade-panel arcade-route-panel">
+            <div class="arcade-panel-header">
+              <div>
+                <p class="arcade-panel-kicker">Route Guide</p>
+                <h3 class="arcade-panel-title">Which Button Should Players Use?</h3>
+              </div>
+              <span class="arcade-panel-badge arcade-panel-badge--subtle">Briefing</span>
+            </div>
+            <p class="arcade-panel-copy">Public Scramble is for immediate matchmaking. Private Squad Room is for invited players. Local Wi-Fi Field Play is the dedicated hotspot path and keeps the OpsX local-play flow front and center.</p>
+          </section>
+        </section>
+
+        <section class="${ARCADE_MENU_SCREEN_CLASS}" id="${arcadeScreenId("join")}">
+          <header class="arcade-screen-header">
+            <button type="button" class="arcade-back-btn" data-arcade-back>Back</button>
+            <div class="arcade-screen-title-wrap">
+              <p class="arcade-panel-kicker">Join Console</p>
+              <h2 class="arcade-screen-title">Scan Or Enter Invite</h2>
+              <p class="arcade-screen-copy">Every join path funnels through one clear screen so players are never stuck guessing.</p>
+            </div>
+          </header>
+
+          <div class="arcade-join-grid">
+            <button type="button" id="arcade-scan-open-btn" class="arcade-command-btn arcade-command-btn--major">
+              <span class="arcade-command-icon">QR</span>
+              <span class="arcade-command-copy">
+                <strong>Scan QR Invite</strong>
+                <span>Use the host's on-screen code and join with the least friction.</span>
+              </span>
+              <span class="arcade-command-tag">Camera</span>
+            </button>
+
+            <section class="arcade-panel arcade-join-panel">
+              <div class="arcade-panel-header">
+                <div>
+                  <p class="arcade-panel-kicker">Manual Entry</p>
+                  <h3 class="arcade-panel-title">Paste Code Or Link</h3>
+                </div>
+              </div>
+              <p class="arcade-panel-copy">Private-room links, short room codes, and local invites all resolve from the same input.</p>
+              <input id="arcade-join-code-input" class="arcade-input arcade-input--wide" maxlength="200" placeholder="ABCDEF or paste invite link" autocomplete="off" spellcheck="false" aria-label="Room code or invite link" />
+              <button type="button" id="arcade-join-code-submit" class="arcade-panel-action arcade-panel-action--wide">Join Room</button>
+            </section>
+
+            <section class="arcade-panel arcade-invite-guide">
+              <div class="arcade-panel-header">
+                <div>
+                  <p class="arcade-panel-kicker">Accepted Invites</p>
+                  <h3 class="arcade-panel-title">One Input, Three Formats</h3>
+                </div>
+                <span class="arcade-panel-badge arcade-panel-badge--subtle">Simple</span>
+              </div>
+              <div class="arcade-rule-list">
+                <div class="arcade-rule-row"><strong>Room code</strong><span>Enter the 6-character code from the host.</span></div>
+                <div class="arcade-rule-row"><strong>Invite link</strong><span>Paste the full URL exactly as it was shared.</span></div>
+                <div class="arcade-rule-row"><strong>Local QR</strong><span>Scan when the host shows a nearby or hotspot invite.</span></div>
+              </div>
+            </section>
+          </div>
+        </section>
+
+        <section class="${ARCADE_MENU_SCREEN_CLASS}" id="${arcadeScreenId("lan")}">
+          <header class="arcade-screen-header">
+            <button type="button" class="arcade-back-btn" data-arcade-back>Back</button>
+            <div class="arcade-screen-title-wrap">
+              <p class="arcade-panel-kicker">OpsX Local Play</p>
+              <h2 class="arcade-screen-title">Local Wi-Fi Command</h2>
+              <p class="arcade-screen-copy">Built for one hotspot: host creates the room, nearby players scan, and fallback tools stay tucked below.</p>
+            </div>
+          </header>
+
+          <div class="arcade-banner">
+            <span class="arcade-banner-label">Selected plane</span>
+            <p id="arcade-local-loadout-summary">Viper Fighter - Scarlet - Clean - White Smoke</p>
+          </div>
+
+          <div class="arcade-local-grid">
+            <section class="arcade-panel arcade-local-panel">
+              <div class="arcade-panel-header">
+                <div>
+                  <p class="arcade-panel-kicker">Host On This Device</p>
+                  <h3 class="arcade-panel-title">Create Room</h3>
+                </div>
+                <span class="arcade-panel-badge">Primary</span>
+              </div>
+              <p class="arcade-panel-copy">Start the hotspot match here. Friends on the same Wi-Fi only need to scan and tap Join.</p>
+              <div class="arcade-inline-field">
+                <input id="arcade-local-room-name" class="arcade-input" maxlength="20" placeholder="Room name" aria-label="Room name" />
+                <button type="button" id="arcade-local-create-btn" class="arcade-panel-action">Create Room</button>
+              </div>
+            </section>
+
+            <section class="arcade-panel arcade-local-panel">
+              <div class="arcade-panel-header">
+                <div>
+                  <p class="arcade-panel-kicker">Join Nearby</p>
+                  <h3 class="arcade-panel-title">Scan Rooms</h3>
+                </div>
+                <span class="arcade-panel-badge arcade-panel-badge--subtle">Nearby</span>
+              </div>
+              <p class="arcade-panel-copy">See live rooms on the same hotspot, inspect player counts, and join without typing a server address.</p>
+              <div class="arcade-local-actions">
+                <button type="button" id="arcade-local-scan-btn" class="arcade-panel-action arcade-panel-action--wide">Scan Rooms</button>
+                <div id="arcade-local-room-list" class="local-room-list arcade-local-room-list">
+                  <p class="muted local-empty">No scan yet. If someone is already hosting, tap Scan Rooms.</p>
+                </div>
+              </div>
+            </section>
+          </div>
+
+          <div class="arcade-local-grid arcade-local-grid--brief">
+            <section class="arcade-panel arcade-opsx-panel">
+              <div class="arcade-panel-header">
+                <div>
+                  <p class="arcade-panel-kicker">OpsX Proposal</p>
+                  <h3 class="arcade-panel-title">Upcoming Local Field Flow</h3>
+                </div>
+                <span class="arcade-panel-badge arcade-panel-badge--subtle">Pilot Plan</span>
+              </div>
+              <div class="arcade-rule-list">
+                <div class="arcade-rule-row"><strong>Step 1</strong><span>Host launches from this screen and names the room.</span></div>
+                <div class="arcade-rule-row"><strong>Step 2</strong><span>Guests on the same hotspot tap Scan Rooms and see the host immediately.</span></div>
+                <div class="arcade-rule-row"><strong>Step 3</strong><span>Fallback server and offline QR tools stay available only when auto-discovery is not enough.</span></div>
+              </div>
+            </section>
+
+            <section class="arcade-panel arcade-fallback-panel">
+              <div class="arcade-panel-header">
+                <div>
+                  <p class="arcade-panel-kicker">Fallback Utilities</p>
+                  <h3 class="arcade-panel-title">Manual Server And Offline QR</h3>
+                </div>
+                <span class="arcade-panel-badge arcade-panel-badge--subtle">Secondary</span>
+              </div>
+              <p class="arcade-panel-copy">Use these only when hotspot discovery is unavailable. The main intended flow is Create Room plus Scan Rooms.</p>
+              <label class="arcade-field">
+                <span class="arcade-field-label">Hotspot server</span>
+                <input id="arcade-lan-server-input" class="arcade-input" maxlength="120" placeholder="http://192.168.43.1:2567" />
+              </label>
+              <div class="arcade-fallback-actions">
+                <button type="button" id="arcade-lan-quick-btn" class="arcade-panel-action">LAN Quick Play</button>
+                <button type="button" id="arcade-lan-friends-btn" class="arcade-panel-action arcade-panel-action--secondary">LAN Room</button>
+              </div>
+              <p id="arcade-lan-hint" class="muted arcade-hint"></p>
+              <div class="arcade-divider"></div>
+              <p class="arcade-panel-copy">No hotspot server? Use the offline browser-to-browser fallback below.</p>
+              <div class="arcade-fallback-actions">
+                <button type="button" id="arcade-p2p-offline-btn" class="arcade-panel-action arcade-panel-action--secondary">Offline QR</button>
+              </div>
+              <div id="arcade-p2p-offline-section" class="hidden arcade-offline-section">
+                <p class="muted">Host: scan the QR below on the guest device. Guest: paste the answer payload here.</p>
+                <canvas id="arcade-p2p-offline-canvas" class="arcade-offline-canvas"></canvas>
+                <div class="arcade-inline-field">
+                  <input id="arcade-p2p-answer-input" class="arcade-input" placeholder="Paste guest answer" />
+                  <button type="button" id="arcade-p2p-answer-submit" class="arcade-panel-action arcade-panel-action--secondary">Connect</button>
+                </div>
+              </div>
+            </section>
+          </div>
+        </section>
+
+        <section class="${ARCADE_MENU_SCREEN_CLASS}" id="${arcadeScreenId("leaders")}">
+          <header class="arcade-screen-header">
+            <button type="button" class="arcade-back-btn" data-arcade-back>Back</button>
+            <div class="arcade-screen-title-wrap">
+              <p class="arcade-panel-kicker">Aces Board</p>
+              <h2 class="arcade-screen-title">All-Time Leaders</h2>
+              <p class="arcade-screen-copy">Persistent pilot rankings with enough weight to feel like part of the game front-end.</p>
+            </div>
+          </header>
+
+          <section class="arcade-panel arcade-leaderboard-panel">
+            <div class="arcade-panel-header">
+              <div>
+                <p class="arcade-panel-kicker">Top Pilots</p>
+                <h3 class="arcade-panel-title">Current Scoreline</h3>
+              </div>
+              <span class="arcade-panel-badge arcade-panel-badge--subtle">Top 10</span>
+            </div>
+            <div id="arcade-menu-leaderboard">
+              <div class="lb-row muted">Loading...</div>
+            </div>
+          </section>
+        </section>
+
+        <section class="${ARCADE_MENU_SCREEN_CLASS}" id="${arcadeScreenId("customize")}">
+          <header class="arcade-screen-header">
+            <button type="button" class="arcade-back-btn" data-arcade-back>Back</button>
+            <div class="arcade-screen-title-wrap">
+              <p class="arcade-panel-kicker">Hangar</p>
+              <h2 class="arcade-screen-title">Customize Your Plane</h2>
+              <p class="arcade-screen-copy">A proper loadout system: save presets, swap airframes, and carry the same plane into public, private, and local Wi-Fi matches.</p>
+            </div>
+          </header>
+
+          <div class="arcade-customize-layout">
+            <aside class="arcade-customize-sidebar">
+              <section class="arcade-panel arcade-hangar-panel">
+                <div class="arcade-panel-header">
+                  <div>
+                    <p class="arcade-panel-kicker">Armed Loadout</p>
+                    <h3 id="arcade-customize-summary-name" class="arcade-panel-title">Viper Fighter</h3>
+                  </div>
+                  <span class="arcade-panel-badge">Live</span>
+                </div>
+                <p id="arcade-customize-summary-text" class="arcade-panel-copy">Scarlet paint, Midnight accent, Clean livery, White Smoke trail</p>
+                <div id="arcade-customize-summary-grid" class="summary-grid"></div>
+                <div class="arcade-fallback-actions">
+                  <button type="button" id="arcade-customize-randomize" class="arcade-panel-action arcade-panel-action--secondary">Randomize</button>
+                  <button type="button" id="arcade-customize-reset" class="arcade-panel-action arcade-panel-action--secondary">Reset</button>
+                  <button type="button" id="arcade-customize-done" class="arcade-panel-action" data-arcade-back>Done</button>
+                </div>
+                <p id="arcade-customize-feedback" class="muted arcade-hint">Cosmetics are visual only. No effect on flight or damage.</p>
+              </section>
+
+              <section class="arcade-panel">
+                <div class="arcade-panel-header">
+                  <div>
+                    <p class="arcade-panel-kicker">Preset Slots</p>
+                    <h3 class="arcade-panel-title">Save And Swap</h3>
+                  </div>
+                  <span class="arcade-panel-badge arcade-panel-badge--subtle">4 slots</span>
+                </div>
+                <div id="arcade-preset-grid" class="preset-grid"></div>
+              </section>
+            </aside>
+
+            <div class="arcade-customize-main">
+              <section class="arcade-panel arcade-stage-panel">
+                <div class="arcade-stage-grid">
+                  <div class="arcade-stage-radar"></div>
+                  <div>
+                    <p class="arcade-panel-kicker">Runway Camera</p>
+                    <h3 class="arcade-panel-title">Live Preview Behind The UI</h3>
+                    <p class="arcade-panel-copy">The 3D scene keeps the selected aircraft visible while you tune paint, airframe, livery, and trail from a real hangar screen instead of a settings list.</p>
+                  </div>
+                </div>
+              </section>
+
+              <div class="arcade-option-columns">
+                <section class="arcade-panel">
+                  <div class="arcade-panel-header">
+                    <div>
+                      <p class="arcade-panel-kicker">Airframe</p>
+                      <h3 class="arcade-panel-title">Choose The Silhouette</h3>
+                    </div>
+                  </div>
+                  <div id="arcade-customize-airframe" class="option-grid option-grid--cards"></div>
+                </section>
+
+                <section class="arcade-panel">
+                  <div class="arcade-panel-header">
+                    <div>
+                      <p class="arcade-panel-kicker">Paint</p>
+                      <h3 class="arcade-panel-title">Primary Finish</h3>
+                    </div>
+                  </div>
+                  <div id="arcade-customize-paint" class="option-grid option-grid--swatches"></div>
+                </section>
+
+                <section class="arcade-panel">
+                  <div class="arcade-panel-header">
+                    <div>
+                      <p class="arcade-panel-kicker">Accent</p>
+                      <h3 class="arcade-panel-title">Trim Color</h3>
+                    </div>
+                  </div>
+                  <div id="arcade-customize-accent" class="option-grid option-grid--swatches"></div>
+                </section>
+
+                <section class="arcade-panel">
+                  <div class="arcade-panel-header">
+                    <div>
+                      <p class="arcade-panel-kicker">Livery</p>
+                      <h3 class="arcade-panel-title">Pattern Layout</h3>
+                    </div>
+                  </div>
+                  <div id="arcade-customize-livery" class="option-grid option-grid--cards"></div>
+                </section>
+
+                <section class="arcade-panel">
+                  <div class="arcade-panel-header">
+                    <div>
+                      <p class="arcade-panel-kicker">Trail</p>
+                      <h3 class="arcade-panel-title">Engine Wake</h3>
+                    </div>
+                  </div>
+                  <div id="arcade-customize-trail" class="option-grid option-grid--swatches"></div>
+                </section>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <div class="arcade-menu-footer">
+          <p id="arcade-orientation-note" class="muted">Landscape is recommended on touch devices.</p>
+          <p id="arcade-friends-note" class="muted"></p>
+          <p id="arcade-status" class="muted arcade-status-line" aria-live="polite"></p>
+        </div>
+      </div>
+    </div>
+  `;
+  }
+  var ARCADE_MENU_HOST_ID, ARCADE_MENU_SCREEN_CLASS;
+  var init_arcadeMenu = __esm({
+    "src/client/arcadeMenu.ts"() {
+      "use strict";
+      ARCADE_MENU_HOST_ID = "arcade-start-screen";
+      ARCADE_MENU_SCREEN_CLASS = "arcade-menu-screen";
+    }
+  });
+
+  // src/shared/loadout.ts
+  function toInt(value) {
+    if (typeof value === "number" && Number.isFinite(value)) return Math.trunc(value);
+    if (typeof value === "string" && value.trim()) {
+      const parsed = Number.parseInt(value, 10);
+      return Number.isFinite(parsed) ? parsed : null;
+    }
+    return null;
+  }
+  function clampIndex(value, count, fallback) {
+    const parsed = toInt(value);
+    return parsed !== null && parsed >= 0 && parsed < count ? parsed : fallback;
+  }
+  function cloneLoadout(loadout) {
+    return {
+      color: loadout.color,
+      bodyShape: loadout.bodyShape,
+      accent: loadout.accent,
+      trail: loadout.trail,
+      livery: loadout.livery
+    };
+  }
+  function sameLoadout(a, b) {
+    return a.color === b.color && a.bodyShape === b.bodyShape && a.accent === b.accent && a.trail === b.trail && a.livery === b.livery;
+  }
+  function clampLoadout(loadout) {
+    return {
+      color: clampIndex(loadout.color, PAINT_OPTIONS.length, DEFAULT_LOADOUT.color),
+      bodyShape: clampIndex(loadout.bodyShape, AIRFRAME_OPTIONS.length, DEFAULT_LOADOUT.bodyShape),
+      accent: clampIndex(loadout.accent, ACCENT_OPTIONS.length, DEFAULT_LOADOUT.accent),
+      trail: clampIndex(loadout.trail, TRAIL_OPTIONS.length, DEFAULT_LOADOUT.trail),
+      livery: clampIndex(loadout.livery, LIVERY_OPTIONS.length, DEFAULT_LOADOUT.livery)
+    };
+  }
+  function createDefaultLoadoutStore() {
+    return {
+      version: 1,
+      active: cloneLoadout(DEFAULT_LOADOUT),
+      presets: Array.from({ length: PRESET_SLOT_COUNT }, () => cloneLoadout(DEFAULT_LOADOUT))
+    };
+  }
+  function parseLoadoutStore(raw) {
+    if (!raw) return null;
+    try {
+      const parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== "object") return null;
+      const store = createDefaultLoadoutStore();
+      store.active = clampLoadout(parsed.active || {});
+      const rawPresets = Array.isArray(parsed.presets) ? parsed.presets : [];
+      store.presets = Array.from(
+        { length: PRESET_SLOT_COUNT },
+        (_, index) => clampLoadout(rawPresets[index] || DEFAULT_LOADOUT)
+      );
+      return store;
+    } catch {
+      return null;
+    }
+  }
+  function loadoutFromLegacy(source) {
+    const fallbackColor = clampIndex(source.skin, PAINT_OPTIONS.length, DEFAULT_LOADOUT.color);
+    return {
+      color: clampIndex(source.color, PAINT_OPTIONS.length, fallbackColor),
+      bodyShape: clampIndex(source.bodyShape, AIRFRAME_OPTIONS.length, DEFAULT_LOADOUT.bodyShape),
+      accent: clampIndex(source.accent, ACCENT_OPTIONS.length, DEFAULT_LOADOUT.accent),
+      trail: clampIndex(source.trail, TRAIL_OPTIONS.length, DEFAULT_LOADOUT.trail),
+      livery: clampIndex(source.livery, LIVERY_OPTIONS.length, DEFAULT_LOADOUT.livery)
+    };
+  }
+  function randomizeLoadout(random = Math.random) {
+    const pick = (count) => Math.max(0, Math.min(count - 1, Math.floor(random() * count)));
+    return {
+      color: pick(PAINT_OPTIONS.length),
+      bodyShape: pick(AIRFRAME_OPTIONS.length),
+      accent: pick(ACCENT_OPTIONS.length),
+      trail: pick(TRAIL_OPTIONS.length),
+      livery: pick(LIVERY_OPTIONS.length)
+    };
+  }
+  function getLoadoutSummary(loadout) {
+    const airframe = AIRFRAME_OPTIONS[loadout.bodyShape] || AIRFRAME_OPTIONS[0];
+    const paint = PAINT_OPTIONS[loadout.color] || PAINT_OPTIONS[0];
+    const accent = ACCENT_OPTIONS[loadout.accent] || ACCENT_OPTIONS[0];
+    const livery = LIVERY_OPTIONS[loadout.livery] || LIVERY_OPTIONS[0];
+    const trail = TRAIL_OPTIONS[loadout.trail] || TRAIL_OPTIONS[0];
+    return {
+      title: `${airframe.callsign} ${airframe.label}`,
+      subtitle: `${paint.label} paint \xB7 ${accent.label} accent \xB7 ${livery.label} livery \xB7 ${trail.label} trail`
+    };
+  }
+  function getLoadoutDetailRows(loadout) {
+    return [
+      { label: "Airframe", value: (AIRFRAME_OPTIONS[loadout.bodyShape] || AIRFRAME_OPTIONS[0]).label },
+      { label: "Paint", value: (PAINT_OPTIONS[loadout.color] || PAINT_OPTIONS[0]).label },
+      { label: "Accent", value: (ACCENT_OPTIONS[loadout.accent] || ACCENT_OPTIONS[0]).label },
+      { label: "Livery", value: (LIVERY_OPTIONS[loadout.livery] || LIVERY_OPTIONS[0]).label },
+      { label: "Trail", value: (TRAIL_OPTIONS[loadout.trail] || TRAIL_OPTIONS[0]).label }
+    ];
+  }
+  var LOADOUT_STORAGE_KEY, PRESET_SLOT_COUNT, DEFAULT_LOADOUT, LEGACY_LOADOUT_KEYS, AIRFRAME_OPTIONS, PAINT_OPTIONS, ACCENT_OPTIONS, LIVERY_OPTIONS, TRAIL_OPTIONS, PRESET_SLOTS;
+  var init_loadout = __esm({
+    "src/shared/loadout.ts"() {
+      "use strict";
+      LOADOUT_STORAGE_KEY = "smashcart.loadout.v1";
+      PRESET_SLOT_COUNT = 4;
+      DEFAULT_LOADOUT = {
+        color: 0,
+        bodyShape: 0,
+        accent: 0,
+        trail: 0,
+        livery: 0
+      };
+      LEGACY_LOADOUT_KEYS = {
+        skin: "smashcart.skin",
+        color: "smashcart.color",
+        bodyShape: "smashcart.bodyShape",
+        accent: "smashcart.accent",
+        trail: "smashcart.trail",
+        livery: "smashcart.livery"
+      };
+      AIRFRAME_OPTIONS = [
+        { value: 0, label: "Fighter", callsign: "Viper", note: "Balanced silhouette with a steady mid-wing stance." },
+        { value: 1, label: "Interceptor", callsign: "Razor", note: "Slim nose and swept wings for a fast strike profile." },
+        { value: 2, label: "Bomber", callsign: "Mammoth", note: "Broad wings and a heavy center mass with twin nacelles." },
+        { value: 3, label: "Biplane", callsign: "Stork", note: "Stacked wings and struts for a vintage dogfight look." }
+      ];
+      PAINT_OPTIONS = [
+        { value: 0, label: "Scarlet", note: "Classic red launch paint.", swatch: "#ff6b6b" },
+        { value: 1, label: "Cobalt", note: "Cold blue squadron finish.", swatch: "#49c0ff" },
+        { value: 2, label: "Olive", note: "Field-ready tactical green.", swatch: "#8be34a" },
+        { value: 3, label: "Sunburst", note: "High-visibility yellow sweep.", swatch: "#ffd24a" },
+        { value: 4, label: "Violet", note: "Arcade purple glow tone.", swatch: "#c07bff" },
+        { value: 5, label: "Ember", note: "Hot orange carrier deck flare.", swatch: "#ff9f43" },
+        { value: 6, label: "Teal", note: "Sea-glass cyan finish.", swatch: "#00d2d3" },
+        { value: 7, label: "Cream", note: "Warm ivory patrol coat.", swatch: "#ffeaa7" },
+        { value: 8, label: "Ghost", note: "Pale alloy shell.", swatch: "#dfe6e9" },
+        { value: 9, label: "Stealth", note: "Low-light blacked-out finish.", swatch: "#2d3436" },
+        { value: 10, label: "Rust", note: "Weathered copper strike paint.", swatch: "#e17055" },
+        { value: 11, label: "Mint", note: "Bright coastal mint.", swatch: "#55efc4" }
+      ];
+      ACCENT_OPTIONS = [
+        { value: 0, label: "Midnight", note: "Dark utility trim.", swatch: "#273244" },
+        { value: 1, label: "Signal White", note: "Clean instrument-white contrast.", swatch: "#ffffff" },
+        { value: 2, label: "Iron Black", note: "Deep matte shadow line.", swatch: "#000000" },
+        { value: 3, label: "Gold", note: "Showcase deck stripe highlight.", swatch: "#ffd24a" },
+        { value: 4, label: "Crimson", note: "Red warning-band accent.", swatch: "#ff6b6b" },
+        { value: 5, label: "Ice Blue", note: "Cold neon wing edge.", swatch: "#49c0ff" },
+        { value: 6, label: "Vector Green", note: "Radar-green trim.", swatch: "#8be34a" }
+      ];
+      LIVERY_OPTIONS = [
+        { value: 0, label: "Clean", note: "Primary body with crisp wing contrast." },
+        { value: 1, label: "Stripe", note: "Single bold centerline stripe." },
+        { value: 2, label: "Two-Tone", note: "Split-color wing and tail treatment." },
+        { value: 3, label: "Camo", note: "Patchwork accent markers across the shell." }
+      ];
+      TRAIL_OPTIONS = [
+        { value: 0, label: "White Smoke", note: "Neutral engine exhaust.", swatch: "#ffffff" },
+        { value: 1, label: "Afterburner Orange", note: "Hot thrust flare.", swatch: "#ff9f43" },
+        { value: 2, label: "Cryo Blue", note: "Cold plasma stream.", swatch: "#49c0ff" },
+        { value: 3, label: "Plasma Violet", note: "Electric purple trail.", swatch: "#c07bff" },
+        { value: 4, label: "Toxic Green", note: "Acid-green vapor wake.", swatch: "#8be34a" }
+      ];
+      PRESET_SLOTS = [
+        { index: 0, label: "Deck 1" },
+        { index: 1, label: "Deck 2" },
+        { index: 2, label: "Deck 3" },
+        { index: 3, label: "Deck 4" }
+      ];
+    }
+  });
+
   // src/client/main.ts
   var require_main = __commonJS({
     "src/client/main.ts"() {
       init_host_sim();
+      init_arcadeMenu();
+      init_loadout();
       var dollar = (id) => document.getElementById(id);
+      var menuRoot = mountArcadeMenu() || dollar("start-screen");
+      var useArcadeMenu = menuRoot.id === ARCADE_MENU_HOST_ID;
+      var menuDollar = (...ids) => {
+        for (const id of ids) {
+          const el = document.getElementById(id);
+          if (el) return el;
+        }
+        throw new Error(`Missing DOM element: ${ids.join(", ")}`);
+      };
+      var menuScreenSelector = useArcadeMenu ? `.${ARCADE_MENU_SCREEN_CLASS}` : ".menu-screen";
+      var menuNavSelector = useArcadeMenu ? "[data-arcade-nav]" : "[data-nav]";
+      var menuBackSelector = useArcadeMenu ? "[data-arcade-back]" : "[data-back]";
+      var menuScreenElementId = (id) => useArcadeMenu ? arcadeScreenId(id) : `screen-${id}`;
       var G = window.GAME;
       var buzz = (ms) => {
         try {
@@ -2595,17 +3242,17 @@
         health: dollar("healthbar"),
         healthfill: dollar("healthfill"),
         respawn: dollar("respawn"),
-        start: dollar("start-screen"),
-        name: dollar("name-input"),
-        lanServer: dollar("lan-server-input"),
-        lanQuick: dollar("lan-quick-btn"),
-        lanFriends: dollar("lan-friends-btn"),
-        lanHint: dollar("lan-hint"),
-        serverBadge: dollar("menu-server-badge"),
-        roomChip: dollar("room-code-chip"),
-        orientationNote: dollar("orientation-note"),
-        friendsNote: dollar("friends-note"),
-        status: dollar("status"),
+        start: menuRoot,
+        name: menuDollar("arcade-name-input", "name-input"),
+        lanServer: menuDollar("arcade-lan-server-input", "lan-server-input"),
+        lanQuick: menuDollar("arcade-lan-quick-btn", "lan-quick-btn"),
+        lanFriends: menuDollar("arcade-lan-friends-btn", "lan-friends-btn"),
+        lanHint: menuDollar("arcade-lan-hint", "lan-hint"),
+        serverBadge: menuDollar("arcade-menu-server-badge", "menu-server-badge"),
+        roomChip: menuDollar("arcade-room-code-chip", "room-code-chip"),
+        orientationNote: menuDollar("arcade-orientation-note", "orientation-note"),
+        friendsNote: menuDollar("arcade-friends-note", "friends-note"),
+        status: menuDollar("arcade-status", "status"),
         mute: dollar("mute-btn"),
         pause: dollar("pause-screen"),
         resume: dollar("resume-btn"),
@@ -2628,7 +3275,7 @@
         scanCanvas: dollar("scan-canvas"),
         scanStatus: dollar("scan-status"),
         scanCloseBtn: dollar("scan-close-btn"),
-        scanOpenBtn: dollar("scan-open-btn"),
+        scanOpenBtn: menuDollar("arcade-scan-open-btn", "scan-open-btn"),
         inter: dollar("intermission"),
         finalBoard: dollar("final-board"),
         interTime: dollar("inter-time"),
@@ -2650,20 +3297,17 @@
         connMsg: dollar("conn-msg"),
         connRetry: dollar("conn-retry"),
         connMenu: dollar("conn-menu"),
-        bots: dollar("bots-check"),
+        bots: menuDollar("arcade-bots-check", "bots-check"),
         countdown: dollar("countdown"),
         interLeave: dollar("intermission-leave"),
-        // P2P additions
-        p2pHostBtn: dollar("p2p-host-btn"),
-        p2pOfflineBtn: dollar("p2p-offline-btn"),
-        p2pOfflineCanvas: dollar("p2p-offline-canvas"),
-        p2pAnswerInput: dollar("p2p-answer-input"),
-        p2pAnswerSubmit: dollar("p2p-answer-submit"),
-        p2pOfflineSection: dollar("p2p-offline-section"),
+        p2pOfflineBtn: menuDollar("arcade-p2p-offline-btn", "p2p-offline-btn"),
+        p2pOfflineCanvas: menuDollar("arcade-p2p-offline-canvas", "p2p-offline-canvas"),
+        p2pAnswerInput: menuDollar("arcade-p2p-answer-input", "p2p-answer-input"),
+        p2pAnswerSubmit: menuDollar("arcade-p2p-answer-submit", "p2p-answer-submit"),
+        p2pOfflineSection: menuDollar("arcade-p2p-offline-section", "p2p-offline-section"),
         hostLeftOverlay: dollar("host-left-overlay"),
         hostLeftMenuBtn: dollar("host-left-menu-btn"),
         p2pMigratingOverlay: dollar("p2p-migrating-overlay"),
-        // Slice 1 additions
         bootOverlay: dollar("boot-overlay"),
         fatalOverlay: dollar("fatal-overlay"),
         fatalMsg: dollar("fatal-msg"),
@@ -2686,26 +3330,45 @@
         settingsScreen: dollar("settings-screen"),
         settingsCloseBtn: dollar("settings-close-btn"),
         settingsCloseBtn2: dollar("settings-close-btn2"),
-        menuSettingsBtn: dollar("menu-settings-btn"),
-        joinCodeInput: dollar("join-code-input"),
-        joinCodeSubmit: dollar("join-code-submit"),
-        menuLeaderboard: dollar("menu-leaderboard"),
-        hangarOverlay: dollar("hangar-overlay"),
-        hangarBtn: dollar("hangar-btn"),
-        hangarCloseBtn: dollar("hangar-close-btn"),
-        hangarDone: dollar("hangar-done"),
+        menuSettingsBtn: menuDollar("arcade-menu-settings-btn", "menu-settings-btn"),
+        joinCodeInput: menuDollar("arcade-join-code-input", "join-code-input"),
+        joinCodeSubmit: menuDollar("arcade-join-code-submit", "join-code-submit"),
+        menuLeaderboard: menuDollar("arcade-menu-leaderboard", "menu-leaderboard"),
+        lobbyRoomChip: dollar("lobby-room-chip"),
+        lobbyModeChip: dollar("lobby-mode-chip"),
+        lobbyPlaneSummary: dollar("lobby-plane-summary"),
+        customizeOpenBtn: menuDollar("arcade-customize-open-btn", "customize-open-btn"),
+        selectedPlaneName: menuDollar("arcade-selected-plane-name", "selected-plane-name"),
+        selectedPlaneSummary: menuDollar("arcade-selected-plane-summary", "selected-plane-summary"),
+        selectedPlaneChips: menuDollar("arcade-selected-plane-chips", "selected-plane-chips"),
+        quickPlayBtn: menuDollar("arcade-quick-play-btn", "quick-play-btn"),
+        privateRoomBtn: menuDollar("arcade-private-room-btn", "private-room-btn"),
+        playLoadoutSummary: menuDollar("arcade-play-loadout-summary", "play-loadout-summary"),
+        localLoadoutSummary: menuDollar("arcade-local-loadout-summary", "local-loadout-summary"),
+        customizeSummaryName: menuDollar("arcade-customize-summary-name", "customize-summary-name"),
+        customizeSummaryText: menuDollar("arcade-customize-summary-text", "customize-summary-text"),
+        customizeSummaryGrid: menuDollar("arcade-customize-summary-grid", "customize-summary-grid"),
+        customizeFeedback: menuDollar("arcade-customize-feedback", "customize-feedback"),
+        presetGrid: menuDollar("arcade-preset-grid", "preset-grid"),
+        customizeAirframe: menuDollar("arcade-customize-airframe", "customize-airframe"),
+        customizePaint: menuDollar("arcade-customize-paint", "customize-paint"),
+        customizeAccent: menuDollar("arcade-customize-accent", "customize-accent"),
+        customizeLivery: menuDollar("arcade-customize-livery", "customize-livery"),
+        customizeTrail: menuDollar("arcade-customize-trail", "customize-trail"),
+        customizeRandomize: menuDollar("arcade-customize-randomize", "customize-randomize"),
+        customizeReset: menuDollar("arcade-customize-reset", "customize-reset"),
+        customizeDone: menuDollar("arcade-customize-done", "customize-done"),
         ingameMenuBtn: dollar("ingame-menu-btn"),
         pauseInviteBtn: dollar("pause-invite-btn"),
-        // Local Wi-Fi Party
-        localRoomName: dollar("local-room-name"),
-        localCreateBtn: dollar("local-create-btn"),
-        localScanBtn: dollar("local-scan-btn"),
-        localRoomList: dollar("local-room-list")
+        localRoomName: menuDollar("arcade-local-room-name", "local-room-name"),
+        localCreateBtn: menuDollar("arcade-local-create-btn", "local-create-btn"),
+        localScanBtn: menuDollar("arcade-local-scan-btn", "local-scan-btn"),
+        localRoomList: menuDollar("arcade-local-room-list", "local-room-list")
       };
       var mode = "menu";
+      var sceneMode = "preflight";
       var settingsOpen = false;
       var joinCodeOpen = false;
-      var hangarOpen = false;
       var last = 0;
       var prevPhase = "playing";
       var prevHp = G.MAX_HP;
@@ -2715,7 +3378,6 @@
       var engineStarted = false;
       var botsEnabled = true;
       var botDifficulty = "medium";
-      var selectedCosmetics = { color: 0, bodyShape: 0, accent: 0, trail: 0, livery: 0 };
       var inviteRoom = null;
       var inviteServer = null;
       var activeShareUrl = null;
@@ -2732,66 +3394,45 @@
       var scannerOpen = false;
       var scanRafId = null;
       var _localScanInterval = null;
-      var COLORS_HEX = [
-        "#ff6b6b",
-        // 0 Scarlet
-        "#49c0ff",
-        // 1 Cobalt
-        "#8be34a",
-        // 2 Olive
-        "#ffd24a",
-        // 3 Sunburst
-        "#c07bff",
-        // 4 Violet
-        "#ff9f43",
-        // 5 Ember
-        "#00d2d3",
-        // 6 Teal
-        "#ffeaa7",
-        // 7 Cream
-        "#dfe6e9",
-        // 8 Ghost
-        "#2d3436",
-        // 9 Stealth
-        "#e17055",
-        // 10 Rust
-        "#55efc4"
-        // 11 Mint
-      ];
-      try {
-        const legacySkin = localStorage.getItem("smashcart.skin");
-        if (legacySkin !== null && localStorage.getItem("smashcart.color") === null) {
-          const migrated = parseInt(legacySkin, 10);
-          if (Number.isInteger(migrated) && migrated >= 0 && migrated < G.COLOR_COUNT) {
-            localStorage.setItem("smashcart.color", String(migrated));
-            selectedCosmetics.color = migrated;
-          }
-          localStorage.removeItem("smashcart.skin");
-        } else {
-          const savedColor = parseInt(localStorage.getItem("smashcart.color") || "", 10);
-          if (Number.isInteger(savedColor) && savedColor >= 0 && savedColor < G.COLOR_COUNT) selectedCosmetics.color = savedColor;
+      var presetFeedbackTimeout = null;
+      var COLORS_HEX = PAINT_OPTIONS.map((option) => option.swatch || "#ffffff");
+      function readLegacyLoadout() {
+        return loadoutFromLegacy({
+          skin: localStorage.getItem(LEGACY_LOADOUT_KEYS.skin),
+          color: localStorage.getItem(LEGACY_LOADOUT_KEYS.color),
+          bodyShape: localStorage.getItem(LEGACY_LOADOUT_KEYS.bodyShape),
+          accent: localStorage.getItem(LEGACY_LOADOUT_KEYS.accent),
+          trail: localStorage.getItem(LEGACY_LOADOUT_KEYS.trail),
+          livery: localStorage.getItem(LEGACY_LOADOUT_KEYS.livery)
+        });
+      }
+      function loadPersistedLoadoutStore() {
+        try {
+          const saved = parseLoadoutStore(localStorage.getItem(LOADOUT_STORAGE_KEY));
+          if (saved) return saved;
+        } catch {
         }
-      } catch {
+        const store = createDefaultLoadoutStore();
+        try {
+          store.active = readLegacyLoadout();
+        } catch {
+          store.active = cloneLoadout(DEFAULT_LOADOUT);
+        }
+        return store;
       }
-      try {
-        const savedBodyShape = parseInt(localStorage.getItem("smashcart.bodyShape") || "", 10);
-        if (Number.isInteger(savedBodyShape) && savedBodyShape >= 0 && savedBodyShape < G.BODY_SHAPE_COUNT) selectedCosmetics.bodyShape = savedBodyShape;
-      } catch {
-      }
-      try {
-        const savedAccent = parseInt(localStorage.getItem("smashcart.accent") || "", 10);
-        if (Number.isInteger(savedAccent) && savedAccent >= 0 && savedAccent < G.ACCENT_COUNT) selectedCosmetics.accent = savedAccent;
-      } catch {
-      }
-      try {
-        const savedTrail = parseInt(localStorage.getItem("smashcart.trail") || "", 10);
-        if (Number.isInteger(savedTrail) && savedTrail >= 0 && savedTrail < G.TRAIL_COUNT) selectedCosmetics.trail = savedTrail;
-      } catch {
-      }
-      try {
-        const savedLivery = parseInt(localStorage.getItem("smashcart.livery") || "", 10);
-        if (Number.isInteger(savedLivery) && savedLivery >= 0 && savedLivery < G.LIVERY_COUNT) selectedCosmetics.livery = savedLivery;
-      } catch {
+      var loadoutStore = loadPersistedLoadoutStore();
+      var selectedCosmetics = cloneLoadout(loadoutStore.active);
+      loadoutStore.active = selectedCosmetics;
+      function persistLoadoutStore() {
+        try {
+          localStorage.setItem(LOADOUT_STORAGE_KEY, JSON.stringify(loadoutStore));
+          localStorage.setItem(LEGACY_LOADOUT_KEYS.color, String(selectedCosmetics.color));
+          localStorage.setItem(LEGACY_LOADOUT_KEYS.bodyShape, String(selectedCosmetics.bodyShape));
+          localStorage.setItem(LEGACY_LOADOUT_KEYS.accent, String(selectedCosmetics.accent));
+          localStorage.setItem(LEGACY_LOADOUT_KEYS.trail, String(selectedCosmetics.trail));
+          localStorage.setItem(LEGACY_LOADOUT_KEYS.livery, String(selectedCosmetics.livery));
+        } catch {
+        }
       }
       try {
         botsEnabled = localStorage.getItem("smashcart.bots") !== "0";
@@ -2821,6 +3462,12 @@
         const s = ["th", "st", "nd", "rd"];
         const v = n % 100;
         return n + (s[(v - 20) % 10] || s[v] || s[0]);
+      }
+      function formatClock(totalSeconds) {
+        const safe = Math.max(0, Math.ceil(totalSeconds || 0));
+        const minutes = Math.floor(safe / 60);
+        const seconds = safe % 60;
+        return `${minutes}:${String(seconds).padStart(2, "0")}`;
       }
       function genCode() {
         const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -2998,6 +3645,14 @@
         if (!activeShareUrl || els.qrBtn.disabled) return;
         els.shareQrOverlay.classList.remove("hidden");
       }
+      function updateLobbyMeta() {
+        const state = window.Net.state;
+        const modeLabel = state?.mode === "tdm" ? "Team Deathmatch" : "Free-for-all";
+        const roundLength = typeof state?.roundLength === "number" ? state.roundLength : 150;
+        const roomLabel = currentLobbyCode ? `Code ${currentLobbyCode}` : _isP2PSession ? "Wi-Fi live" : "Private room";
+        els.lobbyRoomChip.textContent = roomLabel;
+        els.lobbyModeChip.textContent = `${modeLabel} \xB7 ${formatClock(roundLength)}`;
+      }
       function renderLobbyRoster() {
         const myId = window.Net.sessionId;
         const hostId = window.Net.getHostId();
@@ -3009,6 +3664,7 @@
         } else if (currentLobbyCode) {
           els.lobbyTitle.textContent = `Room ${currentLobbyCode}`;
         }
+        updateLobbyMeta();
         if (iAmHost) {
           els.lobbySettings.classList.remove("hidden");
           const serverRoomName = window.Net.state?.roomName ?? "";
@@ -3085,8 +3741,9 @@
         els.status.textContent = text;
       }
       function setBusy(busy) {
-        els.lanQuick.disabled = busy;
-        els.lanFriends.disabled = busy;
+        [els.lanQuick, els.lanFriends, els.localCreateBtn, els.localScanBtn, els.quickPlayBtn, els.privateRoomBtn, els.joinCodeSubmit].forEach((button) => {
+          button.disabled = busy;
+        });
       }
       function updateMenuMeta(preserveStatus = true) {
         const lanOrigin = currentLanConnectOrigin();
@@ -3100,12 +3757,14 @@
           els.orientationNote.textContent = "Landscape ready. Touch controls appear after launch.";
         }
         if (inviteRoom) {
-          if (els.roomChip) els.roomChip.textContent = `Invite ${inviteRoom}`;
+          els.roomChip.textContent = `Invite ${inviteRoom}`;
+          els.roomChip.dataset.state = "invite";
           const inviteHost = inviteServer ? new URL(toPageOrigin(inviteServer)).host : location.host;
-          if (els.friendsNote) els.friendsNote.textContent = `Invite ready for room ${inviteRoom} on ${inviteHost}. Tap \u{1F4F7} on the home screen to join.`;
+          if (els.friendsNote) els.friendsNote.textContent = `Invite ready for room ${inviteRoom} on ${inviteHost}. Open Join / Scan to connect.`;
           if (!preserveStatus || !els.status.textContent) setStatus(`Invite ready: room ${inviteRoom}`);
         } else {
-          if (els.roomChip) els.roomChip.textContent = lanOrigin ? "LAN ready" : "Local";
+          els.roomChip.textContent = lanOrigin ? "LAN ready" : "Deck local";
+          els.roomChip.dataset.state = lanOrigin ? "lan" : "local";
           if (els.friendsNote) els.friendsNote.textContent = "";
           if (!preserveStatus) setStatus("");
         }
@@ -3158,9 +3817,34 @@
         saveLanOrigin(origin);
         return origin;
       }
+      var MENU_SCREENS = ["home", "play", "join", "lan", "leaders", "customize"];
       var navStack = ["home"];
+      function currentMenuScreen() {
+        return navStack[navStack.length - 1] || "home";
+      }
+      function deriveSceneMode(state = window.Net?.state) {
+        if (mode === "menu") return currentMenuScreen() === "customize" ? "customize" : "preflight";
+        if (mode === "lobby") return "lobby";
+        if (mode === "paused") return "paused";
+        if (mode === "playing") return state && state.phase === "intermission" ? "results" : "playing";
+        return "preflight";
+      }
+      function syncSceneMode(state = window.Net?.state) {
+        const next = deriveSceneMode(state);
+        if (sceneMode === next && document.body.dataset.sceneMode === next) return;
+        sceneMode = next;
+        document.body.dataset.sceneMode = next;
+        if (window.Renderer && window.Renderer.setSceneMode) window.Renderer.setSceneMode(next);
+      }
       function navShow(id) {
-        document.querySelectorAll(".menu-screen").forEach((s) => s.classList.toggle("active", s.id === `screen-${id}`));
+        document.body.dataset.menuScreen = id;
+        menuRoot.querySelectorAll(menuScreenSelector).forEach((screen2) => screen2.classList.toggle("active", screen2.id === menuScreenElementId(id)));
+        menuRoot.scrollTop = 0;
+        const menuShell = menuRoot.firstElementChild;
+        if (menuShell instanceof HTMLElement) menuShell.scrollTop = 0;
+        if (id === "lan") startLocalScanWithAutoRefresh();
+        else stopLocalScanInterval();
+        syncSceneMode(window.Net?.state);
       }
       function navGo(id) {
         if (navStack[navStack.length - 1] === id) return;
@@ -3197,6 +3881,8 @@
         els.hostLeftOverlay.classList.add("hidden");
         els.p2pMigratingOverlay.classList.add("hidden");
         if (mode !== "lobby") els.share.classList.add("hidden");
+        if (!isMenu) stopLocalScanInterval();
+        syncSceneMode(window.Net?.state);
       }
       function showHostLeftOverlay() {
         els.hostLeftOverlay.classList.remove("hidden");
@@ -3363,121 +4049,139 @@
           els.menuLeaderboard.innerHTML = '<div class="lb-row muted">Leaderboard unavailable</div>';
         });
       }
-      function showHangar() {
-        hangarOpen = true;
-        els.hangarOverlay.classList.remove("hidden");
-        if (window.Renderer && window.Renderer.setHangarOpen) window.Renderer.setHangarOpen(true);
+      function setCustomizeFeedback(text, sticky = false) {
+        els.customizeFeedback.textContent = text;
+        if (presetFeedbackTimeout !== null) {
+          clearTimeout(presetFeedbackTimeout);
+          presetFeedbackTimeout = null;
+        }
+        if (!sticky) {
+          presetFeedbackTimeout = setTimeout(() => {
+            presetFeedbackTimeout = null;
+            els.customizeFeedback.textContent = "Cosmetics are visual only. No effect on flight or damage.";
+          }, 2200);
+        }
+      }
+      function findActivePresetIndex() {
+        return loadoutStore.presets.findIndex((preset) => sameLoadout(preset, selectedCosmetics));
+      }
+      function renderChipStrip(target, rows) {
+        target.innerHTML = rows.map(
+          (row) => `<span class="summary-chip"><span>${escapeHtml(row.label)}</span><strong>${escapeHtml(row.value)}</strong></span>`
+        ).join("");
+      }
+      function renderSummaryGrid(rows) {
+        els.customizeSummaryGrid.innerHTML = rows.map(
+          (row) => `<div class="summary-grid-row"><span>${escapeHtml(row.label)}</span><strong>${escapeHtml(row.value)}</strong></div>`
+        ).join("");
+      }
+      function updateSelectedLoadout(next, feedback) {
+        selectedCosmetics = cloneLoadout(next);
+        loadoutStore.active = selectedCosmetics;
+        persistLoadoutStore();
+        renderLoadoutUI();
         if (window.Renderer && window.Renderer.updateMenuPlane) window.Renderer.updateMenuPlane(selectedCosmetics);
+        if (feedback) setCustomizeFeedback(feedback);
       }
-      function hideHangar() {
-        hangarOpen = false;
-        els.hangarOverlay.classList.add("hidden");
-        if (window.Renderer && window.Renderer.setHangarOpen) window.Renderer.setHangarOpen(false);
+      function updateLoadoutField(key, value) {
+        const next = cloneLoadout(selectedCosmetics);
+        next[key] = value;
+        updateSelectedLoadout(next);
       }
-      function buildHangar() {
-        const tabs = els.hangarOverlay.querySelectorAll(".hangar-tab");
-        const sections = els.hangarOverlay.querySelectorAll(".hangar-section");
-        function activateTab(tabName) {
-          tabs.forEach((t) => {
-            const active = t.dataset.tab === tabName;
-            t.classList.toggle("active", active);
-            t.setAttribute("aria-selected", active ? "true" : "false");
-          });
-          sections.forEach((s) => {
-            const active = s.dataset.section === tabName;
-            s.classList.toggle("active", active);
-            s.classList.toggle("hidden", !active);
-          });
-        }
-        tabs.forEach((tab) => {
-          tab.addEventListener("click", () => {
+      function renderPresetGrid() {
+        const activePreset = findActivePresetIndex();
+        els.presetGrid.innerHTML = PRESET_SLOTS.map((slot) => {
+          const preset = loadoutStore.presets[slot.index] || cloneLoadout(DEFAULT_LOADOUT);
+          const summary = getLoadoutSummary(preset);
+          const isActive = activePreset === slot.index;
+          const swatches = [
+            PAINT_OPTIONS[preset.color]?.swatch || "#ffffff",
+            ACCENT_OPTIONS[preset.accent]?.swatch || "#ffffff",
+            TRAIL_OPTIONS[preset.trail]?.swatch || "#ffffff"
+          ];
+          return `
+      <article class="preset-card${isActive ? " is-active" : ""}">
+        <div class="preset-card-head">
+          <div>
+            <p class="preset-label">${escapeHtml(slot.label)}</p>
+            <h4>${escapeHtml(summary.title)}</h4>
+          </div>
+          <span class="preset-state">${isActive ? "Armed" : "Stored"}</span>
+        </div>
+        <p class="preset-copy">${escapeHtml(summary.subtitle)}</p>
+        <div class="preset-swatch-row">${swatches.map((swatch) => `<span class="preset-swatch" style="--swatch:${swatch}"></span>`).join("")}</div>
+        <div class="preset-actions">
+          <button class="preset-apply-btn" data-slot="${slot.index}">APPLY</button>
+          <button class="preset-save-btn secondary" data-slot="${slot.index}">SAVE</button>
+        </div>
+      </article>`;
+        }).join("");
+        els.presetGrid.querySelectorAll(".preset-apply-btn").forEach((button) => {
+          button.addEventListener("click", () => {
+            const slot = Number.parseInt(button.dataset.slot || "", 10);
+            if (!Number.isFinite(slot) || !loadoutStore.presets[slot]) return;
             window.SFX.uiClick();
-            activateTab(tab.dataset.tab);
+            updateSelectedLoadout(loadoutStore.presets[slot], `${PRESET_SLOTS[slot].label} armed.`);
           });
         });
-        const shapeLabels = ["Fighter", "Interceptor", "Bomber", "Biplane"];
-        shapeLabels.forEach((_, i) => {
-          const btn = dollar(`hangar-shape-${i}`);
-          btn.classList.toggle("selected", selectedCosmetics.bodyShape === i);
-          btn.addEventListener("click", () => {
-            selectedCosmetics.bodyShape = i;
-            try {
-              localStorage.setItem("smashcart.bodyShape", String(i));
-            } catch {
-            }
-            els.hangarOverlay.querySelectorAll(".hangar-shape-btn").forEach((b, j) => b.classList.toggle("selected", j === i));
+        els.presetGrid.querySelectorAll(".preset-save-btn").forEach((button) => {
+          button.addEventListener("click", () => {
+            const slot = Number.parseInt(button.dataset.slot || "", 10);
+            if (!Number.isFinite(slot) || !loadoutStore.presets[slot]) return;
+            loadoutStore.presets[slot] = cloneLoadout(selectedCosmetics);
+            persistLoadoutStore();
+            renderLoadoutUI();
             window.SFX.uiClick();
-            if (window.Renderer && window.Renderer.updateMenuPlane) window.Renderer.updateMenuPlane(selectedCosmetics);
+            setCustomizeFeedback(`${PRESET_SLOTS[slot].label} saved.`);
           });
         });
-        COLORS_HEX.forEach((_, i) => {
-          const btn = dollar(`hangar-color-${i}`);
-          btn.classList.toggle("selected", selectedCosmetics.color === i);
-          btn.addEventListener("click", () => {
-            selectedCosmetics.color = i;
-            try {
-              localStorage.setItem("smashcart.color", String(i));
-            } catch {
-            }
-            els.hangarOverlay.querySelectorAll("[id^='hangar-color-']").forEach((b) => {
-              const idx = parseInt(b.id.replace("hangar-color-", ""), 10);
-              b.classList.toggle("selected", idx === i);
-            });
+      }
+      function renderOptionGroup(target, key, options, variant) {
+        target.innerHTML = options.map((option) => {
+          const selected = selectedCosmetics[key] === option.value;
+          if (variant === "swatches") {
+            return `
+        <button class="option-btn option-btn--swatch${selected ? " is-selected" : ""}" data-key="${key}" data-value="${option.value}" style="--swatch:${option.swatch || "#ffffff"}">
+          <span class="option-swatch"></span>
+          <span class="option-copy">
+            <strong>${escapeHtml(option.label)}</strong>
+            <span>${escapeHtml(option.note)}</span>
+          </span>
+        </button>`;
+          }
+          return `
+      <button class="option-btn option-btn--card${selected ? " is-selected" : ""}" data-key="${key}" data-value="${option.value}">
+        <strong>${escapeHtml(option.label)}</strong>
+        <span>${escapeHtml(option.note)}</span>
+      </button>`;
+        }).join("");
+        target.querySelectorAll(".option-btn").forEach((button) => {
+          button.addEventListener("click", () => {
+            const value = Number.parseInt(button.dataset.value || "", 10);
+            if (!Number.isFinite(value)) return;
             window.SFX.uiClick();
-            if (window.Renderer && window.Renderer.updateMenuPlane) window.Renderer.updateMenuPlane(selectedCosmetics);
+            updateLoadoutField(key, value);
           });
         });
-        const accentCount = 7;
-        for (let i = 0; i < accentCount; i++) {
-          const btn = dollar(`hangar-accent-${i}`);
-          btn.classList.toggle("selected", selectedCosmetics.accent === i);
-          btn.addEventListener("click", () => {
-            selectedCosmetics.accent = i;
-            try {
-              localStorage.setItem("smashcart.accent", String(i));
-            } catch {
-            }
-            els.hangarOverlay.querySelectorAll("[id^='hangar-accent-']").forEach((b) => {
-              const idx = parseInt(b.id.replace("hangar-accent-", ""), 10);
-              b.classList.toggle("selected", idx === i);
-            });
-            window.SFX.uiClick();
-            if (window.Renderer && window.Renderer.updateMenuPlane) window.Renderer.updateMenuPlane(selectedCosmetics);
-          });
-        }
-        const liveryLabels = ["Clean", "Stripe", "Two-Tone", "Camo"];
-        liveryLabels.forEach((_, i) => {
-          const btn = dollar(`hangar-livery-${i}`);
-          btn.classList.toggle("selected", selectedCosmetics.livery === i);
-          btn.addEventListener("click", () => {
-            selectedCosmetics.livery = i;
-            try {
-              localStorage.setItem("smashcart.livery", String(i));
-            } catch {
-            }
-            els.hangarOverlay.querySelectorAll(".hangar-livery-btn").forEach((b, j) => b.classList.toggle("selected", j === i));
-            window.SFX.uiClick();
-            if (window.Renderer && window.Renderer.updateMenuPlane) window.Renderer.updateMenuPlane(selectedCosmetics);
-          });
-        });
-        const trailCount = 5;
-        for (let i = 0; i < trailCount; i++) {
-          const btn = dollar(`hangar-trail-${i}`);
-          btn.classList.toggle("selected", selectedCosmetics.trail === i);
-          btn.addEventListener("click", () => {
-            selectedCosmetics.trail = i;
-            try {
-              localStorage.setItem("smashcart.trail", String(i));
-            } catch {
-            }
-            els.hangarOverlay.querySelectorAll("[id^='hangar-trail-']").forEach((b) => {
-              const idx = parseInt(b.id.replace("hangar-trail-", ""), 10);
-              b.classList.toggle("selected", idx === i);
-            });
-            window.SFX.uiClick();
-            if (window.Renderer && window.Renderer.updateMenuPlane) window.Renderer.updateMenuPlane(selectedCosmetics);
-          });
-        }
+      }
+      function renderLoadoutUI() {
+        const summary = getLoadoutSummary(selectedCosmetics);
+        const rows = getLoadoutDetailRows(selectedCosmetics);
+        els.selectedPlaneName.textContent = summary.title;
+        els.selectedPlaneSummary.textContent = summary.subtitle;
+        els.playLoadoutSummary.textContent = `${summary.title} \xB7 ${rows.map((row) => row.value).join(" \xB7 ")}`;
+        els.localLoadoutSummary.textContent = `${summary.title} \xB7 ${rows.map((row) => row.value).join(" \xB7 ")}`;
+        els.lobbyPlaneSummary.textContent = `${summary.title} \xB7 ${rows.map((row) => row.value).join(" \xB7 ")}`;
+        els.customizeSummaryName.textContent = summary.title;
+        els.customizeSummaryText.textContent = summary.subtitle;
+        renderChipStrip(els.selectedPlaneChips, rows);
+        renderSummaryGrid(rows);
+        renderPresetGrid();
+        renderOptionGroup(els.customizeAirframe, "bodyShape", AIRFRAME_OPTIONS, "cards");
+        renderOptionGroup(els.customizePaint, "color", PAINT_OPTIONS, "swatches");
+        renderOptionGroup(els.customizeAccent, "accent", ACCENT_OPTIONS, "swatches");
+        renderOptionGroup(els.customizeLivery, "livery", LIVERY_OPTIONS, "cards");
+        renderOptionGroup(els.customizeTrail, "trail", TRAIL_OPTIONS, "swatches");
       }
       async function startGame(code, serverOrigin = null) {
         let roomCode = code;
@@ -3714,7 +4418,7 @@
         }
       }
       async function runLocalScan() {
-        els.localRoomList.innerHTML = '<p class="muted">Scanning\u2026</p>';
+        els.localRoomList.innerHTML = '<article class="local-state-card"><p class="deck-label">Scanning hotspot</p><h4>Looking for active rooms</h4><p class="muted">Hosts on the same Wi-Fi appear here automatically.</p></article>';
         let rooms = [];
         try {
           rooms = await WebRtcTransport.listRooms();
@@ -3722,7 +4426,7 @@
           rooms = [];
         }
         if (!rooms.length) {
-          els.localRoomList.innerHTML = `<p class="muted local-empty">No rooms found on your network \u2014 make sure everyone is on the host's hotspot.</p><button class="local-rescan-btn secondary" id="local-rescan-btn">Re-scan</button>`;
+          els.localRoomList.innerHTML = '<article class="local-state-card"><p class="deck-label">No rooms found</p><h4>Nothing is broadcasting yet</h4><p class="muted">Ask the host to tap Create Room on the hotspot device, then scan again.</p></article><button class="local-rescan-btn secondary" id="local-rescan-btn">Re-scan</button>';
           const rescan2 = document.getElementById("local-rescan-btn");
           if (rescan2) rescan2.addEventListener("click", () => {
             window.SFX.uiClick();
@@ -3733,10 +4437,13 @@
         els.localRoomList.innerHTML = rooms.map(
           (r) => `<div class="local-room-row" data-room="${escapeHtml(r.code)}" role="button" tabindex="0" aria-label="Join ${escapeHtml(r.name || r.code)}">
       <div class="local-room-row-info">
-        <span class="local-room-row-name">${escapeHtml(r.name || r.code)}</span>
-        <span class="local-room-row-meta">${escapeHtml(r.hostName || "Unknown")} \xB7 ${r.count} player${r.count !== 1 ? "s" : ""}</span>
+        <div class="local-room-row-head">
+          <span class="local-room-row-name">${escapeHtml(r.name || r.code)}</span>
+          <span class="local-room-tag">${r.count} pilot${r.count !== 1 ? "s" : ""}</span>
+        </div>
+        <span class="local-room-row-meta">Hosted by ${escapeHtml(r.hostName || "Unknown")} \xB7 Same hotspot</span>
       </div>
-      <button class="local-room-join-btn" data-room="${escapeHtml(r.code)}">JOIN</button>
+      <button class="local-room-join-btn" data-room="${escapeHtml(r.code)}">Join</button>
     </div>`
         ).join("") + '<button class="local-rescan-btn secondary" id="local-rescan-btn">Re-scan</button>';
         els.localRoomList.querySelectorAll(".local-room-row").forEach((row) => {
@@ -3779,7 +4486,7 @@
         runLocalScan();
         stopLocalScanInterval();
         _localScanInterval = setInterval(() => {
-          const lanScreen = document.getElementById("screen-lan");
+          const lanScreen = document.getElementById(menuScreenElementId("lan"));
           if (!lanScreen || !lanScreen.classList.contains("active")) {
             stopLocalScanInterval();
             return;
@@ -3867,6 +4574,7 @@
         if (!isFinite(dt) || dt <= 0) return;
         dt = Math.min(dt, 0.05);
         const state = window.Net.state;
+        syncSceneMode(state);
         if (mode === "playing" && state) {
           const myId = window.Net.sessionId;
           const input = window.Input.get();
@@ -3897,7 +4605,7 @@
         const me = state.players.get(myId);
         const local = window.Net.localPose;
         els.score.textContent = String(me ? me.score : 0);
-        els.time.textContent = String(Math.ceil(state.timeLeft));
+        els.time.textContent = formatClock(state.timeLeft);
         const altitude = local && local.active ? local.p.y : me ? me.py : 0;
         const speed = local && local.active ? local.speed : me ? me.speed : 0;
         els.alt.textContent = String(Math.round(altitude));
@@ -3988,7 +4696,7 @@
         }
         if (state.phase === "intermission") {
           els.inter.classList.remove("hidden");
-          els.interTime.textContent = String(Math.ceil(state.timeLeft));
+          els.interTime.textContent = formatClock(state.timeLeft);
           if (isTdm) {
             const ts0 = state.teamScore0 ?? 0;
             const ts1 = state.teamScore1 ?? 0;
@@ -4293,7 +5001,8 @@
           }
           window.SFX.uiClick();
         });
-        buildHangar();
+        renderLoadoutUI();
+        persistLoadoutStore();
         fetchLeaderboard();
         setupTouchButtons();
         updateRotateOverlay();
@@ -4303,19 +5012,27 @@
         if (window.Input.isTouchDevice()) document.body.classList.add("touch-device");
         els.localRoomName.placeholder = randomLocalRoomName();
         els.localRoomName.value = "";
-        document.querySelectorAll("[data-nav]").forEach((el) => {
+        menuRoot.querySelectorAll(menuNavSelector).forEach((el) => {
           el.addEventListener("click", () => {
+            const target = useArcadeMenu ? el.dataset.arcadeNav : el.dataset.nav;
+            if (!target) return;
             window.SFX.uiClick();
-            navGo(el.dataset.nav);
+            navGo(target);
           });
         });
-        document.querySelectorAll("[data-back]").forEach((el) => {
+        menuRoot.querySelectorAll(menuBackSelector).forEach((el) => {
           el.addEventListener("click", () => {
             window.SFX.uiClick();
             navBack();
           });
         });
-        navReset();
+        const initialHashScreen = location.hash.replace(/^#/, "").toLowerCase();
+        if (MENU_SCREENS.includes(initialHashScreen)) {
+          navStack = [initialHashScreen];
+          navShow(initialHashScreen);
+        } else {
+          navReset();
+        }
         els.ingameMenuBtn.addEventListener("click", () => {
           window.SFX.uiClick();
           togglePause();
@@ -4323,10 +5040,6 @@
         els.pauseInviteBtn.addEventListener("click", () => {
           window.SFX.uiClick();
           showShareQr();
-        });
-        els.p2pHostBtn.addEventListener("click", () => {
-          window.SFX.uiClick();
-          startP2PHost();
         });
         els.p2pOfflineBtn.addEventListener("click", async () => {
           window.SFX.uiClick();
@@ -4375,12 +5088,6 @@
         els.localScanBtn.addEventListener("click", () => {
           window.SFX.uiClick();
           startLocalScanWithAutoRefresh();
-        });
-        document.querySelectorAll("[data-back]").forEach((el) => {
-          el.addEventListener("click", stopLocalScanInterval);
-        });
-        document.querySelectorAll("[data-nav]").forEach((el) => {
-          if (el.dataset.nav !== "lan") el.addEventListener("click", stopLocalScanInterval);
         });
         els.lanQuick.addEventListener("click", () => {
           window.SFX.uiClick();
@@ -4498,20 +5205,21 @@
         els.settingsScreen.addEventListener("click", (e) => {
           if (e.target === els.settingsScreen) hideSettings();
         });
-        els.hangarBtn.addEventListener("click", () => {
+        els.quickPlayBtn.addEventListener("click", () => {
           window.SFX.uiClick();
-          showHangar();
+          startGame("PUBLIC");
         });
-        els.hangarCloseBtn.addEventListener("click", () => {
+        els.privateRoomBtn.addEventListener("click", () => {
           window.SFX.uiClick();
-          hideHangar();
+          startGame(genCode());
         });
-        els.hangarDone.addEventListener("click", () => {
+        els.customizeRandomize.addEventListener("click", () => {
           window.SFX.uiClick();
-          hideHangar();
+          updateSelectedLoadout(randomizeLoadout(), "Random loadout armed.");
         });
-        els.hangarOverlay.addEventListener("click", (e) => {
-          if (e.target === els.hangarOverlay) hideHangar();
+        els.customizeReset.addEventListener("click", () => {
+          window.SFX.uiClick();
+          updateSelectedLoadout(DEFAULT_LOADOUT, "Loadout reset to deck default.");
         });
         const volMasterEl = document.getElementById("set-vol-master");
         const volSfxEl = document.getElementById("set-vol-sfx");
@@ -4749,10 +5457,6 @@
             }
             if (!els.shareQrOverlay.classList.contains("hidden")) {
               hideShareQr();
-              return;
-            }
-            if (hangarOpen) {
-              hideHangar();
               return;
             }
             if (settingsOpen) {

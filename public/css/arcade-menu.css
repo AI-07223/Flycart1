@@ -1,0 +1,1033 @@
+body.arcade-menu-enabled #start-screen {
+  display: none !important;
+}
+
+#arcade-start-screen {
+  display: block;
+  justify-content: flex-start;
+  overflow-y: auto;
+  padding: clamp(16px, 2vw, 28px);
+  background:
+    radial-gradient(circle at top, rgba(255, 168, 0, 0.16), transparent 30%),
+    radial-gradient(circle at 20% 20%, rgba(0, 196, 255, 0.14), transparent 32%),
+    linear-gradient(180deg, rgba(5, 10, 18, 0.78), rgba(3, 7, 12, 0.94));
+  text-align: left;
+}
+
+.arcade-menu-shell {
+  --arcade-bg: rgba(6, 12, 20, 0.88);
+  --arcade-panel: linear-gradient(180deg, rgba(18, 27, 42, 0.96), rgba(10, 16, 28, 0.96));
+  --arcade-panel-soft: linear-gradient(180deg, rgba(14, 21, 33, 0.9), rgba(7, 12, 22, 0.92));
+  --arcade-line: rgba(163, 194, 225, 0.16);
+  --arcade-text: #f1f5fb;
+  --arcade-muted: #9eb1c9;
+  --arcade-amber: #ffbe3d;
+  --arcade-amber-deep: #a85c06;
+  --arcade-cyan: #69e5ff;
+  --arcade-red: #ff6d47;
+  --arcade-green: #76f0b2;
+  position: relative;
+  width: min(1380px, 100%);
+  min-height: calc(100vh - clamp(32px, 4vw, 56px));
+  margin: 0 auto;
+  border-radius: 34px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.03), transparent 28%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent 22%),
+    var(--arcade-bg);
+  box-shadow:
+    0 26px 70px rgba(0, 0, 0, 0.48),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.02);
+  backdrop-filter: blur(16px);
+  overflow: hidden;
+}
+
+.arcade-menu-shell::before,
+.arcade-menu-shell::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.arcade-menu-shell::before {
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
+  background-size: 100% 36px, 36px 100%;
+  opacity: 0.22;
+}
+
+.arcade-menu-shell::after {
+  inset: 18px;
+  border: 1px solid rgba(105, 229, 255, 0.12);
+  border-radius: 24px;
+  mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  padding: 1px;
+  opacity: 0.55;
+}
+
+.arcade-menu-shell,
+.arcade-menu-shell button,
+.arcade-menu-shell input {
+  font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+}
+
+.arcade-menu-shell h1,
+.arcade-menu-shell h2,
+.arcade-menu-shell h3,
+.arcade-menu-shell strong,
+.arcade-screen-title,
+.arcade-command-copy strong,
+.arcade-panel-title {
+  font-family: "Arial Black", "Impact", "Franklin Gothic Heavy", sans-serif;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.arcade-menu-router {
+  position: relative;
+  z-index: 1;
+  min-height: calc(100vh - clamp(32px, 4vw, 56px));
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  padding: clamp(20px, 3vw, 34px);
+}
+
+.arcade-menu-screen {
+  display: none;
+  gap: 22px;
+}
+
+.arcade-menu-screen.active {
+  display: flex;
+  flex-direction: column;
+  animation: arcadeScreenIn 180ms ease;
+}
+
+@keyframes arcadeScreenIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.arcade-home-hero,
+.arcade-home-grid,
+.arcade-mode-grid,
+.arcade-join-grid,
+.arcade-local-grid,
+.arcade-customize-layout {
+  display: grid;
+  gap: 20px;
+}
+
+.arcade-home-hero {
+  grid-template-columns: minmax(0, 1.5fr) minmax(320px, 0.9fr);
+  align-items: stretch;
+}
+
+.arcade-title-block,
+.arcade-hero-console,
+.arcade-panel,
+.arcade-banner {
+  position: relative;
+  border: 1px solid var(--arcade-line);
+  border-radius: 24px;
+  background: var(--arcade-panel);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 12px 30px rgba(0, 0, 0, 0.24);
+}
+
+.arcade-title-block {
+  padding: clamp(28px, 4vw, 40px);
+  min-height: 250px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  background:
+    radial-gradient(circle at top left, rgba(255, 190, 61, 0.14), transparent 38%),
+    linear-gradient(180deg, rgba(20, 32, 48, 0.96), rgba(8, 13, 23, 0.94));
+}
+
+.arcade-kicker,
+.arcade-panel-kicker {
+  color: var(--arcade-cyan);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+}
+
+.arcade-title-block h1 {
+  font-size: clamp(54px, 11vw, 118px);
+  line-height: 0.88;
+  color: var(--arcade-text);
+  text-shadow: 0 0 26px rgba(255, 190, 61, 0.12);
+}
+
+.arcade-tagline,
+.arcade-panel-copy,
+.arcade-screen-copy,
+.arcade-hero-copy {
+  color: #d2deed;
+  font-size: 15px;
+  line-height: 1.7;
+}
+
+.arcade-hero-console {
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 18px;
+  background:
+    radial-gradient(circle at right top, rgba(105, 229, 255, 0.12), transparent 34%),
+    var(--arcade-panel-soft);
+}
+
+.arcade-chip-cluster,
+.arcade-hero-actions,
+.arcade-field-row,
+.arcade-inline-field,
+.arcade-fallback-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.arcade-menu-shell .signal-chip,
+.arcade-menu-shell .server-badge,
+.arcade-panel-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 38px;
+  border-radius: 999px;
+  padding: 0 14px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.arcade-menu-shell .signal-chip {
+  background: rgba(12, 26, 40, 0.92);
+  color: #eef8ff;
+}
+
+.arcade-menu-shell .server-badge {
+  background: rgba(255, 190, 61, 0.14);
+  border-color: rgba(255, 190, 61, 0.24);
+  color: #ffe2a4;
+}
+
+.arcade-panel-badge {
+  background: rgba(255, 190, 61, 0.12);
+  border-color: rgba(255, 190, 61, 0.24);
+  color: #ffe0a2;
+}
+
+.arcade-panel-badge--subtle {
+  background: rgba(255, 255, 255, 0.05);
+  color: #cdd9e8;
+}
+
+.arcade-menu-shell button {
+  min-height: 54px;
+  border-radius: 16px;
+  border: 1px solid transparent;
+  box-shadow: none;
+  color: #fff;
+  background: transparent;
+  transition: transform 120ms ease, border-color 120ms ease, background 120ms ease, box-shadow 120ms ease;
+}
+
+.arcade-menu-shell button:hover {
+  transform: translateY(-2px);
+}
+
+.arcade-menu-shell button:active {
+  transform: translateY(1px);
+  box-shadow: none;
+}
+
+.arcade-meta-btn,
+.arcade-panel-action,
+.arcade-back-btn {
+  padding: 0 18px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: linear-gradient(180deg, rgba(30, 41, 59, 0.96), rgba(14, 21, 33, 0.96));
+  color: #eef6ff;
+}
+
+.arcade-meta-btn {
+  flex: 1 1 0;
+  min-width: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-size: 12px;
+}
+
+.arcade-meta-btn--secondary,
+.arcade-panel-action--secondary,
+.arcade-menu-shell button.secondary {
+  background: linear-gradient(180deg, rgba(20, 30, 46, 0.96), rgba(8, 13, 23, 0.96));
+  border-color: rgba(137, 168, 201, 0.16);
+  color: #dce7f4;
+}
+
+.arcade-home-grid {
+  grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.25fr);
+}
+
+.arcade-panel {
+  padding: 22px;
+}
+
+.arcade-panel-header,
+.arcade-screen-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.arcade-panel-header {
+  margin-bottom: 16px;
+}
+
+.arcade-panel-title {
+  font-size: clamp(22px, 3vw, 34px);
+  line-height: 1;
+  color: var(--arcade-text);
+}
+
+.arcade-loadout-panel .arcade-panel-copy {
+  margin-bottom: 18px;
+}
+
+.arcade-panel-action {
+  padding: 0 16px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.arcade-panel-action--wide {
+  width: 100%;
+  justify-content: center;
+}
+
+.arcade-command-stack {
+  display: grid;
+  gap: 14px;
+}
+
+.arcade-command-btn {
+  position: relative;
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  padding: 20px 22px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 22px;
+  background:
+    linear-gradient(90deg, rgba(255, 255, 255, 0.02), transparent 20%),
+    linear-gradient(180deg, rgba(22, 33, 50, 0.98), rgba(9, 15, 26, 0.98));
+  overflow: hidden;
+}
+
+.arcade-command-btn::after {
+  content: "";
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 3px;
+  background: linear-gradient(90deg, rgba(105, 229, 255, 0.65), rgba(255, 190, 61, 0.8));
+  opacity: 0.7;
+}
+
+.arcade-command-btn--major {
+  background:
+    radial-gradient(circle at left center, rgba(255, 190, 61, 0.18), transparent 34%),
+    linear-gradient(180deg, rgba(39, 27, 10, 0.98), rgba(18, 12, 4, 0.98));
+  border-color: rgba(255, 190, 61, 0.3);
+}
+
+.arcade-command-btn:hover {
+  border-color: rgba(105, 229, 255, 0.36);
+  box-shadow:
+    0 16px 26px rgba(0, 0, 0, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.arcade-command-icon {
+  width: 64px;
+  height: 64px;
+  display: grid;
+  place-items: center;
+  border-radius: 18px;
+  background:
+    linear-gradient(180deg, rgba(105, 229, 255, 0.16), rgba(105, 229, 255, 0.04)),
+    rgba(8, 16, 26, 0.9);
+  border: 1px solid rgba(105, 229, 255, 0.2);
+  color: #ecf8ff;
+  font-family: "Arial Black", "Impact", sans-serif;
+  font-size: 22px;
+  letter-spacing: 0.08em;
+}
+
+.arcade-command-copy {
+  display: grid;
+  gap: 4px;
+  text-align: left;
+}
+
+.arcade-command-copy strong {
+  font-size: clamp(20px, 2.5vw, 30px);
+  color: #fff;
+}
+
+.arcade-command-copy span,
+.arcade-rule-row span {
+  color: var(--arcade-muted);
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.arcade-command-tag {
+  align-self: flex-start;
+  min-width: 74px;
+  padding: 8px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #d9e5f3;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.arcade-field {
+  display: grid;
+  gap: 8px;
+  min-width: min(100%, 240px);
+  flex: 1 1 220px;
+}
+
+.arcade-field-label,
+.arcade-banner-label {
+  color: var(--arcade-cyan);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.arcade-input {
+  width: 100%;
+  min-height: 56px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  padding: 0 16px;
+  color: #fff;
+  background: rgba(3, 8, 14, 0.86);
+  font-size: 15px;
+  outline: none;
+  transition: border-color 120ms ease, box-shadow 120ms ease, background 120ms ease;
+}
+
+.arcade-input::placeholder {
+  color: #6f839e;
+}
+
+.arcade-input:focus {
+  border-color: rgba(105, 229, 255, 0.42);
+  box-shadow: 0 0 0 3px rgba(105, 229, 255, 0.12);
+  background: rgba(6, 13, 22, 0.94);
+}
+
+.arcade-input--wide {
+  margin: 16px 0 14px;
+}
+
+.arcade-switch {
+  flex: 1 1 260px;
+  min-height: 56px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 16px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(3, 8, 14, 0.74);
+  color: #dce8f5;
+}
+
+.arcade-switch input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--arcade-amber);
+}
+
+.arcade-screen-header {
+  padding: 4px 0 2px;
+}
+
+.arcade-back-btn {
+  min-width: 110px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: 12px;
+}
+
+.arcade-screen-title-wrap {
+  flex: 1 1 auto;
+  display: grid;
+  gap: 6px;
+}
+
+.arcade-screen-title {
+  font-size: clamp(32px, 5vw, 56px);
+  line-height: 0.95;
+  color: var(--arcade-text);
+}
+
+.arcade-banner {
+  padding: 16px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  background:
+    linear-gradient(90deg, rgba(255, 190, 61, 0.12), transparent 40%),
+    var(--arcade-panel-soft);
+}
+
+.arcade-banner p {
+  color: #edf5ff;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.arcade-mode-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.arcade-route-panel {
+  max-width: 960px;
+}
+
+.arcade-join-grid,
+.arcade-local-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: start;
+}
+
+.arcade-local-grid--brief {
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+}
+
+.arcade-rule-list {
+  display: grid;
+  gap: 12px;
+}
+
+.arcade-rule-row {
+  display: grid;
+  grid-template-columns: 104px minmax(0, 1fr);
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.arcade-rule-row strong {
+  color: #fff2cb;
+  font-size: 14px;
+}
+
+.arcade-local-actions {
+  display: grid;
+  gap: 14px;
+}
+
+.arcade-local-room-list {
+  min-height: 220px;
+}
+
+.arcade-divider {
+  height: 1px;
+  margin: 18px 0;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.12), transparent);
+}
+
+.arcade-hint {
+  margin-top: 10px;
+  min-height: 20px;
+}
+
+.arcade-offline-section {
+  margin-top: 14px;
+  display: grid;
+  gap: 12px;
+}
+
+.arcade-offline-canvas {
+  display: block;
+  margin: 0 auto;
+  max-width: 220px;
+  border-radius: 14px;
+  background: #fff;
+}
+
+.arcade-leaderboard-panel {
+  max-width: 860px;
+}
+
+.arcade-customize-layout {
+  grid-template-columns: minmax(320px, 0.78fr) minmax(0, 1.22fr);
+  align-items: start;
+}
+
+.arcade-customize-sidebar,
+.arcade-customize-main,
+.arcade-option-columns {
+  display: grid;
+  gap: 18px;
+}
+
+.arcade-stage-panel {
+  padding: 26px;
+  background:
+    radial-gradient(circle at left center, rgba(105, 229, 255, 0.14), transparent 36%),
+    linear-gradient(180deg, rgba(15, 26, 40, 0.96), rgba(8, 12, 20, 0.96));
+}
+
+.arcade-stage-grid {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  gap: 24px;
+  align-items: center;
+}
+
+.arcade-stage-radar {
+  height: 220px;
+  border-radius: 50%;
+  border: 1px solid rgba(105, 229, 255, 0.18);
+  background:
+    radial-gradient(circle, rgba(105, 229, 255, 0.16), transparent 58%),
+    linear-gradient(rgba(105, 229, 255, 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(105, 229, 255, 0.08) 1px, transparent 1px),
+    rgba(4, 10, 16, 0.88);
+  background-size: auto, 100% 28px, 28px 100%, auto;
+  box-shadow: inset 0 0 30px rgba(105, 229, 255, 0.08);
+}
+
+.arcade-option-columns {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.arcade-menu-footer {
+  display: grid;
+  gap: 6px;
+  padding-top: 2px;
+}
+
+.arcade-status-line,
+.arcade-menu-footer .muted {
+  color: #93a9c4;
+}
+
+.arcade-chip-strip,
+.summary-grid,
+.preset-grid,
+.option-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.arcade-chip-strip {
+  grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+  margin-bottom: 18px;
+}
+
+.arcade-menu-shell .summary-chip {
+  display: grid;
+  gap: 4px;
+  min-height: 82px;
+  padding: 14px 16px;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.arcade-menu-shell .summary-chip span,
+.arcade-menu-shell .summary-grid-row span,
+.arcade-menu-shell .preset-label,
+.arcade-menu-shell .preset-copy,
+.arcade-menu-shell .option-btn span {
+  color: var(--arcade-muted);
+}
+
+.arcade-menu-shell .summary-chip strong,
+.arcade-menu-shell .summary-grid-row strong {
+  color: #fff;
+  font-size: 15px;
+}
+
+.arcade-menu-shell .summary-grid {
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+}
+
+.arcade-menu-shell .summary-grid-row {
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.arcade-menu-shell .preset-grid {
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.arcade-menu-shell .preset-card {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.arcade-menu-shell .preset-card.is-active {
+  border-color: rgba(255, 190, 61, 0.34);
+  box-shadow: inset 0 0 0 1px rgba(255, 190, 61, 0.12);
+}
+
+.arcade-menu-shell .preset-card-head,
+.arcade-menu-shell .preset-actions {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.arcade-menu-shell .preset-card h4 {
+  color: #fff;
+  font-size: 18px;
+}
+
+.arcade-menu-shell .preset-state {
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(105, 229, 255, 0.12);
+  color: #dffbff;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.arcade-menu-shell .preset-swatch-row {
+  display: flex;
+  gap: 8px;
+}
+
+.arcade-menu-shell .preset-swatch {
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  background: var(--swatch);
+  border: 2px solid rgba(255, 255, 255, 0.1);
+}
+
+.arcade-menu-shell .preset-actions {
+  align-items: center;
+}
+
+.arcade-menu-shell .preset-actions button {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 46px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: linear-gradient(180deg, rgba(34, 46, 67, 0.96), rgba(12, 18, 31, 0.96));
+  color: #edf5ff;
+  font-size: 12px;
+  text-transform: uppercase;
+}
+
+.arcade-menu-shell .option-grid {
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+}
+
+.arcade-menu-shell .option-btn {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+  text-align: left;
+}
+
+.arcade-menu-shell .option-btn strong {
+  font-size: 16px;
+  color: #fff;
+}
+
+.arcade-menu-shell .option-btn--swatch {
+  grid-template-columns: 24px minmax(0, 1fr);
+  align-items: center;
+}
+
+.arcade-menu-shell .option-swatch {
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  background: var(--swatch);
+  border: 2px solid rgba(255, 255, 255, 0.12);
+}
+
+.arcade-menu-shell .option-copy {
+  display: grid;
+  gap: 2px;
+}
+
+.arcade-menu-shell .option-btn.is-selected {
+  border-color: rgba(255, 190, 61, 0.34);
+  background:
+    linear-gradient(180deg, rgba(56, 35, 9, 0.86), rgba(27, 17, 6, 0.86)),
+    rgba(255, 255, 255, 0.04);
+  box-shadow: inset 0 0 0 1px rgba(255, 190, 61, 0.14);
+}
+
+.arcade-menu-shell .local-room-list {
+  display: grid;
+  gap: 10px;
+}
+
+.arcade-menu-shell .local-state-card,
+.arcade-menu-shell .local-room-row {
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.arcade-menu-shell .local-state-card {
+  padding: 18px;
+}
+
+.arcade-menu-shell .local-room-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 14px 16px;
+}
+
+.arcade-menu-shell .local-room-row:hover,
+.arcade-menu-shell .local-room-row:focus {
+  border-color: rgba(105, 229, 255, 0.32);
+  outline: none;
+}
+
+.arcade-menu-shell .local-room-row-info {
+  display: grid;
+  gap: 6px;
+}
+
+.arcade-menu-shell .local-room-row-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.arcade-menu-shell .local-room-row-name {
+  color: #fff;
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.arcade-menu-shell .local-room-row-meta {
+  color: var(--arcade-muted);
+  font-size: 13px;
+}
+
+.arcade-menu-shell .local-room-join-btn {
+  min-height: 42px;
+  padding: 0 16px;
+  border-radius: 12px;
+  background: linear-gradient(180deg, rgba(255, 190, 61, 0.2), rgba(134, 76, 8, 0.28));
+  border: 1px solid rgba(255, 190, 61, 0.24);
+  color: #fff1ca;
+  font-size: 12px;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.arcade-menu-shell .lb-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  background: rgba(255, 255, 255, 0.03);
+  color: #e8f1fc;
+}
+
+.arcade-menu-shell .lb-row:nth-child(-n + 3) {
+  border-color: rgba(255, 190, 61, 0.22);
+  background: rgba(255, 190, 61, 0.06);
+}
+
+@media (max-width: 1180px) {
+  .arcade-home-hero,
+  .arcade-home-grid,
+  .arcade-local-grid--brief,
+  .arcade-customize-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .arcade-mode-grid,
+  .arcade-join-grid,
+  .arcade-local-grid,
+  .arcade-option-columns {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .arcade-stage-grid {
+    grid-template-columns: 180px minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 780px) {
+  .arcade-title-block h1 {
+    font-size: 44px;
+    letter-spacing: 0.01em;
+  }
+
+  .arcade-chip-cluster,
+  .arcade-hero-actions {
+    flex-direction: column;
+  }
+
+  .arcade-meta-btn,
+  .arcade-menu-shell .signal-chip,
+  .arcade-menu-shell .server-badge {
+    width: 100%;
+    justify-content: center;
+  }
+
+
+  #arcade-start-screen {
+    padding: 10px;
+  }
+
+  .arcade-menu-router {
+    min-height: auto;
+    padding: 14px;
+    gap: 16px;
+  }
+
+  .arcade-menu-shell {
+    min-height: calc(100vh - 20px);
+    border-radius: 22px;
+  }
+
+  .arcade-menu-shell::after {
+    inset: 10px;
+    border-radius: 14px;
+  }
+
+  .arcade-panel,
+  .arcade-title-block,
+  .arcade-hero-console,
+  .arcade-banner {
+    border-radius: 18px;
+  }
+
+  .arcade-panel,
+  .arcade-title-block,
+  .arcade-hero-console {
+    padding: 18px;
+  }
+
+  .arcade-mode-grid,
+  .arcade-join-grid,
+  .arcade-local-grid,
+  .arcade-option-columns {
+    grid-template-columns: 1fr;
+  }
+
+  .arcade-command-btn {
+    grid-template-columns: 52px minmax(0, 1fr);
+    padding: 16px;
+  }
+
+  .arcade-command-tag {
+    grid-column: 2;
+    justify-self: start;
+    margin-top: 2px;
+  }
+
+  .arcade-command-icon {
+    width: 52px;
+    height: 52px;
+    font-size: 18px;
+  }
+
+  .arcade-command-copy strong {
+    font-size: 22px;
+  }
+
+  .arcade-screen-header,
+  .arcade-panel-header,
+  .arcade-banner,
+  .arcade-menu-shell .preset-card-head,
+  .arcade-menu-shell .preset-actions,
+  .arcade-menu-shell .local-room-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .arcade-screen-title {
+    font-size: 34px;
+  }
+
+  .arcade-stage-grid,
+  .arcade-rule-row {
+    grid-template-columns: 1fr;
+  }
+
+  .arcade-stage-radar {
+    height: 180px;
+  }
+
+  .arcade-menu-shell .preset-grid,
+  .arcade-menu-shell .summary-grid,
+  .arcade-chip-strip {
+    grid-template-columns: 1fr;
+  }
+}

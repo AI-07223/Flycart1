@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <title>SmashCart — Flat-World Air Combat</title>
   <link rel="stylesheet" href="css/style.css" />
+  <link rel="stylesheet" href="css/arcade-menu.css" />
   <script type="importmap">
     {
       "imports": {
@@ -53,20 +54,27 @@
     <div id="oob-warning" class="hidden" aria-live="assertive">⚠ OUT OF BOUNDS — TURN BACK</div>
 
     <div id="hud" class="hidden">
-      <button id="ingame-menu-btn" class="hud-menu-btn" title="Menu" aria-label="Menu">☰</button>
-      <div class="hud-row">
-        <div class="hud-item">SCORE <span id="hud-score">0</span></div>
-        <div class="hud-item">TIME <span id="hud-time">--</span></div>
-        <div class="hud-item">ALT <span id="hud-alt">0</span></div>
-        <div class="hud-item">SPD <span id="hud-speed">0</span></div>
-        <div class="hud-item hud-boost-wrap">BOOST <span class="boost-bar"><span id="boost-fill"></span></span></div>
-        <button id="mute-btn" class="icon-btn" title="Mute (M)">🔊</button>
-      </div>
-      <!-- TDM team score bar: only visible in Team Deathmatch mode -->
-      <div id="hud-team-score" class="hidden hud-team-score">
-        <span id="hud-team-blue" class="hud-team hud-team--blue">&#9646; BLUE <span id="hud-tscore0">0</span></span>
-        <span class="hud-team-sep">vs</span>
-        <span id="hud-team-red" class="hud-team hud-team--red"><span id="hud-tscore1">0</span> RED &#9646;</span>
+      <div class="hud-cluster hud-cluster--telemetry">
+        <div class="hud-cluster-head">
+          <button id="ingame-menu-btn" class="hud-menu-btn" title="Menu" aria-label="Menu">☰</button>
+          <span class="hud-context">Combat telemetry</span>
+        </div>
+        <div class="hud-row">
+          <div class="hud-item"><span class="hud-item-label">Score</span><strong id="hud-score">0</strong></div>
+          <div class="hud-item"><span class="hud-item-label">Time</span><strong id="hud-time">--</strong></div>
+          <div class="hud-item"><span class="hud-item-label">Altitude</span><strong id="hud-alt">0</strong></div>
+          <div class="hud-item"><span class="hud-item-label">Speed</span><strong id="hud-speed">0</strong></div>
+          <div class="hud-item hud-boost-wrap">
+            <span class="hud-item-label">Boost</span>
+            <span class="boost-bar"><span id="boost-fill"></span></span>
+          </div>
+          <button id="mute-btn" class="icon-btn" title="Mute (M)">🔊</button>
+        </div>
+        <div id="hud-team-score" class="hidden hud-team-score">
+          <span id="hud-team-blue" class="hud-team hud-team--blue"><span class="hud-team-name">Blue</span> <span id="hud-tscore0">0</span></span>
+          <span class="hud-team-sep">vs</span>
+          <span id="hud-team-red" class="hud-team hud-team--red"><span class="hud-team-name">Red</span> <span id="hud-tscore1">0</span></span>
+        </div>
       </div>
       <div id="leaderboard"></div>
       <div id="power-chip" class="hidden"></div>
@@ -107,8 +115,11 @@
 
     <div id="share-bar" class="hidden">
       <div class="share-copy">
-        <span class="share-label">Invite friends:</span>
-        <input id="share-link" readonly />
+        <span class="share-label">Invite route</span>
+        <div class="share-link-wrap">
+          <span class="share-link-label">Room link</span>
+          <input id="share-link" readonly />
+        </div>
         <div class="share-actions">
           <button id="qr-btn" class="secondary">Show QR</button>
           <button id="copy-btn">Copy</button>
@@ -134,63 +145,169 @@
       </div>
     </div>
 
+    <div id="arcade-start-screen" class="overlay hidden"></div>
+
     <div id="start-screen" class="overlay">
       <div class="menu-router">
 
+
         <!-- HOME SCREEN -->
         <section class="menu-screen active" id="screen-home">
-          <div class="screen-home-top">
-            <div class="screen-home-brand">
-              <h1>SMASH<span>CART</span></h1>
-              <p class="tagline">Flat-world air combat</p>
+          <div class="preflight-shell">
+            <div class="screen-home-top">
+              <div class="screen-home-brand">
+                <p class="eyebrow">Carrier Ops / Preflight</p>
+                <h1>SMASH<span>CART</span></h1>
+                <p class="tagline">Stage your plane, launch fast, and keep local Wi-Fi dogfights one tap away.</p>
+              </div>
+              <div class="screen-home-actions">
+                <span id="room-code-chip" class="signal-chip signal-chip--ready">Deck local</span>
+                <span id="menu-server-badge" class="server-badge">Local play</span>
+                <button id="join-qr-btn" class="icon-btn" data-nav="join" title="Join / QR" aria-label="Join a game by code or QR">📷</button>
+                <button id="menu-settings-btn" class="icon-btn" title="Settings" aria-label="Settings">⚙</button>
+              </div>
             </div>
-            <div class="screen-home-actions">
-              <span id="menu-server-badge" class="server-badge">Local play</span>
-              <button id="join-qr-btn" class="icon-btn" data-nav="join" title="Join / QR" aria-label="Join a game by code or QR">📷</button>
-              <button id="menu-settings-btn" class="icon-btn" title="Settings" aria-label="Settings">⚙</button>
+
+            <div class="preflight-deck">
+              <section class="panel-surface preflight-brief">
+                <div class="panel-head">
+                  <div>
+                    <p class="deck-label">Selected Aircraft</p>
+                    <h2 id="selected-plane-name" class="deck-title">Viper Fighter</h2>
+                  </div>
+                  <button id="customize-open-btn" class="secondary" data-nav="customize">CUSTOMIZE</button>
+                </div>
+                <p id="selected-plane-summary" class="deck-summary">Scarlet paint · Midnight accent · Clean livery · White Smoke trail</p>
+                <div id="selected-plane-chips" class="chip-strip"></div>
+                <div class="screen-home-inputs">
+                  <label class="field-wrap">
+                    <span class="field-label">Call Sign</span>
+                    <input id="name-input" maxlength="14" placeholder="Call sign" aria-label="Call sign" />
+                  </label>
+                  <label class="switch deck-switch"><input type="checkbox" id="bots-check" checked /> 🤖 Fill empty seats with bots</label>
+                </div>
+              </section>
+
+              <section class="panel-surface preflight-launch">
+                <p class="deck-label">Flight Deck</p>
+                <nav class="screen-home-nav">
+                  <button class="menu-nav-btn menu-nav-btn--feature" data-nav="play">
+                    <span class="nav-icon">▶</span>
+                    <span class="nav-label-group">
+                      <span class="nav-title">Launch Match</span>
+                      <span class="nav-desc">Choose public, private, or local Wi-Fi play.</span>
+                    </span>
+                    <span class="nav-kicker">Ready</span>
+                  </button>
+                  <button class="menu-nav-btn" data-nav="join">
+                    <span class="nav-icon">📷</span>
+                    <span class="nav-label-group">
+                      <span class="nav-title">Join / Scan</span>
+                      <span class="nav-desc">Scan a QR, paste an invite, or enter a room code.</span>
+                    </span>
+                  </button>
+                  <button class="menu-nav-btn" data-nav="leaders">
+                    <span class="nav-icon">🏆</span>
+                    <span class="nav-label-group">
+                      <span class="nav-title">Leaderboard</span>
+                      <span class="nav-desc">Check the all-time aces before you roll out.</span>
+                    </span>
+                  </button>
+                </nav>
+              </section>
             </div>
           </div>
-
-          <div class="screen-home-inputs">
-            <input id="name-input" maxlength="14" placeholder="Call sign" aria-label="Call sign" />
-            <label class="switch"><input type="checkbox" id="bots-check" checked /> 🤖 Fill empty seats with bots</label>
-          </div>
-
-          <nav class="screen-home-nav">
-            <button class="menu-nav-btn" data-nav="play">▶ PLAY</button>
-            <button class="menu-nav-btn" id="hangar-btn">✈ HANGAR</button>
-            <button class="menu-nav-btn" data-nav="leaders">🏆 LEADERBOARD</button>
-          </nav>
-
-          <p id="orientation-note" class="muted">Landscape is recommended on touch devices.</p>
-          <p id="status" class="muted status-line"></p>
         </section>
 
         <!-- PLAY SCREEN -->
         <section class="menu-screen" id="screen-play">
           <header class="screen-head">
             <button class="screen-back" data-back aria-label="Back">‹ Back</button>
-            <h2 class="screen-title">Play</h2>
+            <div class="screen-title-wrap">
+              <h2 class="screen-title">Launch</h2>
+              <p class="screen-subtitle">Pick the room type first. Your current plane stays armed for all of them.</p>
+            </div>
           </header>
-          <nav class="screen-nav">
-            <button class="menu-nav-btn" id="p2p-host-btn">🎮 HOST LOCAL GAME<span class="nav-btn-sub">Host on this device — friends join over Wi-Fi</span></button>
-            <button class="menu-nav-btn" data-nav="lan">📡 LAN PARTY<span class="nav-btn-sub">Connect to a hotspot server on your network</span></button>
+          <div class="screen-loadout-strip">
+            <span class="deck-label">Current loadout</span>
+            <p id="play-loadout-summary" class="screen-loadout-copy">Viper Fighter · Scarlet · Clean · White Smoke</p>
+          </div>
+          <nav class="launch-grid">
+            <button class="menu-nav-btn menu-nav-btn--feature" id="quick-play-btn">
+              <span class="nav-icon">⚡</span>
+              <span class="nav-label-group">
+                <span class="nav-title">Public Scramble</span>
+                <span class="nav-desc">Jump into the instant public fight with your current loadout.</span>
+              </span>
+              <span class="nav-kicker">Fastest</span>
+            </button>
+            <button class="menu-nav-btn" id="private-room-btn">
+              <span class="nav-icon">🔐</span>
+              <span class="nav-label-group">
+                <span class="nav-title">Private Room</span>
+                <span class="nav-desc">Create a shareable invite code for friends on the same build.</span>
+              </span>
+            </button>
+            <button class="menu-nav-btn" data-nav="lan">
+              <span class="nav-icon">📡</span>
+              <span class="nav-label-group">
+                <span class="nav-title">Local Wi-Fi</span>
+                <span class="nav-desc">Host or scan rooms on one hotspot without typing server addresses first.</span>
+              </span>
+            </button>
           </nav>
-          <p class="muted join-helper">Joining a friend? Tap 📷 on the home screen to scan their QR or enter a code.</p>
-          <p id="friends-note" class="muted"></p>
+          <section class="panel-surface route-brief-card">
+            <div class="panel-head">
+              <div>
+                <p class="deck-label">Route Guide</p>
+                <h3>Choose The Least Friction Path</h3>
+              </div>
+              <span class="panel-chip subtle">Ops</span>
+            </div>
+            <p class="muted route-brief-copy">Public is the fastest match. Private rooms are for invited squads. Local Wi-Fi is the upcoming couch-and-hotspot flow: one host creates the room, everyone else scans and joins.</p>
+          </section>
+          <p class="muted join-helper">Already have a room? Use Join / Scan to open a QR, paste an invite link, or enter the code manually.</p>
         </section>
 
         <!-- JOIN SCREEN -->
         <section class="menu-screen" id="screen-join">
           <header class="screen-head">
             <button class="screen-back" data-back aria-label="Back">‹ Back</button>
-            <h2 class="screen-title">Join a Room</h2>
+            <div class="screen-title-wrap">
+              <h2 class="screen-title">Join / Scan</h2>
+              <p class="screen-subtitle">Use whichever invite surface the host shared with you.</p>
+            </div>
           </header>
           <div class="screen-join-body">
-            <button id="scan-open-btn" class="menu-nav-btn scan-cta">📷 SCAN QR</button>
-            <p class="muted join-helper">Enter a 6-char code, paste an invite link, or scan a QR.</p>
-            <input id="join-code-input" maxlength="200" placeholder="ABCDEF or paste link" autocomplete="off" spellcheck="false" aria-label="Room code or invite link" />
-            <button id="join-code-submit" class="menu-nav-btn">JOIN</button>
+            <button id="scan-open-btn" class="menu-nav-btn scan-cta">
+              <span class="nav-icon">📷</span>
+              <span class="nav-label-group">
+                <span class="nav-title">Scan QR</span>
+                <span class="nav-desc">Use the host's room QR if they have one on screen.</span>
+              </span>
+            </button>
+            <div class="panel-surface join-input-card">
+              <p class="deck-label">Manual Join</p>
+              <p class="muted join-helper">Enter a 6-character room code or paste the full invite link.</p>
+              <input id="join-code-input" maxlength="200" placeholder="ABCDEF or paste link" autocomplete="off" spellcheck="false" aria-label="Room code or invite link" />
+              <button id="join-code-submit" class="menu-nav-btn">
+                <span class="nav-icon">→</span>
+                <span class="nav-label-group">
+                  <span class="nav-title">Join Room</span>
+                  <span class="nav-desc">Private and local invite codes are routed automatically.</span>
+                </span>
+              </button>
+            </div>
+            <section class="panel-surface join-guide-card">
+              <div class="panel-head">
+                <div>
+                  <p class="deck-label">Accepted Invites</p>
+                  <h3>Codes, Links, Or Local QR</h3>
+                </div>
+                <span class="panel-chip subtle">One flow</span>
+              </div>
+              <p class="muted">The join screen is intentionally non-technical: if the host sends a code, paste it. If they send a link, paste it. If they show a QR, scan it.</p>
+            </section>
           </div>
         </section>
 
@@ -198,29 +315,58 @@
         <section class="menu-screen" id="screen-lan">
           <header class="screen-head">
             <button class="screen-back" data-back aria-label="Back">‹ Back</button>
-            <h2 class="screen-title">LAN / Local</h2>
+            <div class="screen-title-wrap">
+              <h2 class="screen-title">Local Wi-Fi</h2>
+              <p class="screen-subtitle">Designed for one hotspot: host taps Create Room, everyone else taps Scan Rooms.</p>
+            </div>
           </header>
-
-          <!-- LOCAL WI-FI PARTY: above the hotspot-server + Offline-QR fallbacks -->
-          <div class="local-wifi">
-            <h3 class="panel-subhead">Local Wi-Fi Party</h3>
-            <p class="muted">Everyone on one Wi-Fi hotspot. Host creates a room; others scan and tap to join. Everyone-kills-everyone, join or leave anytime.</p>
-            <div class="local-create">
-              <input id="local-room-name" maxlength="20" placeholder="Room name" aria-label="Room name" />
-              <button id="local-create-btn">CREATE ROOM</button>
-            </div>
-            <div class="local-scan">
-              <button id="local-scan-btn" class="secondary">🔍 SCAN ROOMS</button>
-              <div id="local-room-list" class="local-room-list"><p class="muted">Tap "Scan rooms" to find games on your hotspot.</p></div>
-            </div>
+          <div class="screen-loadout-strip">
+            <span class="deck-label">Selected plane for local rooms</span>
+            <p id="local-loadout-summary" class="screen-loadout-copy">Viper Fighter · Scarlet · Clean · White Smoke</p>
           </div>
 
-          <div class="lan-panel">
+          <div class="local-command-grid">
+            <section class="panel-surface local-command-card">
+              <div class="panel-head">
+                <div>
+                  <p class="deck-label">Host On This Device</p>
+                  <h3>Create Room</h3>
+                </div>
+                <span class="panel-chip">Primary</span>
+              </div>
+              <p class="muted">Start a live dogfight here. Friends on the same hotspot only need to scan and tap join.</p>
+              <label class="field-label" for="local-room-name">Room name</label>
+              <div class="local-create">
+                <input id="local-room-name" maxlength="20" placeholder="Room name" aria-label="Room name" />
+                <button id="local-create-btn">CREATE ROOM</button>
+              </div>
+            </section>
+
+            <section class="panel-surface local-command-card">
+              <div class="panel-head">
+                <div>
+                  <p class="deck-label">Join Nearby</p>
+                  <h3>Scan Rooms</h3>
+                </div>
+                <span class="panel-chip subtle">Primary</span>
+              </div>
+              <p class="muted">Find active rooms on this hotspot, see player counts, and jump in without entering any server address.</p>
+              <div class="local-scan">
+                <button id="local-scan-btn" class="secondary">SCAN ROOMS</button>
+                <div id="local-room-list" class="local-room-list"><p class="muted local-empty">No scan yet. If someone is already hosting, tap Scan Rooms.</p></div>
+              </div>
+            </section>
+          </div>
+
+          <div class="panel-surface lan-panel">
             <div class="panel-head">
-              <h3>LAN Party</h3>
-              <span class="panel-chip">Low latency</span>
+              <div>
+                <p class="deck-label">Fallback Utilities</p>
+                <h3>Manual Server / Offline QR</h3>
+              </div>
+              <span class="panel-chip subtle">Secondary</span>
             </div>
-            <p>Point the game at a server running on the hotspot host. For the cleanest latency, everyone should open the same local address.</p>
+            <p>Use these only when automatic room discovery is not an option. For most hotspot sessions, the Create Room and Scan Rooms actions above are the intended flow.</p>
             <label class="field-label" for="lan-server-input">Hotspot server</label>
             <input id="lan-server-input" maxlength="120" placeholder="http://192.168.43.1:2567" />
             <div class="btn-row btn-row-tight">
@@ -231,7 +377,7 @@
 
             <hr class="panel-divider" />
             <h3 class="panel-subhead">P2P (No Server)</h3>
-            <p class="muted">No hotspot server? Use <strong>🎮 Host Local Game</strong> on the Play screen — the host runs in your browser and guests connect peer-to-peer on the same Wi-Fi. Below is manual offline signaling for when auto-connect fails.</p>
+            <p class="muted">No hotspot server? Use the fallback below for manual browser-to-browser signaling when auto-connect fails.</p>
             <div class="btn-row btn-row-tight">
               <button id="p2p-offline-btn" class="secondary">Offline QR</button>
             </div>
@@ -251,54 +397,197 @@
         <section class="menu-screen" id="screen-leaders">
           <header class="screen-head">
             <button class="screen-back" data-back aria-label="Back">‹ Back</button>
-            <h2 class="screen-title">All-Time Leaders</h2>
+            <div class="screen-title-wrap">
+              <h2 class="screen-title">All-Time Leaders</h2>
+              <p class="screen-subtitle">Top pilots across every match type.</p>
+            </div>
           </header>
-          <div id="menu-leaderboard">
-            <div class="lb-row muted">Loading…</div>
+          <section class="panel-surface leaderboard-surface">
+            <div class="panel-head">
+              <div>
+                <p class="deck-label">Aces Board</p>
+                <h3>Persistent Scoreline</h3>
+              </div>
+              <span class="panel-chip subtle">Top 10</span>
+            </div>
+            <div id="menu-leaderboard">
+              <div class="lb-row muted">Loading…</div>
+            </div>
+          </section>
+        </section>
+
+        <!-- CUSTOMIZE SCREEN -->
+        <section class="menu-screen" id="screen-customize">
+          <header class="screen-head">
+            <button class="screen-back" data-back aria-label="Back">‹ Back</button>
+            <div class="screen-title-wrap">
+              <h2 class="screen-title">Customize Your Plane</h2>
+              <p class="screen-subtitle">Visual only. The same loadout carries into public, private, and local Wi-Fi matches.</p>
+            </div>
+          </header>
+
+          <div class="customize-layout">
+            <aside class="customize-sidebar">
+              <section class="panel-surface customize-summary-card">
+                <p class="deck-label">Armed Loadout</p>
+                <h3 id="customize-summary-name" class="deck-title">Viper Fighter</h3>
+                <p id="customize-summary-text" class="deck-summary">Scarlet paint · Midnight accent · Clean livery · White Smoke trail</p>
+                <div id="customize-summary-grid" class="summary-grid"></div>
+                <div class="customize-action-row">
+                  <button id="customize-randomize" class="secondary">RANDOMIZE</button>
+                  <button id="customize-reset" class="secondary">RESET</button>
+                  <button id="customize-done" data-back>DONE</button>
+                </div>
+                <p id="customize-feedback" class="muted customize-feedback">Cosmetics are visual only. No effect on flight or damage.</p>
+              </section>
+
+              <section class="panel-surface customize-presets">
+                <div class="panel-head">
+                  <div>
+                    <p class="deck-label">Preset Slots</p>
+                    <h3>Save And Swap</h3>
+                  </div>
+                  <span class="panel-chip subtle">4 slots</span>
+                </div>
+                <div id="preset-grid" class="preset-grid"></div>
+              </section>
+
+              <section class="panel-surface customize-group">
+                <div class="customize-group-head">
+                  <p class="deck-label">Airframe</p>
+                  <p class="muted">Change the silhouette first, then refine the finish.</p>
+                </div>
+                <div id="customize-airframe" class="option-grid option-grid--cards"></div>
+              </section>
+
+              <section class="panel-surface customize-group">
+                <div class="customize-group-head">
+                  <p class="deck-label">Paint</p>
+                  <p class="muted">Primary hull finish.</p>
+                </div>
+                <div id="customize-paint" class="option-grid option-grid--swatches"></div>
+              </section>
+
+              <section class="panel-surface customize-group">
+                <div class="customize-group-head">
+                  <p class="deck-label">Accent</p>
+                  <p class="muted">Trim color used by wings, markings, and utility details.</p>
+                </div>
+                <div id="customize-accent" class="option-grid option-grid--swatches"></div>
+              </section>
+
+              <section class="panel-surface customize-group">
+                <div class="customize-group-head">
+                  <p class="deck-label">Livery</p>
+                  <p class="muted">Pattern layout across the body.</p>
+                </div>
+                <div id="customize-livery" class="option-grid option-grid--cards"></div>
+              </section>
+
+              <section class="panel-surface customize-group">
+                <div class="customize-group-head">
+                  <p class="deck-label">Trail</p>
+                  <p class="muted">Engine wake color in flight.</p>
+                </div>
+                <div id="customize-trail" class="option-grid option-grid--swatches"></div>
+              </section>
+            </aside>
+
+            <div class="customize-stage" aria-hidden="true">
+              <div class="customize-stage-radar"></div>
+              <p class="customize-stage-label">Live runway camera locked on the selected aircraft</p>
+              <p class="customize-stage-copy">Preview updates instantly while you tune the airframe, paint, and trail.</p>
+            </div>
           </div>
         </section>
+
+        <div class="menu-global-footer">
+          <p id="orientation-note" class="muted">Landscape is recommended on touch devices.</p>
+          <p id="friends-note" class="muted"></p>
+          <p id="status" class="muted status-line"></p>
+        </div>
 
       </div>
     </div>
 
     <div id="intermission" class="overlay hidden">
-      <h2>ROUND OVER</h2>
-      <p id="winner-line" class="winner"></p>
-      <ol id="final-board"></ol>
-      <p id="your-place" class="muted"></p>
-      <p class="muted">Next round in <span id="inter-time">--</span>s</p>
-      <button id="intermission-leave" class="secondary">Main Menu</button>
+      <div class="ops-modal results-modal">
+        <div class="ops-modal-head">
+          <div>
+            <p class="eyebrow">Round Debrief</p>
+            <h2>Round Over</h2>
+          </div>
+          <span class="signal-chip signal-chip--ready">Reset in <span id="inter-time">--</span>s</span>
+        </div>
+        <p id="winner-line" class="winner"></p>
+        <div class="results-grid">
+          <section class="panel-surface results-board-panel">
+            <p class="deck-label">Final Board</p>
+            <ol id="final-board"></ol>
+          </section>
+          <section class="panel-surface results-side-panel">
+            <p class="deck-label">Your Debrief</p>
+            <p id="your-place" class="muted"></p>
+            <p class="muted">Stay on deck. The next round relaunches automatically when the timer clears.</p>
+            <button id="intermission-leave" class="secondary">Main Menu</button>
+          </section>
+        </div>
+      </div>
     </div>
 
     <div id="pause-screen" class="overlay hidden">
-      <h2>PAUSED</h2>
-      <p class="muted">Your plane keeps drifting forward. Resume or return to the menu.</p>
-      <div class="btn-row">
-        <button id="resume-btn">RESUME</button>
-        <button id="pause-invite-btn" class="secondary hidden">📨 INVITE</button>
-        <button id="pause-settings-btn" class="secondary">⚙ SETTINGS</button>
-        <button id="pause-menu-btn" class="secondary">MAIN MENU</button>
+      <div class="ops-modal pause-modal">
+        <div class="ops-modal-head">
+          <div>
+            <p class="eyebrow">Flight Hold</p>
+            <h2>Paused</h2>
+            <p class="ops-modal-copy">Your plane keeps drifting forward. Resume when you're ready, or route back to the menu.</p>
+          </div>
+        </div>
+        <div class="pause-hints">
+          <span class="signal-chip subtle">Resume returns you to live flight instantly.</span>
+          <span class="signal-chip subtle">Private rooms keep invite tools available while paused.</span>
+        </div>
+        <div class="btn-row pause-actions">
+          <button id="resume-btn">Resume</button>
+          <button id="pause-invite-btn" class="secondary hidden">Invite</button>
+          <button id="pause-settings-btn" class="secondary">Settings</button>
+          <button id="pause-menu-btn" class="secondary">Main Menu</button>
+        </div>
       </div>
     </div>
 
     <div id="conn-lost" class="overlay hidden">
-      <h2>CONNECTION LOST</h2>
-      <p id="conn-msg" class="muted">Reconnecting…</p>
-      <div class="btn-row">
-        <button id="conn-retry" class="hidden">RECONNECT</button>
-        <button id="conn-menu" class="secondary">MAIN MENU</button>
+      <div class="ops-modal conn-modal">
+        <div class="ops-modal-head">
+          <div>
+            <p class="eyebrow">Signal Alert</p>
+            <h2>Connection Lost</h2>
+            <p id="conn-msg" class="ops-modal-copy muted">Reconnecting…</p>
+          </div>
+        </div>
+        <div class="btn-row conn-actions">
+          <button id="conn-retry" class="hidden">Reconnect</button>
+          <button id="conn-menu" class="secondary">Main Menu</button>
+        </div>
       </div>
     </div>
 
     <!-- LOBBY SCREEN: pre-game waiting room, shown after createPrivateRoom -->
     <div id="lobby-screen" class="overlay hidden">
-      <div class="lobby-card">
-        <div class="panel-head">
+      <div class="ops-modal lobby-modal">
+        <div class="ops-modal-head">
           <div>
-            <p class="eyebrow">Waiting Room</p>
+            <p class="eyebrow">Squad Room</p>
             <h2 id="lobby-title">Private Room</h2>
+            <p id="lobby-subtitle" class="ops-modal-copy">Invite a squad, tune the rules, then launch when everyone is ready.</p>
           </div>
           <button id="lobby-leave-btn" class="secondary">Leave</button>
+        </div>
+        <div class="lobby-meta-strip">
+          <span id="lobby-room-chip" class="signal-chip">Room code</span>
+          <span id="lobby-mode-chip" class="signal-chip subtle">Free-for-all</span>
+          <span id="lobby-plane-summary" class="signal-chip subtle">Selected plane</span>
         </div>
         <div id="lobby-settings" class="lobby-settings hidden">
           <div class="lobby-settings-row">
@@ -331,12 +620,21 @@
             </select>
           </div>
         </div>
-        <div id="lobby-roster" class="lobby-roster">
-          <p class="muted">Waiting for players…</p>
-        </div>
+        <section class="panel-surface lobby-roster-panel">
+          <div class="panel-head">
+            <div>
+              <p class="deck-label">Roster</p>
+              <h3>Ready Check</h3>
+            </div>
+            <span class="panel-chip subtle">Live</span>
+          </div>
+          <div id="lobby-roster" class="lobby-roster">
+            <p class="muted">Waiting for players…</p>
+          </div>
+        </section>
         <div class="btn-row lobby-actions">
           <button id="lobby-ready-btn" class="secondary">Ready</button>
-          <button id="lobby-start-btn" class="hidden">START GAME</button>
+          <button id="lobby-start-btn" class="hidden">Start Game</button>
         </div>
       </div>
       <!-- share bar is reused here when in lobby; #share-bar is shown separately -->
@@ -414,94 +712,6 @@
       </div>
     </div>
 
-    <!-- HANGAR OVERLAY: card anchored left, 3D plane visible in the clear right zone -->
-    <div id="hangar-overlay" class="overlay hangar-overlay hidden" role="dialog" aria-labelledby="hangar-title">
-      <div class="hangar-card">
-        <div class="panel-head">
-          <h2 id="hangar-title">Hangar</h2>
-          <button id="hangar-close-btn" class="secondary" aria-label="Close hangar">✕</button>
-        </div>
-
-        <!-- Tab row -->
-        <div class="hangar-tabs" role="tablist">
-          <button class="hangar-tab active" data-tab="shape" role="tab" aria-selected="true">Shape</button>
-          <button class="hangar-tab" data-tab="color" role="tab" aria-selected="false">Color</button>
-          <button class="hangar-tab" data-tab="accent" role="tab" aria-selected="false">Accent</button>
-          <button class="hangar-tab" data-tab="trail" role="tab" aria-selected="false">Trail</button>
-        </div>
-
-        <!-- SHAPE section -->
-        <div class="hangar-section active" data-section="shape" role="tabpanel">
-          <p class="hangar-section-label">Body Shape</p>
-          <div class="hangar-shape-grid">
-            <button class="hangar-shape-btn" id="hangar-shape-0">Fighter</button>
-            <button class="hangar-shape-btn" id="hangar-shape-1">Interceptor</button>
-            <button class="hangar-shape-btn" id="hangar-shape-2">Bomber</button>
-            <button class="hangar-shape-btn" id="hangar-shape-3">Biplane</button>
-          </div>
-        </div>
-
-        <!-- COLOR section -->
-        <div class="hangar-section hidden" data-section="color" role="tabpanel">
-          <p class="hangar-section-label">Color</p>
-          <div class="hangar-swatch-grid">
-            <button class="hangar-swatch" id="hangar-color-0"  style="background:#ff6b6b" title="Scarlet"></button>
-            <button class="hangar-swatch" id="hangar-color-1"  style="background:#49c0ff" title="Cobalt"></button>
-            <button class="hangar-swatch" id="hangar-color-2"  style="background:#8be34a" title="Olive"></button>
-            <button class="hangar-swatch" id="hangar-color-3"  style="background:#ffd24a" title="Sunburst"></button>
-            <button class="hangar-swatch" id="hangar-color-4"  style="background:#c07bff" title="Violet"></button>
-            <button class="hangar-swatch" id="hangar-color-5"  style="background:#ff9f43" title="Ember"></button>
-            <button class="hangar-swatch" id="hangar-color-6"  style="background:#00d2d3" title="Teal"></button>
-            <button class="hangar-swatch" id="hangar-color-7"  style="background:#ffeaa7" title="Cream"></button>
-            <button class="hangar-swatch" id="hangar-color-8"  style="background:#dfe6e9" title="Ghost"></button>
-            <button class="hangar-swatch" id="hangar-color-9"  style="background:#2d3436" title="Stealth"></button>
-            <button class="hangar-swatch" id="hangar-color-10" style="background:#e17055" title="Rust"></button>
-            <button class="hangar-swatch" id="hangar-color-11" style="background:#55efc4" title="Mint"></button>
-          </div>
-        </div>
-
-        <!-- ACCENT section (accent colors + livery patterns) -->
-        <div class="hangar-section hidden" data-section="accent" role="tabpanel">
-          <p class="hangar-section-label">Accent Color</p>
-          <div class="hangar-swatch-grid">
-            <button class="hangar-swatch" id="hangar-accent-0" style="background:#273244" title="None"></button>
-            <button class="hangar-swatch" id="hangar-accent-1" style="background:#ffffff" title="White"></button>
-            <button class="hangar-swatch" id="hangar-accent-2" style="background:#000000" title="Black"></button>
-            <button class="hangar-swatch" id="hangar-accent-3" style="background:#ffd24a" title="Gold"></button>
-            <button class="hangar-swatch" id="hangar-accent-4" style="background:#ff6b6b" title="Red"></button>
-            <button class="hangar-swatch" id="hangar-accent-5" style="background:#49c0ff" title="Blue"></button>
-            <button class="hangar-swatch" id="hangar-accent-6" style="background:#8be34a" title="Green"></button>
-          </div>
-          <p class="hangar-section-label" style="margin-top:14px">Livery Pattern</p>
-          <div class="hangar-livery-grid">
-            <button class="hangar-livery-btn" id="hangar-livery-0">Clean</button>
-            <button class="hangar-livery-btn" id="hangar-livery-1">Stripe</button>
-            <button class="hangar-livery-btn" id="hangar-livery-2">Two-Tone</button>
-            <button class="hangar-livery-btn" id="hangar-livery-3">Camo</button>
-          </div>
-        </div>
-
-        <!-- TRAIL section -->
-        <div class="hangar-section hidden" data-section="trail" role="tabpanel">
-          <p class="hangar-section-label">Trail</p>
-          <div class="hangar-swatch-grid">
-            <button class="hangar-swatch" id="hangar-trail-0" style="background:#ffffff" title="White Smoke"></button>
-            <button class="hangar-swatch" id="hangar-trail-1" style="background:#ff9f43" title="Orange Thrust"></button>
-            <button class="hangar-swatch" id="hangar-trail-2" style="background:#49c0ff" title="Cryo Blue"></button>
-            <button class="hangar-swatch" id="hangar-trail-3" style="background:#c07bff" title="Plasma Violet"></button>
-            <button class="hangar-swatch" id="hangar-trail-4" style="background:#8be34a" title="Toxic Green"></button>
-          </div>
-        </div>
-
-        <button id="hangar-done">DONE</button>
-        <p class="muted hangar-hint">Cosmetics are visual only — no effect on flight or damage.</p>
-      </div>
-      <!-- Preview zone: clear right column where the 3D plane rotates -->
-      <div class="hangar-preview-zone" aria-hidden="true">
-        <p class="hangar-preview-label">Live preview</p>
-      </div>
-    </div>
-
     <!-- SCAN OVERLAY: camera QR scanner -->
     <div id="scan-overlay" class="overlay hidden" role="dialog" aria-labelledby="scan-title">
       <div class="scan-card">
@@ -572,3 +782,14 @@
   </script>
 </body>
 </html>
+
+
+
+
+
+
+
+
+
+
+

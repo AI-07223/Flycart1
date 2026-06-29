@@ -1,7 +1,43 @@
 // Orchestration: menu, HUD, connection, and render loop for the flat-world reboot.
 import { WebRtcTransport } from "./host-sim";
+import { ARCADE_MENU_HOST_ID, ARCADE_MENU_SCREEN_CLASS, arcadeScreenId, mountArcadeMenu } from "./arcadeMenu";
+import {
+  ACCENT_OPTIONS,
+  AIRFRAME_OPTIONS,
+  DEFAULT_LOADOUT,
+  LEGACY_LOADOUT_KEYS,
+  LOADOUT_STORAGE_KEY,
+  LIVERY_OPTIONS,
+  PAINT_OPTIONS,
+  PRESET_SLOTS,
+  TRAIL_OPTIONS,
+  cloneLoadout,
+  createDefaultLoadoutStore,
+  getLoadoutDetailRows,
+  getLoadoutSummary,
+  loadoutFromLegacy,
+  parseLoadoutStore,
+  randomizeLoadout,
+  sameLoadout,
+  type CosmeticLoadout,
+  type CosmeticOption,
+  type LoadoutStore,
+} from "../shared/loadout";
 
 const dollar = (id: string) => document.getElementById(id)!;
+const menuRoot = mountArcadeMenu() || dollar("start-screen");
+const useArcadeMenu = menuRoot.id === ARCADE_MENU_HOST_ID;
+const menuDollar = (...ids: string[]) => {
+  for (const id of ids) {
+    const el = document.getElementById(id);
+    if (el) return el;
+  }
+  throw new Error(`Missing DOM element: ${ids.join(", ")}`);
+};
+const menuScreenSelector = useArcadeMenu ? `.${ARCADE_MENU_SCREEN_CLASS}` : ".menu-screen";
+const menuNavSelector = useArcadeMenu ? "[data-arcade-nav]" : "[data-nav]";
+const menuBackSelector = useArcadeMenu ? "[data-arcade-back]" : "[data-back]";
+const menuScreenElementId = (id: string) => useArcadeMenu ? arcadeScreenId(id) : `screen-${id}`;
 const G = window.GAME;
 const buzz = (ms: number): void => { try { if (navigator.vibrate) navigator.vibrate(ms); } catch {} };
 
@@ -19,17 +55,17 @@ const els = {
   health: dollar("healthbar"),
   healthfill: dollar("healthfill"),
   respawn: dollar("respawn"),
-  start: dollar("start-screen"),
-  name: dollar("name-input") as HTMLInputElement,
-  lanServer: dollar("lan-server-input") as HTMLInputElement,
-  lanQuick: dollar("lan-quick-btn") as HTMLButtonElement,
-  lanFriends: dollar("lan-friends-btn") as HTMLButtonElement,
-  lanHint: dollar("lan-hint"),
-  serverBadge: dollar("menu-server-badge"),
-  roomChip: dollar("room-code-chip"),
-  orientationNote: dollar("orientation-note"),
-  friendsNote: dollar("friends-note"),
-  status: dollar("status"),
+  start: menuRoot,
+  name: menuDollar("arcade-name-input", "name-input") as HTMLInputElement,
+  lanServer: menuDollar("arcade-lan-server-input", "lan-server-input") as HTMLInputElement,
+  lanQuick: menuDollar("arcade-lan-quick-btn", "lan-quick-btn") as HTMLButtonElement,
+  lanFriends: menuDollar("arcade-lan-friends-btn", "lan-friends-btn") as HTMLButtonElement,
+  lanHint: menuDollar("arcade-lan-hint", "lan-hint"),
+  serverBadge: menuDollar("arcade-menu-server-badge", "menu-server-badge"),
+  roomChip: menuDollar("arcade-room-code-chip", "room-code-chip"),
+  orientationNote: menuDollar("arcade-orientation-note", "orientation-note"),
+  friendsNote: menuDollar("arcade-friends-note", "friends-note"),
+  status: menuDollar("arcade-status", "status"),
   mute: dollar("mute-btn") as HTMLButtonElement,
   pause: dollar("pause-screen"),
   resume: dollar("resume-btn") as HTMLButtonElement,
@@ -52,7 +88,7 @@ const els = {
   scanCanvas: dollar("scan-canvas") as HTMLCanvasElement,
   scanStatus: dollar("scan-status"),
   scanCloseBtn: dollar("scan-close-btn") as HTMLButtonElement,
-  scanOpenBtn: dollar("scan-open-btn") as HTMLButtonElement,
+  scanOpenBtn: menuDollar("arcade-scan-open-btn", "scan-open-btn") as HTMLButtonElement,
   inter: dollar("intermission"),
   finalBoard: dollar("final-board"),
   interTime: dollar("inter-time"),
@@ -74,20 +110,17 @@ const els = {
   connMsg: dollar("conn-msg"),
   connRetry: dollar("conn-retry") as HTMLButtonElement,
   connMenu: dollar("conn-menu") as HTMLButtonElement,
-  bots: dollar("bots-check") as HTMLInputElement,
+  bots: menuDollar("arcade-bots-check", "bots-check") as HTMLInputElement,
   countdown: dollar("countdown"),
   interLeave: dollar("intermission-leave") as HTMLButtonElement,
-  // P2P additions
-  p2pHostBtn: dollar("p2p-host-btn") as HTMLButtonElement,
-  p2pOfflineBtn: dollar("p2p-offline-btn") as HTMLButtonElement,
-  p2pOfflineCanvas: dollar("p2p-offline-canvas") as HTMLCanvasElement,
-  p2pAnswerInput: dollar("p2p-answer-input") as HTMLInputElement,
-  p2pAnswerSubmit: dollar("p2p-answer-submit") as HTMLButtonElement,
-  p2pOfflineSection: dollar("p2p-offline-section"),
+  p2pOfflineBtn: menuDollar("arcade-p2p-offline-btn", "p2p-offline-btn") as HTMLButtonElement,
+  p2pOfflineCanvas: menuDollar("arcade-p2p-offline-canvas", "p2p-offline-canvas") as HTMLCanvasElement,
+  p2pAnswerInput: menuDollar("arcade-p2p-answer-input", "p2p-answer-input") as HTMLInputElement,
+  p2pAnswerSubmit: menuDollar("arcade-p2p-answer-submit", "p2p-answer-submit") as HTMLButtonElement,
+  p2pOfflineSection: menuDollar("arcade-p2p-offline-section", "p2p-offline-section"),
   hostLeftOverlay: dollar("host-left-overlay"),
   hostLeftMenuBtn: dollar("host-left-menu-btn") as HTMLButtonElement,
   p2pMigratingOverlay: dollar("p2p-migrating-overlay"),
-  // Slice 1 additions
   bootOverlay: dollar("boot-overlay"),
   fatalOverlay: dollar("fatal-overlay"),
   fatalMsg: dollar("fatal-msg"),
@@ -110,27 +143,48 @@ const els = {
   settingsScreen: dollar("settings-screen"),
   settingsCloseBtn: dollar("settings-close-btn") as HTMLButtonElement,
   settingsCloseBtn2: dollar("settings-close-btn2") as HTMLButtonElement,
-  menuSettingsBtn: dollar("menu-settings-btn") as HTMLButtonElement,
-  joinCodeInput: dollar("join-code-input") as HTMLInputElement,
-  joinCodeSubmit: dollar("join-code-submit") as HTMLButtonElement,
-  menuLeaderboard: dollar("menu-leaderboard"),
-  hangarOverlay: dollar("hangar-overlay"),
-  hangarBtn: dollar("hangar-btn") as HTMLButtonElement,
-  hangarCloseBtn: dollar("hangar-close-btn") as HTMLButtonElement,
-  hangarDone: dollar("hangar-done") as HTMLButtonElement,
+  menuSettingsBtn: menuDollar("arcade-menu-settings-btn", "menu-settings-btn") as HTMLButtonElement,
+  joinCodeInput: menuDollar("arcade-join-code-input", "join-code-input") as HTMLInputElement,
+  joinCodeSubmit: menuDollar("arcade-join-code-submit", "join-code-submit") as HTMLButtonElement,
+  menuLeaderboard: menuDollar("arcade-menu-leaderboard", "menu-leaderboard"),
+  lobbyRoomChip: dollar("lobby-room-chip"),
+  lobbyModeChip: dollar("lobby-mode-chip"),
+  lobbyPlaneSummary: dollar("lobby-plane-summary"),
+  customizeOpenBtn: menuDollar("arcade-customize-open-btn", "customize-open-btn") as HTMLButtonElement,
+  selectedPlaneName: menuDollar("arcade-selected-plane-name", "selected-plane-name"),
+  selectedPlaneSummary: menuDollar("arcade-selected-plane-summary", "selected-plane-summary"),
+  selectedPlaneChips: menuDollar("arcade-selected-plane-chips", "selected-plane-chips"),
+  quickPlayBtn: menuDollar("arcade-quick-play-btn", "quick-play-btn") as HTMLButtonElement,
+  privateRoomBtn: menuDollar("arcade-private-room-btn", "private-room-btn") as HTMLButtonElement,
+  playLoadoutSummary: menuDollar("arcade-play-loadout-summary", "play-loadout-summary"),
+  localLoadoutSummary: menuDollar("arcade-local-loadout-summary", "local-loadout-summary"),
+  customizeSummaryName: menuDollar("arcade-customize-summary-name", "customize-summary-name"),
+  customizeSummaryText: menuDollar("arcade-customize-summary-text", "customize-summary-text"),
+  customizeSummaryGrid: menuDollar("arcade-customize-summary-grid", "customize-summary-grid"),
+  customizeFeedback: menuDollar("arcade-customize-feedback", "customize-feedback"),
+  presetGrid: menuDollar("arcade-preset-grid", "preset-grid"),
+  customizeAirframe: menuDollar("arcade-customize-airframe", "customize-airframe"),
+  customizePaint: menuDollar("arcade-customize-paint", "customize-paint"),
+  customizeAccent: menuDollar("arcade-customize-accent", "customize-accent"),
+  customizeLivery: menuDollar("arcade-customize-livery", "customize-livery"),
+  customizeTrail: menuDollar("arcade-customize-trail", "customize-trail"),
+  customizeRandomize: menuDollar("arcade-customize-randomize", "customize-randomize") as HTMLButtonElement,
+  customizeReset: menuDollar("arcade-customize-reset", "customize-reset") as HTMLButtonElement,
+  customizeDone: menuDollar("arcade-customize-done", "customize-done") as HTMLButtonElement,
   ingameMenuBtn: dollar("ingame-menu-btn") as HTMLButtonElement,
   pauseInviteBtn: dollar("pause-invite-btn") as HTMLButtonElement,
-  // Local Wi-Fi Party
-  localRoomName: dollar("local-room-name") as HTMLInputElement,
-  localCreateBtn: dollar("local-create-btn") as HTMLButtonElement,
-  localScanBtn: dollar("local-scan-btn") as HTMLButtonElement,
-  localRoomList: dollar("local-room-list"),
+  localRoomName: menuDollar("arcade-local-room-name", "local-room-name") as HTMLInputElement,
+  localCreateBtn: menuDollar("arcade-local-create-btn", "local-create-btn") as HTMLButtonElement,
+  localScanBtn: menuDollar("arcade-local-scan-btn", "local-scan-btn") as HTMLButtonElement,
+  localRoomList: menuDollar("arcade-local-room-list", "local-room-list"),
 };
 
+type SceneMode = "preflight" | "customize" | "lobby" | "results" | "playing" | "paused";
+
 let mode: "menu" | "lobby" | "playing" | "paused" | "lost" | "error" = "menu";
+let sceneMode: SceneMode = "preflight";
 let settingsOpen = false;
 let joinCodeOpen = false;
-let hangarOpen = false;
 let last = 0;
 let prevPhase = "playing";
 let prevHp = G.MAX_HP;
@@ -140,83 +194,66 @@ let lastFireSnd = 0;
 let engineStarted = false;
 let botsEnabled = true;
 let botDifficulty: "easy" | "medium" | "high" = "medium";
-let selectedCosmetics: { color: number; bodyShape: number; accent: number; trail: number; livery: number } = { color: 0, bodyShape: 0, accent: 0, trail: 0, livery: 0 };
 let inviteRoom: string | null = null;
 let inviteServer: string | null = null;
 let activeShareUrl: string | null = null;
-// Respawn countdown tracking
 let deathTime: number = -1;
 let wasAlive: boolean = true;
-// OOB warning throttle
 let oobShownUntil: number = 0;
-// Boost bar fill level [0..1], client-side only
 let boostLevel: number = 0;
-// Round-start countdown
 let countdownActive = false;
-// Slice 6: tracks the code + origin for the active private lobby
 let currentLobbyCode: string | null = null;
 let currentLobbyServer: string | null = null;
-// Host settings debounce timer
 let _settingsDebounce: ReturnType<typeof setTimeout> | null = null;
-// P2P: reference to the original Colyseus Net so we can restore it on leave
 let _colyseusNet: any = null;
-// Whether the current session is P2P (host or guest)
 let _isP2PSession = false;
-// Scanner state
 let scannerOpen = false;
 let scanRafId: number | null = null;
-// Local Wi-Fi auto-scan interval
 let _localScanInterval: ReturnType<typeof setInterval> | null = null;
+let presetFeedbackTimeout: ReturnType<typeof setTimeout> | null = null;
 
-const SKINS = [0xff6b6b, 0x49c0ff, 0x8be34a, 0xffd24a, 0xc07bff];
+const COLORS_HEX = PAINT_OPTIONS.map((option) => option.swatch || "#ffffff");
 
-// COLORS hex list — must match COLORS array in render3d.js (12 entries, indices 0-11)
-const COLORS_HEX = [
-  "#ff6b6b", // 0 Scarlet
-  "#49c0ff", // 1 Cobalt
-  "#8be34a", // 2 Olive
-  "#ffd24a", // 3 Sunburst
-  "#c07bff", // 4 Violet
-  "#ff9f43", // 5 Ember
-  "#00d2d3", // 6 Teal
-  "#ffeaa7", // 7 Cream
-  "#dfe6e9", // 8 Ghost
-  "#2d3436", // 9 Stealth
-  "#e17055", // 10 Rust
-  "#55efc4", // 11 Mint
-];
+function readLegacyLoadout(): CosmeticLoadout {
+  return loadoutFromLegacy({
+    skin: localStorage.getItem(LEGACY_LOADOUT_KEYS.skin),
+    color: localStorage.getItem(LEGACY_LOADOUT_KEYS.color),
+    bodyShape: localStorage.getItem(LEGACY_LOADOUT_KEYS.bodyShape),
+    accent: localStorage.getItem(LEGACY_LOADOUT_KEYS.accent),
+    trail: localStorage.getItem(LEGACY_LOADOUT_KEYS.trail),
+    livery: localStorage.getItem(LEGACY_LOADOUT_KEYS.livery),
+  });
+}
 
-try {
-  // One-time migration: if old smashcart.skin exists but smashcart.color does not, copy it over.
-  const legacySkin = localStorage.getItem("smashcart.skin");
-  if (legacySkin !== null && localStorage.getItem("smashcart.color") === null) {
-    const migrated = parseInt(legacySkin, 10);
-    if (Number.isInteger(migrated) && migrated >= 0 && migrated < G.COLOR_COUNT) {
-      localStorage.setItem("smashcart.color", String(migrated));
-      selectedCosmetics.color = migrated;
-    }
-    localStorage.removeItem("smashcart.skin");
-  } else {
-    const savedColor = parseInt(localStorage.getItem("smashcart.color") || "", 10);
-    if (Number.isInteger(savedColor) && savedColor >= 0 && savedColor < G.COLOR_COUNT) selectedCosmetics.color = savedColor;
+function loadPersistedLoadoutStore(): LoadoutStore {
+  try {
+    const saved = parseLoadoutStore(localStorage.getItem(LOADOUT_STORAGE_KEY));
+    if (saved) return saved;
+  } catch {}
+  const store = createDefaultLoadoutStore();
+  try {
+    store.active = readLegacyLoadout();
+  } catch {
+    store.active = cloneLoadout(DEFAULT_LOADOUT);
   }
-} catch {}
-try {
-  const savedBodyShape = parseInt(localStorage.getItem("smashcart.bodyShape") || "", 10);
-  if (Number.isInteger(savedBodyShape) && savedBodyShape >= 0 && savedBodyShape < G.BODY_SHAPE_COUNT) selectedCosmetics.bodyShape = savedBodyShape;
-} catch {}
-try {
-  const savedAccent = parseInt(localStorage.getItem("smashcart.accent") || "", 10);
-  if (Number.isInteger(savedAccent) && savedAccent >= 0 && savedAccent < G.ACCENT_COUNT) selectedCosmetics.accent = savedAccent;
-} catch {}
-try {
-  const savedTrail = parseInt(localStorage.getItem("smashcart.trail") || "", 10);
-  if (Number.isInteger(savedTrail) && savedTrail >= 0 && savedTrail < G.TRAIL_COUNT) selectedCosmetics.trail = savedTrail;
-} catch {}
-try {
-  const savedLivery = parseInt(localStorage.getItem("smashcart.livery") || "", 10);
-  if (Number.isInteger(savedLivery) && savedLivery >= 0 && savedLivery < G.LIVERY_COUNT) selectedCosmetics.livery = savedLivery;
-} catch {}
+  return store;
+}
+
+let loadoutStore: LoadoutStore = loadPersistedLoadoutStore();
+let selectedCosmetics: CosmeticLoadout = cloneLoadout(loadoutStore.active);
+loadoutStore.active = selectedCosmetics;
+
+function persistLoadoutStore(): void {
+  try {
+    localStorage.setItem(LOADOUT_STORAGE_KEY, JSON.stringify(loadoutStore));
+    localStorage.setItem(LEGACY_LOADOUT_KEYS.color, String(selectedCosmetics.color));
+    localStorage.setItem(LEGACY_LOADOUT_KEYS.bodyShape, String(selectedCosmetics.bodyShape));
+    localStorage.setItem(LEGACY_LOADOUT_KEYS.accent, String(selectedCosmetics.accent));
+    localStorage.setItem(LEGACY_LOADOUT_KEYS.trail, String(selectedCosmetics.trail));
+    localStorage.setItem(LEGACY_LOADOUT_KEYS.livery, String(selectedCosmetics.livery));
+  } catch {}
+}
+
 try {
   botsEnabled = localStorage.getItem("smashcart.bots") !== "0";
 } catch {}
@@ -241,6 +278,13 @@ function ordinal(n: number): string {
   const s = ["th", "st", "nd", "rd"];
   const v = n % 100;
   return n + (s[(v - 20) % 10] || s[v] || s[0]);
+}
+
+function formatClock(totalSeconds: number): string {
+  const safe = Math.max(0, Math.ceil(totalSeconds || 0));
+  const minutes = Math.floor(safe / 60);
+  const seconds = safe % 60;
+  return `${minutes}:${String(seconds).padStart(2, "0")}`;
 }
 
 function genCode(): string {
@@ -436,6 +480,15 @@ function showShareQr(): void {
   els.shareQrOverlay.classList.remove("hidden");
 }
 
+function updateLobbyMeta(): void {
+  const state = window.Net.state;
+  const modeLabel = state?.mode === "tdm" ? "Team Deathmatch" : "Free-for-all";
+  const roundLength = typeof state?.roundLength === "number" ? state.roundLength : 150;
+  const roomLabel = currentLobbyCode ? `Code ${currentLobbyCode}` : (_isP2PSession ? "Wi-Fi live" : "Private room");
+  els.lobbyRoomChip.textContent = roomLabel;
+  els.lobbyModeChip.textContent = `${modeLabel} · ${formatClock(roundLength)}`;
+}
+
 // ─── LOBBY ROSTER ────────────────────────────────────────────────────────────
 function renderLobbyRoster(): void {
   const myId = window.Net.sessionId;
@@ -450,6 +503,7 @@ function renderLobbyRoster(): void {
   } else if (currentLobbyCode) {
     els.lobbyTitle.textContent = `Room ${currentLobbyCode}`;
   }
+  updateLobbyMeta();
 
   // Show/hide and reflect settings panel (host only)
   if (iAmHost) {
@@ -548,8 +602,9 @@ function setStatus(text = ""): void {
 }
 
 function setBusy(busy: boolean): void {
-  els.lanQuick.disabled = busy;
-  els.lanFriends.disabled = busy;
+  [els.lanQuick, els.lanFriends, els.localCreateBtn, els.localScanBtn, els.quickPlayBtn, els.privateRoomBtn, els.joinCodeSubmit].forEach((button) => {
+    button.disabled = busy;
+  });
 }
 
 function updateMenuMeta(preserveStatus = true): void {
@@ -566,12 +621,14 @@ function updateMenuMeta(preserveStatus = true): void {
   }
 
   if (inviteRoom) {
-    if (els.roomChip) els.roomChip.textContent = `Invite ${inviteRoom}`;
+    els.roomChip.textContent = `Invite ${inviteRoom}`;
+    els.roomChip.dataset.state = "invite";
     const inviteHost = inviteServer ? new URL(toPageOrigin(inviteServer)).host : location.host;
-    if (els.friendsNote) els.friendsNote.textContent = `Invite ready for room ${inviteRoom} on ${inviteHost}. Tap 📷 on the home screen to join.`;
+    if (els.friendsNote) els.friendsNote.textContent = `Invite ready for room ${inviteRoom} on ${inviteHost}. Open Join / Scan to connect.`;
     if (!preserveStatus || !els.status.textContent) setStatus(`Invite ready: room ${inviteRoom}`);
   } else {
-    if (els.roomChip) els.roomChip.textContent = lanOrigin ? "LAN ready" : "Local";
+    els.roomChip.textContent = lanOrigin ? "LAN ready" : "Deck local";
+    els.roomChip.dataset.state = lanOrigin ? "lan" : "local";
     if (els.friendsNote) els.friendsNote.textContent = "";
     if (!preserveStatus) setStatus("");
   }
@@ -632,14 +689,41 @@ function resolveLanOrigin(): string | null {
 }
 
 // ─── MENU SCREEN ROUTER ──────────────────────────────────────────────────────
-// Operates ONLY over the .menu-screen sections inside #start-screen.
+// Operates ONLY over the active menu shell, whether arcade or legacy fallback.
 // Does NOT disturb mode/applyMode — those control top-level screen visibility.
-const MENU_SCREENS = ["home", "play", "join", "lan", "leaders"] as const;
+const MENU_SCREENS = ["home", "play", "join", "lan", "leaders", "customize"] as const;
 let navStack: string[] = ["home"];
 
+function currentMenuScreen(): string {
+  return navStack[navStack.length - 1] || "home";
+}
+
+function deriveSceneMode(state: any = window.Net?.state): SceneMode {
+  if (mode === "menu") return currentMenuScreen() === "customize" ? "customize" : "preflight";
+  if (mode === "lobby") return "lobby";
+  if (mode === "paused") return "paused";
+  if (mode === "playing") return state && state.phase === "intermission" ? "results" : "playing";
+  return "preflight";
+}
+
+function syncSceneMode(state: any = window.Net?.state): void {
+  const next = deriveSceneMode(state);
+  if (sceneMode === next && document.body.dataset.sceneMode === next) return;
+  sceneMode = next;
+  document.body.dataset.sceneMode = next;
+  if (window.Renderer && window.Renderer.setSceneMode) window.Renderer.setSceneMode(next);
+}
+
 function navShow(id: string): void {
-  document.querySelectorAll(".menu-screen").forEach((s) =>
-    s.classList.toggle("active", s.id === `screen-${id}`));
+  document.body.dataset.menuScreen = id;
+  menuRoot.querySelectorAll<HTMLElement>(menuScreenSelector).forEach((screen) =>
+    screen.classList.toggle("active", screen.id === menuScreenElementId(id)));
+  menuRoot.scrollTop = 0;
+  const menuShell = menuRoot.firstElementChild;
+  if (menuShell instanceof HTMLElement) menuShell.scrollTop = 0;
+  if (id === "lan") startLocalScanWithAutoRefresh();
+  else stopLocalScanInterval();
+  syncSceneMode(window.Net?.state);
 }
 function navGo(id: string): void {
   if (navStack[navStack.length - 1] === id) return;
@@ -658,14 +742,13 @@ function navReset(): void { navStack = ["home"]; navShow("home"); }
 function applyMode(nextMode: typeof mode): void {
   mode = nextMode;
 
-  // Top-level screen visibility
   const isMenu    = mode === "menu";
   const isLobby   = mode === "lobby";
   const isPlaying = mode === "playing" || mode === "paused";
   const isLost    = mode === "lost";
   const isError   = mode === "error";
 
-  els.bootOverlay.classList.add("hidden");           // boot overlay only shown pre-init
+  els.bootOverlay.classList.add("hidden");
   els.start.classList.toggle("hidden", !isMenu);
   els.lobbyScreen.classList.toggle("hidden", !isLobby);
   els.hud.classList.toggle("hidden", !isPlaying);
@@ -673,16 +756,13 @@ function applyMode(nextMode: typeof mode): void {
   els.pause.classList.toggle("hidden", mode !== "paused");
   els.connLost.classList.toggle("hidden", !isLost);
   els.fatalOverlay.classList.toggle("hidden", !isError);
-  // Crosshair: visible only when actively playing (not paused)
   els.crosshair.classList.toggle("hidden", mode !== "playing");
-  // OOB warning: always off on mode transitions; updateHud re-enables if needed
   if (mode !== "playing") els.oobWarning.classList.add("hidden");
-  // P2P host-left overlay: always hide on any mode transition (reset path shows it explicitly)
   els.hostLeftOverlay.classList.add("hidden");
-  // P2P migrating overlay: always hide on mode transitions
   els.p2pMigratingOverlay.classList.add("hidden");
-  // §D: gate the share bar — visible only in lobby; hide on every other mode
   if (mode !== "lobby") els.share.classList.add("hidden");
+  if (!isMenu) stopLocalScanInterval();
+  syncSceneMode(window.Net?.state);
 }
 
 function showHostLeftOverlay(): void {
@@ -884,126 +964,157 @@ function fetchLeaderboard(): void {
     });
 }
 
-// ─── HANGAR OVERLAY ──────────────────────────────────────────────────────────
+// ─── LOADOUT UI ──────────────────────────────────────────────────────────────
 
-function showHangar(): void {
-  hangarOpen = true;
-  els.hangarOverlay.classList.remove("hidden");
-  // Tell renderer to switch to hangar showcase framing (zoomed, slower orbit)
-  if (window.Renderer && window.Renderer.setHangarOpen) window.Renderer.setHangarOpen(true);
-  // Sync live preview immediately to current cosmetics
+function setCustomizeFeedback(text: string, sticky = false): void {
+  els.customizeFeedback.textContent = text;
+  if (presetFeedbackTimeout !== null) {
+    clearTimeout(presetFeedbackTimeout);
+    presetFeedbackTimeout = null;
+  }
+  if (!sticky) {
+    presetFeedbackTimeout = setTimeout(() => {
+      presetFeedbackTimeout = null;
+      els.customizeFeedback.textContent = "Cosmetics are visual only. No effect on flight or damage.";
+    }, 2200);
+  }
+}
+
+function findActivePresetIndex(): number {
+  return loadoutStore.presets.findIndex((preset) => sameLoadout(preset, selectedCosmetics));
+}
+
+function renderChipStrip(target: HTMLElement, rows: Array<{ label: string; value: string }>): void {
+  target.innerHTML = rows.map((row) =>
+    `<span class="summary-chip"><span>${escapeHtml(row.label)}</span><strong>${escapeHtml(row.value)}</strong></span>`
+  ).join("");
+}
+
+function renderSummaryGrid(rows: Array<{ label: string; value: string }>): void {
+  els.customizeSummaryGrid.innerHTML = rows.map((row) =>
+    `<div class="summary-grid-row"><span>${escapeHtml(row.label)}</span><strong>${escapeHtml(row.value)}</strong></div>`
+  ).join("");
+}
+
+function updateSelectedLoadout(next: CosmeticLoadout, feedback?: string): void {
+  selectedCosmetics = cloneLoadout(next);
+  loadoutStore.active = selectedCosmetics;
+  persistLoadoutStore();
+  renderLoadoutUI();
   if (window.Renderer && window.Renderer.updateMenuPlane) window.Renderer.updateMenuPlane(selectedCosmetics);
+  if (feedback) setCustomizeFeedback(feedback);
 }
 
-function hideHangar(): void {
-  hangarOpen = false;
-  els.hangarOverlay.classList.add("hidden");
-  // Restore normal menu camera framing
-  if (window.Renderer && window.Renderer.setHangarOpen) window.Renderer.setHangarOpen(false);
+function updateLoadoutField<K extends keyof CosmeticLoadout>(key: K, value: CosmeticLoadout[K]): void {
+  const next = cloneLoadout(selectedCosmetics);
+  next[key] = value;
+  updateSelectedLoadout(next);
 }
 
-function buildHangar(): void {
-  // ── TABS ──────────────────────────────────────────────────────────────────
-  const tabs = els.hangarOverlay.querySelectorAll<HTMLButtonElement>(".hangar-tab");
-  const sections = els.hangarOverlay.querySelectorAll<HTMLElement>(".hangar-section");
+function renderPresetGrid(): void {
+  const activePreset = findActivePresetIndex();
+  els.presetGrid.innerHTML = PRESET_SLOTS.map((slot) => {
+    const preset = loadoutStore.presets[slot.index] || cloneLoadout(DEFAULT_LOADOUT);
+    const summary = getLoadoutSummary(preset);
+    const isActive = activePreset === slot.index;
+    const swatches = [
+      PAINT_OPTIONS[preset.color]?.swatch || "#ffffff",
+      ACCENT_OPTIONS[preset.accent]?.swatch || "#ffffff",
+      TRAIL_OPTIONS[preset.trail]?.swatch || "#ffffff",
+    ];
+    return `
+      <article class="preset-card${isActive ? " is-active" : ""}">
+        <div class="preset-card-head">
+          <div>
+            <p class="preset-label">${escapeHtml(slot.label)}</p>
+            <h4>${escapeHtml(summary.title)}</h4>
+          </div>
+          <span class="preset-state">${isActive ? "Armed" : "Stored"}</span>
+        </div>
+        <p class="preset-copy">${escapeHtml(summary.subtitle)}</p>
+        <div class="preset-swatch-row">${swatches.map((swatch) => `<span class="preset-swatch" style="--swatch:${swatch}"></span>`).join("")}</div>
+        <div class="preset-actions">
+          <button class="preset-apply-btn" data-slot="${slot.index}">APPLY</button>
+          <button class="preset-save-btn secondary" data-slot="${slot.index}">SAVE</button>
+        </div>
+      </article>`;
+  }).join("");
 
-  function activateTab(tabName: string): void {
-    tabs.forEach((t) => {
-      const active = t.dataset.tab === tabName;
-      t.classList.toggle("active", active);
-      t.setAttribute("aria-selected", active ? "true" : "false");
-    });
-    sections.forEach((s) => {
-      const active = s.dataset.section === tabName;
-      s.classList.toggle("active", active);
-      s.classList.toggle("hidden", !active);
-    });
-  }
-
-  tabs.forEach((tab) => {
-    tab.addEventListener("click", () => {
+  els.presetGrid.querySelectorAll<HTMLButtonElement>(".preset-apply-btn").forEach((button) => {
+    button.addEventListener("click", () => {
+      const slot = Number.parseInt(button.dataset.slot || "", 10);
+      if (!Number.isFinite(slot) || !loadoutStore.presets[slot]) return;
       window.SFX.uiClick();
-      activateTab(tab.dataset.tab!);
+      updateSelectedLoadout(loadoutStore.presets[slot], `${PRESET_SLOTS[slot].label} armed.`);
     });
   });
 
-  // ── BODY SHAPE (0-3) ──────────────────────────────────────────────────────
-  const shapeLabels = ["Fighter", "Interceptor", "Bomber", "Biplane"];
-  shapeLabels.forEach((_, i) => {
-    const btn = dollar(`hangar-shape-${i}`);
-    btn.classList.toggle("selected", selectedCosmetics.bodyShape === i);
-    btn.addEventListener("click", () => {
-      selectedCosmetics.bodyShape = i;
-      try { localStorage.setItem("smashcart.bodyShape", String(i)); } catch {}
-      els.hangarOverlay.querySelectorAll<HTMLButtonElement>(".hangar-shape-btn").forEach((b, j) => b.classList.toggle("selected", j === i));
+  els.presetGrid.querySelectorAll<HTMLButtonElement>(".preset-save-btn").forEach((button) => {
+    button.addEventListener("click", () => {
+      const slot = Number.parseInt(button.dataset.slot || "", 10);
+      if (!Number.isFinite(slot) || !loadoutStore.presets[slot]) return;
+      loadoutStore.presets[slot] = cloneLoadout(selectedCosmetics);
+      persistLoadoutStore();
+      renderLoadoutUI();
       window.SFX.uiClick();
-      if (window.Renderer && window.Renderer.updateMenuPlane) window.Renderer.updateMenuPlane(selectedCosmetics);
+      setCustomizeFeedback(`${PRESET_SLOTS[slot].label} saved.`);
     });
   });
+}
 
-  // ── COLORS (0-11) ─────────────────────────────────────────────────────────
-  COLORS_HEX.forEach((_, i) => {
-    const btn = dollar(`hangar-color-${i}`);
-    btn.classList.toggle("selected", selectedCosmetics.color === i);
-    btn.addEventListener("click", () => {
-      selectedCosmetics.color = i;
-      try { localStorage.setItem("smashcart.color", String(i)); } catch {}
-      els.hangarOverlay.querySelectorAll<HTMLButtonElement>("[id^='hangar-color-']").forEach((b) => {
-        const idx = parseInt(b.id.replace("hangar-color-", ""), 10);
-        b.classList.toggle("selected", idx === i);
-      });
+function renderOptionGroup<K extends keyof CosmeticLoadout>(
+  target: HTMLElement,
+  key: K,
+  options: CosmeticOption[],
+  variant: "cards" | "swatches",
+): void {
+  target.innerHTML = options.map((option) => {
+    const selected = selectedCosmetics[key] === option.value;
+    if (variant === "swatches") {
+      return `
+        <button class="option-btn option-btn--swatch${selected ? " is-selected" : ""}" data-key="${key}" data-value="${option.value}" style="--swatch:${option.swatch || "#ffffff"}">
+          <span class="option-swatch"></span>
+          <span class="option-copy">
+            <strong>${escapeHtml(option.label)}</strong>
+            <span>${escapeHtml(option.note)}</span>
+          </span>
+        </button>`;
+    }
+    return `
+      <button class="option-btn option-btn--card${selected ? " is-selected" : ""}" data-key="${key}" data-value="${option.value}">
+        <strong>${escapeHtml(option.label)}</strong>
+        <span>${escapeHtml(option.note)}</span>
+      </button>`;
+  }).join("");
+
+  target.querySelectorAll<HTMLButtonElement>(".option-btn").forEach((button) => {
+    button.addEventListener("click", () => {
+      const value = Number.parseInt(button.dataset.value || "", 10);
+      if (!Number.isFinite(value)) return;
       window.SFX.uiClick();
-      if (window.Renderer && window.Renderer.updateMenuPlane) window.Renderer.updateMenuPlane(selectedCosmetics);
+      updateLoadoutField(key, value as CosmeticLoadout[K]);
     });
   });
+}
 
-  // ── ACCENT (0-6) ──────────────────────────────────────────────────────────
-  const accentCount = 7;
-  for (let i = 0; i < accentCount; i++) {
-    const btn = dollar(`hangar-accent-${i}`);
-    btn.classList.toggle("selected", selectedCosmetics.accent === i);
-    btn.addEventListener("click", () => {
-      selectedCosmetics.accent = i;
-      try { localStorage.setItem("smashcart.accent", String(i)); } catch {}
-      els.hangarOverlay.querySelectorAll<HTMLButtonElement>("[id^='hangar-accent-']").forEach((b) => {
-        const idx = parseInt(b.id.replace("hangar-accent-", ""), 10);
-        b.classList.toggle("selected", idx === i);
-      });
-      window.SFX.uiClick();
-      if (window.Renderer && window.Renderer.updateMenuPlane) window.Renderer.updateMenuPlane(selectedCosmetics);
-    });
-  }
-
-  // ── LIVERY (0-3) ──────────────────────────────────────────────────────────
-  const liveryLabels = ["Clean", "Stripe", "Two-Tone", "Camo"];
-  liveryLabels.forEach((_, i) => {
-    const btn = dollar(`hangar-livery-${i}`);
-    btn.classList.toggle("selected", selectedCosmetics.livery === i);
-    btn.addEventListener("click", () => {
-      selectedCosmetics.livery = i;
-      try { localStorage.setItem("smashcart.livery", String(i)); } catch {}
-      els.hangarOverlay.querySelectorAll<HTMLButtonElement>(".hangar-livery-btn").forEach((b, j) => b.classList.toggle("selected", j === i));
-      window.SFX.uiClick();
-      if (window.Renderer && window.Renderer.updateMenuPlane) window.Renderer.updateMenuPlane(selectedCosmetics);
-    });
-  });
-
-  // ── TRAIL (0-4) ───────────────────────────────────────────────────────────
-  const trailCount = 5;
-  for (let i = 0; i < trailCount; i++) {
-    const btn = dollar(`hangar-trail-${i}`);
-    btn.classList.toggle("selected", selectedCosmetics.trail === i);
-    btn.addEventListener("click", () => {
-      selectedCosmetics.trail = i;
-      try { localStorage.setItem("smashcart.trail", String(i)); } catch {}
-      els.hangarOverlay.querySelectorAll<HTMLButtonElement>("[id^='hangar-trail-']").forEach((b) => {
-        const idx = parseInt(b.id.replace("hangar-trail-", ""), 10);
-        b.classList.toggle("selected", idx === i);
-      });
-      window.SFX.uiClick();
-      if (window.Renderer && window.Renderer.updateMenuPlane) window.Renderer.updateMenuPlane(selectedCosmetics);
-    });
-  }
+function renderLoadoutUI(): void {
+  const summary = getLoadoutSummary(selectedCosmetics);
+  const rows = getLoadoutDetailRows(selectedCosmetics);
+  els.selectedPlaneName.textContent = summary.title;
+  els.selectedPlaneSummary.textContent = summary.subtitle;
+  els.playLoadoutSummary.textContent = `${summary.title} · ${rows.map((row) => row.value).join(" · ")}`;
+  els.localLoadoutSummary.textContent = `${summary.title} · ${rows.map((row) => row.value).join(" · ")}`;
+  els.lobbyPlaneSummary.textContent = `${summary.title} · ${rows.map((row) => row.value).join(" · ")}`;
+  els.customizeSummaryName.textContent = summary.title;
+  els.customizeSummaryText.textContent = summary.subtitle;
+  renderChipStrip(els.selectedPlaneChips, rows);
+  renderSummaryGrid(rows);
+  renderPresetGrid();
+  renderOptionGroup(els.customizeAirframe, "bodyShape", AIRFRAME_OPTIONS, "cards");
+  renderOptionGroup(els.customizePaint, "color", PAINT_OPTIONS, "swatches");
+  renderOptionGroup(els.customizeAccent, "accent", ACCENT_OPTIONS, "swatches");
+  renderOptionGroup(els.customizeLivery, "livery", LIVERY_OPTIONS, "cards");
+  renderOptionGroup(els.customizeTrail, "trail", TRAIL_OPTIONS, "swatches");
 }
 
 // ─── PUBLIC QUICK-PLAY (unchanged path) ──────────────────────────────────────
@@ -1316,7 +1427,7 @@ function stopLocalScanInterval(): void {
 }
 
 async function runLocalScan(): Promise<void> {
-  els.localRoomList.innerHTML = '<p class="muted">Scanning…</p>';
+  els.localRoomList.innerHTML = '<article class="local-state-card"><p class="deck-label">Scanning hotspot</p><h4>Looking for active rooms</h4><p class="muted">Hosts on the same Wi-Fi appear here automatically.</p></article>';
   let rooms: Array<{ code: string; name: string; hostName: string; count: number }> = [];
   try {
     rooms = await WebRtcTransport.listRooms();
@@ -1326,7 +1437,7 @@ async function runLocalScan(): Promise<void> {
 
   if (!rooms.length) {
     els.localRoomList.innerHTML =
-      '<p class="muted local-empty">No rooms found on your network — make sure everyone is on the host\'s hotspot.</p>' +
+      '<article class="local-state-card"><p class="deck-label">No rooms found</p><h4>Nothing is broadcasting yet</h4><p class="muted">Ask the host to tap Create Room on the hotspot device, then scan again.</p></article>' +
       '<button class="local-rescan-btn secondary" id="local-rescan-btn">Re-scan</button>';
     const rescan = document.getElementById("local-rescan-btn");
     if (rescan) rescan.addEventListener("click", () => { window.SFX.uiClick(); runLocalScan(); });
@@ -1336,10 +1447,13 @@ async function runLocalScan(): Promise<void> {
   els.localRoomList.innerHTML = rooms.map((r) =>
     `<div class="local-room-row" data-room="${escapeHtml(r.code)}" role="button" tabindex="0" aria-label="Join ${escapeHtml(r.name || r.code)}">
       <div class="local-room-row-info">
-        <span class="local-room-row-name">${escapeHtml(r.name || r.code)}</span>
-        <span class="local-room-row-meta">${escapeHtml(r.hostName || "Unknown")} · ${r.count} player${r.count !== 1 ? "s" : ""}</span>
+        <div class="local-room-row-head">
+          <span class="local-room-row-name">${escapeHtml(r.name || r.code)}</span>
+          <span class="local-room-tag">${r.count} pilot${r.count !== 1 ? "s" : ""}</span>
+        </div>
+        <span class="local-room-row-meta">Hosted by ${escapeHtml(r.hostName || "Unknown")} · Same hotspot</span>
       </div>
-      <button class="local-room-join-btn" data-room="${escapeHtml(r.code)}">JOIN</button>
+      <button class="local-room-join-btn" data-room="${escapeHtml(r.code)}">Join</button>
     </div>`
   ).join("") + '<button class="local-rescan-btn secondary" id="local-rescan-btn">Re-scan</button>';
 
@@ -1381,7 +1495,7 @@ function startLocalScanWithAutoRefresh(): void {
   stopLocalScanInterval();
   // Auto-refresh every 3s while #screen-lan is the active screen
   _localScanInterval = setInterval(() => {
-    const lanScreen = document.getElementById("screen-lan");
+    const lanScreen = document.getElementById(menuScreenElementId("lan"));
     if (!lanScreen || !lanScreen.classList.contains("active")) {
       stopLocalScanInterval();
       return;
@@ -1499,6 +1613,7 @@ function loop(ts: number): void {
   dt = Math.min(dt, 0.05);
 
   const state = window.Net.state;
+  syncSceneMode(state);
   if (mode === "playing" && state) {
     const myId = window.Net.sessionId;
     const input = window.Input.get();
@@ -1534,7 +1649,7 @@ function updateHud(state: any, myId: string): void {
   const me = state.players.get(myId);
   const local = (window.Net as any).localPose;
   els.score.textContent = String(me ? me.score : 0);
-  els.time.textContent = String(Math.ceil(state.timeLeft));
+  els.time.textContent = formatClock(state.timeLeft);
   const altitude = local && local.active ? local.p.y : me ? me.py : 0;
   const speed = local && local.active ? local.speed : me ? me.speed : 0;
   els.alt.textContent = String(Math.round(altitude));
@@ -1654,7 +1769,7 @@ function updateHud(state: any, myId: string): void {
 
   if (state.phase === "intermission") {
     els.inter.classList.remove("hidden");
-    els.interTime.textContent = String(Math.ceil(state.timeLeft));
+    els.interTime.textContent = formatClock(state.timeLeft);
     if (isTdm) {
       const ts0 = state.teamScore0 ?? 0;
       const ts1 = state.teamScore1 ?? 0;
@@ -1975,7 +2090,8 @@ function init(): void {
     window.SFX.uiClick();
   });
 
-  buildHangar();
+  renderLoadoutUI();
+  persistLoadoutStore();
   fetchLeaderboard();
   setupTouchButtons();
   updateRotateOverlay();
@@ -1991,21 +2107,29 @@ function init(): void {
   els.localRoomName.value = "";
 
   // ─── MENU NAV ROUTER WIRING ───────────────────────────────────────────────
-  // Wire all [data-nav] buttons to navGo and all [data-back] buttons to navBack
-  document.querySelectorAll<HTMLElement>("[data-nav]").forEach((el) => {
+  // Wire nav buttons only inside the active menu shell.
+  menuRoot.querySelectorAll<HTMLElement>(menuNavSelector).forEach((el) => {
     el.addEventListener("click", () => {
+      const target = useArcadeMenu ? el.dataset.arcadeNav : el.dataset.nav;
+      if (!target) return;
       window.SFX.uiClick();
-      navGo(el.dataset.nav!);
+      navGo(target);
     });
   });
-  document.querySelectorAll<HTMLElement>("[data-back]").forEach((el) => {
+  menuRoot.querySelectorAll<HTMLElement>(menuBackSelector).forEach((el) => {
     el.addEventListener("click", () => {
       window.SFX.uiClick();
       navBack();
     });
   });
-  // Ensure menu always opens on Home screen
-  navReset();
+  // Allow direct QA/deep-link entry to a menu screen via location hash (#customize, #lan, etc.)
+  const initialHashScreen = location.hash.replace(/^#/, "").toLowerCase();
+  if (MENU_SCREENS.includes(initialHashScreen as (typeof MENU_SCREENS)[number])) {
+    navStack = [initialHashScreen];
+    navShow(initialHashScreen);
+  } else {
+    navReset();
+  }
 
   // ─── IN-GAME MENU BUTTON (§E) ─────────────────────────────────────────────
   els.ingameMenuBtn.addEventListener("click", () => {
@@ -2019,11 +2143,7 @@ function init(): void {
     showShareQr();
   });
 
-  // P2P host button
-  els.p2pHostBtn.addEventListener("click", () => {
-    window.SFX.uiClick();
-    startP2PHost();
-  });
+
 
   // P2P offline QR button — starts host AND renders offer QR in one click
   els.p2pOfflineBtn.addEventListener("click", async () => {
@@ -2078,13 +2198,7 @@ function init(): void {
     window.SFX.uiClick();
     startLocalScanWithAutoRefresh();
   });
-  // Stop auto-scan when navigating away from the LAN screen
-  document.querySelectorAll<HTMLElement>("[data-back]").forEach((el) => {
-    el.addEventListener("click", stopLocalScanInterval);
-  });
-  document.querySelectorAll<HTMLElement>("[data-nav]").forEach((el) => {
-    if (el.dataset.nav !== "lan") el.addEventListener("click", stopLocalScanInterval);
-  });
+
 
   els.lanQuick.addEventListener("click", () => {
     window.SFX.uiClick();
@@ -2199,22 +2313,22 @@ function init(): void {
     if (e.target === els.settingsScreen) hideSettings();
   });
 
-  // ─── HANGAR OVERLAY WIRING ────────────────────────────────────────────────
-  els.hangarBtn.addEventListener("click", () => {
+  // ─── LOADOUT QUICK ACTIONS ────────────────────────────────────────────────
+  els.quickPlayBtn.addEventListener("click", () => {
     window.SFX.uiClick();
-    showHangar();
+    startGame("PUBLIC");
   });
-  els.hangarCloseBtn.addEventListener("click", () => {
+  els.privateRoomBtn.addEventListener("click", () => {
     window.SFX.uiClick();
-    hideHangar();
+    startGame(genCode());
   });
-  els.hangarDone.addEventListener("click", () => {
+  els.customizeRandomize.addEventListener("click", () => {
     window.SFX.uiClick();
-    hideHangar();
+    updateSelectedLoadout(randomizeLoadout(), "Random loadout armed.");
   });
-  // Click-outside to close hangar
-  els.hangarOverlay.addEventListener("click", (e: MouseEvent) => {
-    if (e.target === els.hangarOverlay) hideHangar();
+  els.customizeReset.addEventListener("click", () => {
+    window.SFX.uiClick();
+    updateSelectedLoadout(DEFAULT_LOADOUT, "Loadout reset to deck default.");
   });
 
   // ─── SETTINGS CONTROLS ───────────────────────────────────────────────────
@@ -2466,7 +2580,6 @@ function init(): void {
     if (e.key === "Escape") {
       if (scannerOpen) { closeScanner(); return; }
       if (!els.shareQrOverlay.classList.contains("hidden")) { hideShareQr(); return; }
-      if (hangarOpen) { hideHangar(); return; }
       if (settingsOpen) { hideSettings(); return; }
       // §C: nav back within menu (modal closes take priority above)
       if (mode === "menu" && navStack.length > 1) { navBack(); return; }
@@ -2525,3 +2638,36 @@ window.addEventListener("unhandledrejection", (e: PromiseRejectionEvent) => {
     showFatal(msg || "An unexpected error occurred.");
   }
 });
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
