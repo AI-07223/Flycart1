@@ -36,6 +36,9 @@ import * as THREE from "three";
   let grid;
   let boundary;
   let landscapeRoot;
+  let groundTexture = null;
+  let skyDome = null;
+  let cloudSprites = [];
   let menuDemo = null;
   let sceneMode = "preflight";
   let particles = [];
@@ -75,6 +78,18 @@ import * as THREE from "three";
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, cfg.pixelRatio || 1.25));
     renderer.shadowMap.enabled = cfg.shadows === "map";
   }
+
+  // ---- Shared geometries for plane detailing (module-level, reused across every plane instance) ----
+  const canopyGeo = new THREE.SphereGeometry(2.6, 10, 8);
+  const cowlGeo = new THREE.CylinderGeometry(2.2, 3.0, 4.5, 8);
+  const intakeGeo = new THREE.TorusGeometry(2.0, 0.45, 6, 12);
+  const propDiscGeo = new THREE.CircleGeometry(7.5, 16);
+  const propBladeGeo = new THREE.BoxGeometry(0.4, 13, 0.6);
+  const nozzleGeo = new THREE.CylinderGeometry(1.6, 2.1, 3.2, 8);
+  const nozzleGlowGeo = new THREE.CircleGeometry(1.7, 10);
+  const wingtipGeo = new THREE.ConeGeometry(0.9, 4, 6);
+  const wingtipFinGeo = new THREE.BoxGeometry(0.6, 3.2, 2.6);
+  const boostFlameGeo = new THREE.ConeGeometry(2.4, 9, 8);
 
   // makePlane(cosmetic): accepts {color,bodyShape,accent,trail,livery}
   // or a bare number (backward compat: treated as {color:n, ...defaults})
@@ -118,6 +133,14 @@ import * as THREE from "three";
       wings.castShadow = true;
       group.add(wings);
 
+      // Swept-back needle wingtips
+      for (const sx of [10, -10]) {
+        const tip = new THREE.Mesh(wingtipGeo, darkMat);
+        tip.rotation.z = sx > 0 ? Math.PI / 2 : -Math.PI / 2;
+        tip.position.set(sx, 0, 3.4);
+        group.add(tip);
+      }
+
       tail = new THREE.Mesh(new THREE.BoxGeometry(8, 1, 3.5), bodyMat);
       tail.name = "tail";
       tail.position.z = 12;
@@ -159,6 +182,13 @@ import * as THREE from "three";
       nacelle2.position.set(-8, -2, 1);
       nacelle2.castShadow = true;
       group.add(nacelle2);
+
+      // Blunt boxy wingtips (chunky bomber silhouette)
+      for (const sx of [15, -15]) {
+        const tip = new THREE.Mesh(wingtipFinGeo, darkMat);
+        tip.position.set(sx, 0.5, 1);
+        group.add(tip);
+      }
 
       tail = new THREE.Mesh(new THREE.BoxGeometry(12, 1.5, 5), bodyMat);
       tail.name = "tail";
@@ -209,6 +239,14 @@ import * as THREE from "three";
         group.add(s2);
       }
 
+      // Rounded wingtip caps on the upper wing pair
+      for (const sx of [12, -12]) {
+        const tip = new THREE.Mesh(wingtipGeo, darkMat);
+        tip.rotation.z = sx > 0 ? Math.PI / 2 : -Math.PI / 2;
+        tip.position.set(sx, 3, 1);
+        group.add(tip);
+      }
+
       tail = new THREE.Mesh(new THREE.BoxGeometry(10, 1, 4), bodyMat);
       tail.name = "tail";
       tail.position.z = 10;
@@ -238,6 +276,13 @@ import * as THREE from "three";
       wings.castShadow = true;
       group.add(wings);
 
+      // Swept wingtip fins (fighter silhouette)
+      for (const sx of [12, -12]) {
+        const tip = new THREE.Mesh(wingtipFinGeo, darkMat);
+        tip.position.set(sx, 0.6, 2);
+        group.add(tip);
+      }
+
       tail = new THREE.Mesh(new THREE.BoxGeometry(10, 1, 4), bodyMat);
       tail.name = "tail";
       tail.position.z = 10;
@@ -249,16 +294,55 @@ import * as THREE from "three";
       group.add(fin);
     }
 
-    // ---- Shared parts: canopy + prop ----
-    const canopy = new THREE.Mesh(new THREE.SphereGeometry(2.6, 10, 8), glassMat);
+    // ---- Shared parts: tinted canopy bubble, engine cowl/intake ----
+    const canopy = new THREE.Mesh(canopyGeo, glassMat);
     canopy.scale.set(1, 0.7, 1.4);
     canopy.position.set(0, 2.5, -2);
     group.add(canopy);
 
-    const prop = new THREE.Mesh(new THREE.BoxGeometry(0.4, 13, 0.6), darkMat);
-    prop.position.z = -17;
-    group.add(prop);
-    group.userData.prop = prop;
+    // Engine cowl: a stubby cylinder hugging the nose, plus an intake ring —
+    // reads as "chunky toy engine" up close, cheap at a distance.
+    const cowl = new THREE.Mesh(cowlGeo, darkMat);
+    cowl.rotation.x = Math.PI / 2;
+    cowl.position.z = -9;
+    group.add(cowl);
+    const intake = new THREE.Mesh(intakeGeo, darkMat);
+    intake.position.z = -11;
+    group.add(intake);
+
+    // ---- Nose accessory: spinning prop disc (biplane/fighter) or jet nozzle glow (interceptor/bomber) ----
+    const usesProp = bodyShape === 0 || bodyShape === 3;
+    let prop = null;
+    let nozzleGlow = null;
+    if (usesProp) {
+      // Two thin blades (cross) that spin fast, plus a translucent disc that
+      // fades in as spin speed increases (drawn additively so it reads as a blur, not a solid wall).
+      prop = new THREE.Group();
+      const bladeA = new THREE.Mesh(propBladeGeo, darkMat);
+      const bladeB = new THREE.Mesh(propBladeGeo, darkMat);
+      bladeB.rotation.z = Math.PI / 2;
+      prop.add(bladeA, bladeB);
+      const discMat = new THREE.MeshBasicMaterial({ color: 0x1a1f26, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide });
+      const disc = new THREE.Mesh(propDiscGeo, discMat);
+      prop.add(disc);
+      prop.userData.disc = disc;
+      prop.position.z = -17;
+      group.add(prop);
+      group.userData.prop = prop;
+    } else {
+      // Jet nozzle: dark cone stub + pulsing additive glow disc at the tail end.
+      const nozzle = new THREE.Mesh(nozzleGeo, darkMat);
+      nozzle.rotation.x = Math.PI / 2;
+      const nozzleZ = bodyShape === 1 ? 15.5 : 13.5;
+      nozzle.position.z = nozzleZ;
+      group.add(nozzle);
+      const glowMat = new THREE.MeshBasicMaterial({ color: 0xff9f43, transparent: true, opacity: 0.7, depthWrite: false, blending: THREE.AdditiveBlending });
+      nozzleGlow = new THREE.Mesh(nozzleGlowGeo, glowMat);
+      nozzleGlow.position.z = nozzleZ + 1.7;
+      nozzleGlow.rotation.x = Math.PI / 2;
+      group.add(nozzleGlow);
+      group.userData.nozzleGlow = nozzleGlow;
+    }
 
     // ---- Livery: assign bodyMat / accentMat to named parts + overlays ----
     // Collect the wing mesh(es) for livery use
@@ -415,6 +499,23 @@ import * as THREE from "three";
     return group;
   }
 
+  // animatePlaneNose(mesh, speedRatio): spins the prop disc (fading in as a blur at
+  // speed) or pulses the jet nozzle glow. speedRatio is 0..1-ish (current/boost speed).
+  function animatePlaneNose(mesh, speedRatio) {
+    const prop = mesh.userData.prop;
+    if (prop) {
+      prop.rotation.z = time * 38;
+      const disc = prop.userData.disc;
+      if (disc) disc.material.opacity = Math.min(0.5, 0.15 + speedRatio * 0.35);
+    }
+    const glow = mesh.userData.nozzleGlow;
+    if (glow) {
+      const pulse = 0.55 + 0.25 * Math.sin(time * 16) + speedRatio * 0.3;
+      glow.material.opacity = Math.min(1, Math.max(0.25, pulse));
+      glow.scale.setScalar(0.8 + speedRatio * 0.9);
+    }
+  }
+
   function orientPlane(obj, pose, bank) {
     const pos = tmpVec.set(pose.p.x, pose.p.y, pose.p.z);
     const fwd = tmpVec2.set(pose.f.x, pose.f.y, pose.f.z).normalize();
@@ -432,24 +533,91 @@ import * as THREE from "three";
     orientPlane(obj, { p, f }, 0);
   }
 
-  function addParticle(pos, color) {
+  // Shared geo for confetti-shaped particles (small flat chip — cheap, distinct from spark spheres)
+  const confettiGeo = new THREE.BoxGeometry(1.6, 1.6, 0.3);
+  const sparkParticleGeo = new THREE.SphereGeometry(1.2, 8, 8);
+  const CONFETTI_COLORS = [0xffd700, 0xff6b6b, 0x49c0ff, 0x8be34a, 0xffffff, 0xc07bff];
+
+  // addParticle(pos, color, opts?): opts lets callers tune spread/gravity/life/shape
+  // without duplicating this whole function (used by explosions, hit sparks, confetti).
+  function addParticle(pos, color, opts) {
+    const o = opts || {};
+    const geo = o.shape === "confetti" ? confettiGeo : sparkParticleGeo;
     const mesh = new THREE.Mesh(
-      new THREE.SphereGeometry(1.2, 8, 8),
+      geo,
       new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.9 })
     );
     mesh.position.copy(pos);
     scene.add(mesh);
+    const spread = o.spread != null ? o.spread : 36;
+    const upMin = o.upMin != null ? o.upMin : 12;
+    const upSpread = o.upSpread != null ? o.upSpread : 26;
     particles.push({
       mesh,
-      vel: new THREE.Vector3((Math.random() - 0.5) * 36, Math.random() * 26 + 12, (Math.random() - 0.5) * 36),
-      life: 0.5 + Math.random() * 0.35,
-      maxLife: 0.85,
+      vel: new THREE.Vector3((Math.random() - 0.5) * spread, Math.random() * upSpread + upMin, (Math.random() - 0.5) * spread),
+      life: o.life != null ? o.life : 0.5 + Math.random() * 0.35,
+      maxLife: o.maxLife != null ? o.maxLife : 0.85,
+      gravity: o.gravity != null ? o.gravity : 42,
+      spin: o.shape === "confetti" ? (Math.random() - 0.5) * 10 : 0,
     });
   }
 
   function explodeAt(pos, color, count) {
     const n = count || 14;
     for (let i = 0; i < n; i++) addParticle(pos, color);
+    if (Q && Q.current !== "low") addShockwave(pos, color);
+  }
+
+  // ---- Shockwave rings: expanding additive torus that fades, layered under explosion particles ----
+  let shockwaves = [];
+  const shockwaveGeo = new THREE.RingGeometry(0.85, 1, 20);
+
+  function addShockwave(pos, color) {
+    const mesh = new THREE.Mesh(
+      shockwaveGeo,
+      new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.55, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide })
+    );
+    mesh.rotation.x = -Math.PI / 2;
+    mesh.position.copy(pos);
+    mesh.position.y += 1;
+    mesh.scale.setScalar(2);
+    scene.add(mesh);
+    shockwaves.push({ mesh, life: 0.5, maxLife: 0.5 });
+  }
+
+  // ---- Muzzle flash: brief additive cone at a plane's nose when it fires ----
+  let muzzleFlashes = [];
+  const muzzleFlashGeo = new THREE.ConeGeometry(1.6, 6, 8);
+
+  function addMuzzleFlash(planeMesh, color) {
+    const mesh = new THREE.Mesh(
+      muzzleFlashGeo,
+      new THREE.MeshBasicMaterial({ color: color || 0xffe27a, transparent: true, opacity: 0.9, depthWrite: false, blending: THREE.AdditiveBlending })
+    );
+    mesh.rotation.x = Math.PI / 2;
+    mesh.position.set(0, 0, -20.5);
+    planeMesh.add(mesh);
+    muzzleFlashes.push({ mesh, life: 0.09, maxLife: 0.09 });
+  }
+
+  // ---- Kill celebration: short confetti/star burst from the killer's tail (SmashKarts-style) ----
+  function celebrate(planeMesh) {
+    if (!planeMesh || !planeMesh.visible) return;
+    const tailLocal = new THREE.Vector3(0, 0, 18);
+    const tailWorld = planeMesh.localToWorld(tailLocal.clone());
+    const n = 16;
+    for (let i = 0; i < n; i++) {
+      const color = CONFETTI_COLORS[(Math.random() * CONFETTI_COLORS.length) | 0];
+      addParticle(tailWorld, color, {
+        shape: "confetti",
+        spread: 50,
+        upMin: 20,
+        upSpread: 34,
+        life: 0.6 + Math.random() * 0.4,
+        maxLife: 1.0,
+        gravity: 30,
+      });
+    }
   }
 
   function worldToScreen(pos) {
@@ -570,6 +738,14 @@ import * as THREE from "three";
       tower.receiveShadow = true;
       group.add(tower);
 
+      // Slim emissive cap segment near the top — reads as a lit tower deck at a distance
+      const towerCap = new THREE.Mesh(
+        new THREE.CylinderGeometry(19, 19.6, landmark.height * 0.06, 12),
+        new THREE.MeshStandardMaterial({ color: 0xffe7a8, emissive: 0xaa7a2a, emissiveIntensity: 0.55, flatShading: true, roughness: 0.6 })
+      );
+      towerCap.position.y = landmark.height * 0.92;
+      group.add(towerCap);
+
       const collar = new THREE.Mesh(new THREE.TorusGeometry(36, 4, 8, 24), new THREE.MeshStandardMaterial({ color: 0x3e4650, flatShading: true, roughness: 0.9 }));
       collar.rotation.x = Math.PI / 2;
       collar.position.y = landmark.height * 0.58;
@@ -589,13 +765,15 @@ import * as THREE from "three";
       beacon.position.y = landmark.height + 6;
       group.add(beacon);
     } else if (landmark.kind === "mesa") {
-      const mesa = new THREE.Mesh(new THREE.CylinderGeometry(landmark.radius * 0.72, landmark.radius, landmark.height, 10), new THREE.MeshStandardMaterial({ color: landmark.color, flatShading: true, roughness: 1 }));
+      // Warm the mesa body slightly toward terracotta/ochre for a sun-baked look
+      const mesaColor = new THREE.Color(landmark.color).lerp(new THREE.Color(0xc97a4a), 0.22).getHex();
+      const mesa = new THREE.Mesh(new THREE.CylinderGeometry(landmark.radius * 0.72, landmark.radius, landmark.height, 10), new THREE.MeshStandardMaterial({ color: mesaColor, flatShading: true, roughness: 1 }));
       mesa.position.y = landmark.height / 2;
       mesa.castShadow = true;
       mesa.receiveShadow = true;
       group.add(mesa);
 
-      const cap = new THREE.Mesh(new THREE.CylinderGeometry(landmark.radius * 0.68, landmark.radius * 0.74, 8, 10), new THREE.MeshStandardMaterial({ color: 0xd2bf8b, flatShading: true, roughness: 0.92 }));
+      const cap = new THREE.Mesh(new THREE.CylinderGeometry(landmark.radius * 0.68, landmark.radius * 0.74, 8, 10), new THREE.MeshStandardMaterial({ color: 0xdcb37e, flatShading: true, roughness: 0.92 }));
       cap.position.y = landmark.height + 4;
       cap.receiveShadow = true;
       group.add(cap);
@@ -636,6 +814,74 @@ import * as THREE from "three";
     parent.add(group);
   }
 
+  // ---- Procedural canvas textures: ground checker/grid fade + sky gradient ----
+  // Generated once at init and reused (no per-frame allocation, no external files).
+  function makeGroundTexture() {
+    const size = 512;
+    const canvas = document.createElement("canvas");
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext("2d");
+    // Base two-tone subtle checker
+    const cell = size / 16;
+    for (let y = 0; y < 16; y++) {
+      for (let x = 0; x < 16; x++) {
+        const dark = (x + y) % 2 === 0;
+        ctx.fillStyle = dark ? "rgba(255,255,255,0.03)" : "rgba(0,0,0,0.03)";
+        ctx.fillRect(x * cell, y * cell, cell, cell);
+      }
+    }
+    // Soft radial fade from center (bright) to edge (slightly darker), matches arena scale
+    const grad = ctx.createRadialGradient(size / 2, size / 2, size * 0.05, size / 2, size / 2, size * 0.62);
+    grad.addColorStop(0, "rgba(255,255,255,0.06)");
+    grad.addColorStop(1, "rgba(0,0,0,0.10)");
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, size, size);
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+    tex.repeat.set(1, 1);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    return tex;
+  }
+
+  function makeSkyTexture(topHex, bottomHex) {
+    const w = 2;
+    const h = 256;
+    const canvas = document.createElement("canvas");
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext("2d");
+    const grad = ctx.createLinearGradient(0, 0, 0, h);
+    const top = new THREE.Color(topHex);
+    const bottom = new THREE.Color(bottomHex);
+    grad.addColorStop(0, `#${top.getHexString()}`);
+    grad.addColorStop(1, `#${bottom.getHexString()}`);
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, w, h);
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    return tex;
+  }
+
+  // Low, flat hill/dune silhouettes ringing the map edge — cheap fog-friendly backdrop.
+  function makeHillRing(mapHalf) {
+    const group = new THREE.Group();
+    const mat = new THREE.MeshStandardMaterial({ color: 0x5f7a63, flatShading: true, roughness: 1, fog: true });
+    const hillGeo = new THREE.ConeGeometry(1, 1, 7); // unit cone, scaled per-hill
+    const count = 22;
+    const ringR = mapHalf * 1.55;
+    for (let i = 0; i < count; i++) {
+      const a = (i / count) * Math.PI * 2 + (i % 2) * 0.12;
+      const w = 220 + (i % 5) * 60;
+      const hgt = 90 + (i % 4) * 46;
+      const hill = new THREE.Mesh(hillGeo, mat);
+      hill.scale.set(w, hgt, w);
+      hill.position.set(Math.cos(a) * ringR, hgt * 0.5 - 30, Math.sin(a) * ringR);
+      group.add(hill);
+    }
+    return group;
+  }
+
   function buildLandscape() {
     if (landscapeRoot) {
       scene.remove(landscapeRoot);
@@ -648,7 +894,19 @@ import * as THREE from "three";
     scene.add(landscapeRoot);
 
     ground = makeGroundTile(G.MAP_HALF * 2.8, G.MAP_HALF * 2.8, 0x688e5f, -0.06, 0, 0, 0);
+    // Overlay the procedural checker/fade texture on the base tile (kept as a second
+    // material layer so the flat-color fallback below stays intact if texture gen fails).
+    if (!groundTexture) groundTexture = makeGroundTexture();
+    if (groundTexture) {
+      ground.material.map = groundTexture;
+      ground.material.needsUpdate = true;
+    }
     landscapeRoot.add(ground);
+
+    // Distant hill/dune silhouette ring at the map edge
+    if (Q && Q.current !== "low") {
+      landscapeRoot.add(makeHillRing(G.MAP_HALF));
+    }
 
     landscapeRoot.add(makeGroundTile(G.MAP_HALF * 2.25, G.MAP_HALF * 2.25, 0x729c68, 0.01, 0, 0, 0, 0.96));
     landscapeRoot.add(makeGroundTile(G.MAP_HALF * 2.05, G.MAP_HALF * 1.4, 0x7ea56c, 0.03, -120, 120, -0.12, 0.72));
@@ -712,6 +970,64 @@ import * as THREE from "three";
     G.LANDMARKS.forEach((landmark) => buildLandmark(landmark, landscapeRoot));
   }
 
+  // ---- Sky: gradient dome + low sun disc + drifting flat cloud sprites ----
+  const SKY_TOP = 0x2f7fe0;
+  const SKY_BOTTOM = 0xbfe3ff;
+  const cloudGeo = new THREE.PlaneGeometry(1, 1);
+
+  function buildSky() {
+    if (skyDome) {
+      scene.remove(skyDome);
+      disposeObject(skyDome);
+      skyDome = null;
+    }
+    cloudSprites.forEach((c) => scene.remove(c.mesh));
+    cloudSprites = [];
+
+    const skyTex = makeSkyTexture(SKY_TOP, SKY_BOTTOM);
+    const domeGeo = new THREE.SphereGeometry(4600, 20, 14, 0, Math.PI * 2, 0, Math.PI * 0.55);
+    const domeMat = new THREE.MeshBasicMaterial({ map: skyTex, side: THREE.BackSide, fog: false, depthWrite: false });
+    skyDome = new THREE.Mesh(domeGeo, domeMat);
+    skyDome.renderOrder = -10;
+    scene.add(skyDome);
+
+    // Low sun disc — a simple additive circle sitting near the horizon
+    const sunGeo = new THREE.CircleGeometry(220, 20);
+    const sunMat = new THREE.MeshBasicMaterial({ color: 0xfff2c8, transparent: true, opacity: 0.85, depthWrite: false, fog: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide });
+    const sunDisc = new THREE.Mesh(sunGeo, sunMat);
+    sunDisc.position.set(1600, 700, -2600);
+    sunDisc.lookAt(0, 700, 0);
+    sunDisc.renderOrder = -9;
+    skyDome.add(sunDisc);
+
+    // Flat cloud sprites: skip entirely on low quality (perf-gated per spec)
+    if (Q && Q.current === "low") return;
+    const cloudMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.55, depthWrite: false, fog: false, side: THREE.DoubleSide });
+    const cloudCount = 6;
+    for (let i = 0; i < cloudCount; i++) {
+      const mesh = new THREE.Mesh(cloudGeo, cloudMat);
+      const w = 380 + (i % 3) * 140;
+      const hgt = w * 0.38;
+      mesh.scale.set(w, hgt, 1);
+      const a = (i / cloudCount) * Math.PI * 2 + i * 0.7;
+      const dist = 2600 + (i % 3) * 300;
+      mesh.position.set(Math.cos(a) * dist, 560 + (i % 4) * 90, Math.sin(a) * dist);
+      mesh.lookAt(0, mesh.position.y, 0);
+      mesh.renderOrder = -8;
+      scene.add(mesh);
+      cloudSprites.push({ mesh, angle: a, dist, speed: 0.003 + (i % 3) * 0.0015, y: mesh.position.y });
+    }
+  }
+
+  function updateSky(step) {
+    if (!cloudSprites.length) return;
+    for (const c of cloudSprites) {
+      c.angle += step * c.speed;
+      c.mesh.position.set(Math.cos(c.angle) * c.dist, c.y, Math.sin(c.angle) * c.dist);
+      c.mesh.lookAt(0, c.y, 0);
+    }
+  }
+
   function clearMenuDemo() {
     if (!menuDemo) return;
     scene.remove(menuDemo);
@@ -738,8 +1054,10 @@ import * as THREE from "three";
       renderer.shadowMap.enabled = true;
       renderer.shadowMap.type = THREE.PCFShadowMap;
       scene = new THREE.Scene();
-      scene.background = new THREE.Color(0x8cc8ff);
-      scene.fog = new THREE.Fog(0x8cc8ff, 900, 5000);
+      // Fog tuned to the sky's horizon (bottom) tone so distant geometry blends into the dome
+      // instead of fading into a mismatched flat color.
+      scene.background = new THREE.Color(SKY_BOTTOM);
+      scene.fog = new THREE.Fog(SKY_BOTTOM, 900, 5000);
       camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 10000);
       camera.position.copy(camPos);
 
@@ -752,6 +1070,7 @@ import * as THREE from "three";
       scene.add(sun);
 
       buildLandscape();
+      buildSky();
 
       minimap = document.createElement("canvas");
       minimap.id = "minimap";
@@ -787,7 +1106,10 @@ import * as THREE from "three";
       (document.getElementById("game-wrap") || document.body).appendChild(leadReticle);
 
       applyQuality();
-      Q && Q.onChange && Q.onChange(() => applyQuality());
+      Q && Q.onChange && Q.onChange(() => {
+        applyQuality();
+        buildSky(); // re-gate clouds when quality tier crosses into/out of "low"
+      });
       window.addEventListener("resize", () => this.resize());
       this.resize();
     },
@@ -804,6 +1126,7 @@ import * as THREE from "three";
       hitStop = Math.max(0, hitStop - rawDt);
       time += step;
       clearMenuDemo();
+      updateSky(step);
 
       const samples = window.Net.sample ? window.Net.sample(performance.now() - 100) : {};
       const local = window.Net.localPose;
@@ -824,7 +1147,9 @@ import * as THREE from "three";
             empRing: null,
             bank: 0,
             wasAlive: !!p.alive,
+            wasHp: p.hp != null ? p.hp : 100,
             pose: null,
+            boostFlame: null,
           };
           scene.add(view.mesh);
           stateMaps.views.set(id, view);
@@ -856,17 +1181,43 @@ import * as THREE from "three";
         view.mesh.visible = !!pose.alive;
         if (pose.alive) {
           orientPlane(view.mesh, pose, view.bank);
-          const prop = view.mesh.userData.prop;
-          if (prop) prop.rotation.z = time * 38;
+          const speedRatio = Math.min(1, (pose.speed || 0) / boostSpeed);
+          animatePlaneNose(view.mesh, speedRatio);
 
           // Animate exhaust
           const exhaust = view.mesh.userData.exhaust;
           if (exhaust) {
-            const speedRatio = Math.min(1, (pose.speed || 0) / boostSpeed);
             exhaust.material.opacity = 0.35 + 0.4 * (0.7 + 0.3 * Math.sin(time * 14 + id.charCodeAt(0)));
             exhaust.scale.set(1, 0.6 + speedRatio * 1.4, 1);
           }
+
+          // Boost afterburner: a pulsing flame cone stretching back from the exhaust while boosting
+          if (p.boosting) {
+            if (!view.boostFlame) {
+              view.boostFlame = new THREE.Mesh(
+                boostFlameGeo,
+                new THREE.MeshBasicMaterial({ color: 0x6fd0ff, transparent: true, opacity: 0.8, depthWrite: false, blending: THREE.AdditiveBlending })
+              );
+              view.boostFlame.rotation.x = -Math.PI / 2;
+              view.boostFlame.position.z = exhaust ? exhaust.position.z + 3 : 14;
+              view.mesh.add(view.boostFlame);
+            }
+            view.boostFlame.visible = true;
+            const flamePulse = 1 + 0.35 * Math.sin(time * 30 + id.charCodeAt(0));
+            view.boostFlame.scale.set(flamePulse, flamePulse, 1.1 + 0.5 * Math.sin(time * 24));
+          } else if (view.boostFlame) {
+            view.boostFlame.visible = false;
+          }
         }
+
+        // Hit sparks: small yellow burst when hp drops (skip on spawn/undefined-transition)
+        const curHp = p.hp != null ? p.hp : 100;
+        if (pose.alive && view.wasHp != null && curHp < view.wasHp - 0.01) {
+          addParticle(new THREE.Vector3(pose.p.x, pose.p.y, pose.p.z), 0xffe066, { spread: 26, upMin: 6, upSpread: 16, life: 0.28, maxLife: 0.28, gravity: 20 });
+          addParticle(new THREE.Vector3(pose.p.x, pose.p.y, pose.p.z), 0xffe066, { spread: 26, upMin: 6, upSpread: 16, life: 0.28, maxLife: 0.28, gravity: 20 });
+          addParticle(new THREE.Vector3(pose.p.x, pose.p.y, pose.p.z), 0xffffff, { spread: 20, upMin: 4, upSpread: 12, life: 0.22, maxLife: 0.22, gravity: 20 });
+        }
+        view.wasHp = curHp;
 
         // Hide exhaust when dead
         const exhaust = view.mesh.userData.exhaust;
@@ -959,6 +1310,14 @@ import * as THREE from "three";
           mesh.userData.pose = { p: authP, f: authF, ax: b.px, ay: b.py, az: b.pz };
           mesh.userData.isMine = isMine;
           stateMaps.bullets.set(key, mesh);
+
+          // Muzzle flash: a newly-appeared (non-mine) bullet means its owner just fired.
+          if (!isMine && b.owner) {
+            const ownerView = stateMaps.views.get(b.owner);
+            if (ownerView && ownerView.mesh && ownerView.mesh.visible) {
+              addMuzzleFlash(ownerView.mesh, b.homing ? 0xc07bff : 0xffd86b);
+            }
+          }
         }
         const pose = mesh.userData.pose;
         if (isMine) {
@@ -1020,10 +1379,37 @@ import * as THREE from "three";
           particles.splice(i, 1);
           continue;
         }
-        part.vel.y -= rawDt * 42;
+        part.vel.y -= rawDt * part.gravity;
         part.mesh.position.addScaledVector(part.vel, rawDt);
+        if (part.spin) part.mesh.rotation.z += part.spin * rawDt;
         part.mesh.material.opacity = Math.max(0, part.life / part.maxLife);
         part.mesh.scale.setScalar(0.6 + (part.life / part.maxLife) * 1.4);
+      }
+
+      for (let i = shockwaves.length - 1; i >= 0; i--) {
+        const sw = shockwaves[i];
+        sw.life -= rawDt;
+        if (sw.life <= 0) {
+          scene.remove(sw.mesh);
+          disposeObject(sw.mesh);
+          shockwaves.splice(i, 1);
+          continue;
+        }
+        const t = 1 - sw.life / sw.maxLife;
+        sw.mesh.scale.setScalar(2 + t * 34);
+        sw.mesh.material.opacity = 0.55 * (1 - t);
+      }
+
+      for (let i = muzzleFlashes.length - 1; i >= 0; i--) {
+        const mf = muzzleFlashes[i];
+        mf.life -= rawDt;
+        if (mf.life <= 0) {
+          if (mf.mesh.parent) mf.mesh.parent.remove(mf.mesh);
+          disposeObject(mf.mesh);
+          muzzleFlashes.splice(i, 1);
+          continue;
+        }
+        mf.mesh.material.opacity = 0.9 * (mf.life / mf.maxLife);
       }
     },
 
@@ -1040,7 +1426,9 @@ import * as THREE from "three";
 
     // drawMenu(dt, cosmetic): cosmetic can be {color,bodyShape,accent,trail,livery} or bare number
     drawMenu(dt, cosmetic) {
-      time += Math.min(dt || 0.016, 0.05);
+      const menuStep = Math.min(dt || 0.016, 0.05);
+      time += menuStep;
+      updateSky(menuStep);
       for (const [, view] of stateMaps.views) {
         view.mesh.visible = false;
         if (view.shield) view.shield.visible = false;
@@ -1068,8 +1456,7 @@ import * as THREE from "three";
       const pos = { x: Math.cos(angle) * radius, y: 85 + Math.sin(time * 0.8) * bobAmp, z: Math.sin(angle) * radius };
       const fwd = SP.normalize({ x: -Math.sin(angle), y: Math.cos(time * 0.8) * 0.08, z: Math.cos(angle) });
       orientPlane(menuDemo, { p: pos, f: fwd }, Math.sin(time * 1.3) * 0.22);
-      const prop = menuDemo.userData.prop;
-      if (prop) prop.rotation.z = time * 38;
+      animatePlaneNose(menuDemo, 0.4 + 0.2 * Math.sin(time * 0.6));
 
       // Animate menu exhaust (gentle idle pulse)
       const exhaust = menuDemo.userData.exhaust;
@@ -1389,8 +1776,11 @@ import * as THREE from "three";
     },
 
     killPopup(killerId, mine) {
-      if (!popupLayer) return;
       const view = stateMaps.views.get(killerId);
+      // Streak celebration: confetti burst from the killer's tail, gated off on low quality.
+      if (view && view.mesh && view.mesh.visible && Q && Q.current !== "low") celebrate(view.mesh);
+
+      if (!popupLayer) return;
       if (!view || !view.mesh || !view.mesh.visible) return;
       const screen = worldToScreen(view.mesh.position);
       if (!screen.visible) return;

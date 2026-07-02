@@ -29,11 +29,11 @@ body.arcade-menu-enabled #start-screen {
   --arcade-line: rgba(163, 194, 225, 0.16);
   --arcade-text: #f1f5fb;
   --arcade-muted: #9eb1c9;
-  --arcade-amber: #ffbe3d;
+  --arcade-amber: #ffc93d;
   --arcade-amber-deep: #a85c06;
-  --arcade-cyan: #69e5ff;
-  --arcade-red: #ff6d47;
-  --arcade-green: #76f0b2;
+  --arcade-cyan: #4be8ff;
+  --arcade-red: #ff5a3d;
+  --arcade-green: #5dffb0;
   position: relative;
   width: min(1380px, 100%);
   height: calc(100vh - clamp(32px, 4vw, 56px));
@@ -62,10 +62,13 @@ body.arcade-menu-enabled #start-screen {
 
 .arcade-menu-shell::before {
   background:
-    linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
-  background-size: 100% 36px, 36px 100%;
-  opacity: 0.22;
+    linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+    radial-gradient(ellipse at 50% -10%, rgba(255, 201, 61, 0.1), transparent 55%),
+    radial-gradient(ellipse at 50% 110%, rgba(75, 232, 255, 0.08), transparent 55%);
+  background-size: 100% 36px, 36px 100%, auto, auto;
+  opacity: 0.26;
+  animation: arcadeScanDrift 14s linear infinite;
 }
 
 .arcade-menu-shell::after {
@@ -78,6 +81,25 @@ body.arcade-menu-enabled #start-screen {
   mask-composite: exclude;
   padding: 1px;
   opacity: 0.55;
+  box-shadow: 0 0 0 1px rgba(75, 232, 255, 0.06);
+  animation: arcadeEdgeGlow 5s ease-in-out infinite;
+}
+
+@keyframes arcadeScanDrift {
+  0% { background-position: 0 0, 0 0, center, center; }
+  100% { background-position: 0 360px, 360px 0, center, center; }
+}
+
+@keyframes arcadeEdgeGlow {
+  0%, 100% { opacity: 0.42; }
+  50% { opacity: 0.72; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .arcade-menu-shell::before,
+  .arcade-menu-shell::after {
+    animation: none !important;
+  }
 }
 
 .arcade-menu-shell,
@@ -195,10 +217,9 @@ body.arcade-menu-enabled #start-screen {
   min-height: 54px;
   border-radius: 16px;
   border: 1px solid transparent;
-  box-shadow: none;
   color: #fff;
   background: transparent;
-  transition: transform 120ms ease, border-color 120ms ease, background 120ms ease, box-shadow 120ms ease;
+  transition: transform 100ms ease, border-color 120ms ease, background 120ms ease, box-shadow 100ms ease;
 }
 
 .arcade-menu-shell button:hover {
@@ -207,32 +228,58 @@ body.arcade-menu-enabled #start-screen {
 
 .arcade-menu-shell button:active {
   transform: translateY(1px);
-  box-shadow: none;
 }
 
 .arcade-panel-action,
 .arcade-back-btn {
   padding: 0 18px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: linear-gradient(180deg, rgba(30, 41, 59, 0.96), rgba(14, 21, 33, 0.96));
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.08), transparent 46%),
+    linear-gradient(180deg, rgba(34, 48, 70, 0.97), rgba(14, 21, 33, 0.97));
   color: #eef6ff;
+  box-shadow: 0 4px 0 rgba(2, 5, 10, 0.8), 0 6px 12px rgba(0, 0, 0, 0.28);
+}
+
+.arcade-panel-action:hover,
+.arcade-back-btn:hover {
+  box-shadow: 0 5px 0 rgba(2, 5, 10, 0.8), 0 12px 20px rgba(0, 0, 0, 0.24);
+}
+
+.arcade-panel-action:active,
+.arcade-back-btn:active {
+  box-shadow: 0 1px 0 rgba(2, 5, 10, 0.8), 0 3px 8px rgba(0, 0, 0, 0.24);
 }
 
 .arcade-panel-action--secondary,
 .arcade-menu-shell button.secondary {
-  background: linear-gradient(180deg, rgba(20, 30, 46, 0.96), rgba(8, 13, 23, 0.96));
-  border-color: rgba(137, 168, 201, 0.16);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05), transparent 46%),
+    linear-gradient(180deg, rgba(22, 32, 48, 0.97), rgba(8, 13, 23, 0.97));
+  border-color: rgba(137, 168, 201, 0.18);
   color: #dce7f4;
 }
 
 .arcade-panel-action--major {
-  border-color: rgba(255, 190, 61, 0.34);
+  position: relative;
+  border-color: rgba(255, 201, 61, 0.42);
   background:
-    radial-gradient(circle at left center, rgba(255, 190, 61, 0.2), transparent 60%),
-    linear-gradient(180deg, rgba(39, 27, 10, 0.98), rgba(18, 12, 4, 0.98));
+    linear-gradient(180deg, rgba(255, 255, 255, 0.12), transparent 46%),
+    radial-gradient(circle at left center, rgba(255, 201, 61, 0.26), transparent 55%),
+    linear-gradient(180deg, rgba(52, 35, 10, 0.98), rgba(18, 12, 4, 0.98));
   color: #fff3d8;
   min-height: 64px;
   font-size: 15px;
+  overflow: hidden;
+  box-shadow: 0 5px 0 rgba(120, 68, 4, 0.85), 0 10px 18px rgba(163, 92, 6, 0.26);
+}
+
+.arcade-panel-action--major:hover {
+  box-shadow: 0 6px 0 rgba(120, 68, 4, 0.85), 0 16px 24px rgba(163, 92, 6, 0.3);
+}
+
+.arcade-panel-action--major:active {
+  box-shadow: 0 1px 0 rgba(120, 68, 4, 0.85), 0 3px 8px rgba(163, 92, 6, 0.24);
 }
 
 .arcade-panel {
@@ -758,9 +805,16 @@ body.arcade-menu-enabled #start-screen {
   display: grid;
   place-items: center;
   font-size: 18px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: linear-gradient(180deg, rgba(30, 41, 59, 0.9), rgba(14, 21, 33, 0.9));
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.08), transparent 46%),
+    linear-gradient(180deg, rgba(34, 48, 70, 0.92), rgba(14, 21, 33, 0.92));
   color: #eef6ff;
+  box-shadow: 0 3px 0 rgba(2, 5, 10, 0.8), 0 5px 10px rgba(0, 0, 0, 0.26);
+}
+
+.arcade-corner-btn:active {
+  box-shadow: 0 1px 0 rgba(2, 5, 10, 0.8), 0 2px 6px rgba(0, 0, 0, 0.24);
 }
 
 .arcade-corner-btn--secondary {
@@ -793,7 +847,42 @@ body.arcade-menu-enabled #start-screen {
   font-size: clamp(28px, 8vh, 96px);
   line-height: 0.9;
   color: var(--arcade-text);
-  text-shadow: 0 0 26px rgba(255, 190, 61, 0.16);
+  font-weight: 900;
+  font-style: oblique -6deg;
+  transform: skewX(-2deg);
+  -webkit-text-stroke: 1.5px rgba(4, 8, 14, 0.9);
+  text-shadow:
+    0 2px 0 rgba(4, 8, 14, 0.9),
+    0 4px 0 rgba(4, 8, 14, 0.75),
+    0 6px 10px rgba(0, 0, 0, 0.5),
+    0 0 20px rgba(255, 201, 61, 0.5),
+    0 0 46px rgba(255, 201, 61, 0.28);
+  animation: arcadeTitleGlow 3.4s ease-in-out infinite;
+}
+
+@keyframes arcadeTitleGlow {
+  0%, 100% {
+    text-shadow:
+      0 2px 0 rgba(4, 8, 14, 0.9),
+      0 4px 0 rgba(4, 8, 14, 0.75),
+      0 6px 10px rgba(0, 0, 0, 0.5),
+      0 0 20px rgba(255, 201, 61, 0.5),
+      0 0 46px rgba(255, 201, 61, 0.28);
+  }
+  50% {
+    text-shadow:
+      0 2px 0 rgba(4, 8, 14, 0.9),
+      0 4px 0 rgba(4, 8, 14, 0.75),
+      0 6px 10px rgba(0, 0, 0, 0.5),
+      0 0 30px rgba(255, 201, 61, 0.7),
+      0 0 64px rgba(75, 232, 255, 0.3);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .arcade-title-block h1 {
+    animation: none !important;
+  }
 }
 
 .arcade-title-block .arcade-tagline {
@@ -818,6 +907,7 @@ body.arcade-menu-enabled #start-screen {
 }
 
 .arcade-home-btn {
+  position: relative;
   display: grid;
   grid-template-columns: 56px minmax(0, 1fr);
   align-items: center;
@@ -825,25 +915,104 @@ body.arcade-menu-enabled #start-screen {
   padding: 0 22px;
   min-height: clamp(44px, 9vh, 76px);
   border-radius: 22px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.14);
   background:
-    linear-gradient(90deg, rgba(255, 255, 255, 0.02), transparent 20%),
-    linear-gradient(180deg, rgba(22, 33, 50, 0.98), rgba(9, 15, 26, 0.98));
+    linear-gradient(180deg, rgba(255, 255, 255, 0.1), transparent 46%),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.03), transparent 22%),
+    linear-gradient(180deg, rgba(30, 44, 66, 0.98), rgba(9, 15, 26, 0.98));
+  box-shadow:
+    0 5px 0 rgba(2, 5, 10, 0.85),
+    0 9px 16px rgba(0, 0, 0, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
   text-align: left;
+  overflow: hidden;
+  transition: transform 100ms ease, box-shadow 100ms ease, border-color 120ms ease;
+}
+
+.arcade-home-btn::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -60%;
+  width: 40%;
+  height: 100%;
+  background: linear-gradient(100deg, transparent, rgba(255, 255, 255, 0.22), transparent);
+  transform: skewX(-18deg);
+  pointer-events: none;
 }
 
 .arcade-home-btn:hover {
-  border-color: rgba(105, 229, 255, 0.36);
+  border-color: rgba(105, 229, 255, 0.4);
+  transform: translateY(-2px);
   box-shadow:
-    0 16px 26px rgba(0, 0, 0, 0.2),
-    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    0 7px 0 rgba(2, 5, 10, 0.85),
+    0 18px 28px rgba(0, 0, 0, 0.24),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+.arcade-home-btn:active {
+  transform: translateY(3px);
+  box-shadow:
+    0 2px 0 rgba(2, 5, 10, 0.85),
+    0 4px 10px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
 .arcade-home-btn--primary {
-  border-color: rgba(255, 190, 61, 0.34);
+  border-color: rgba(255, 201, 61, 0.46);
   background:
-    radial-gradient(circle at left center, rgba(255, 190, 61, 0.18), transparent 40%),
-    linear-gradient(180deg, rgba(39, 27, 10, 0.98), rgba(18, 12, 4, 0.98));
+    linear-gradient(180deg, rgba(255, 255, 255, 0.14), transparent 46%),
+    radial-gradient(circle at left center, rgba(255, 201, 61, 0.26), transparent 42%),
+    linear-gradient(180deg, rgba(52, 35, 10, 0.98), rgba(18, 12, 4, 0.98));
+  box-shadow:
+    0 5px 0 rgba(120, 68, 4, 0.85),
+    0 10px 20px rgba(163, 92, 6, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.14);
+  animation: arcadePrimaryShine 3.6s ease-in-out infinite;
+}
+
+.arcade-home-btn--primary:hover {
+  box-shadow:
+    0 7px 0 rgba(120, 68, 4, 0.85),
+    0 20px 30px rgba(163, 92, 6, 0.32),
+    inset 0 1px 0 rgba(255, 255, 255, 0.14);
+}
+
+.arcade-home-btn--primary:active {
+  box-shadow:
+    0 2px 0 rgba(120, 68, 4, 0.85),
+    0 4px 10px rgba(163, 92, 6, 0.24),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+.arcade-home-btn--primary::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -60%;
+  width: 34%;
+  height: 100%;
+  background: linear-gradient(100deg, transparent, rgba(255, 234, 170, 0.4), transparent);
+  transform: skewX(-18deg);
+  pointer-events: none;
+  animation: arcadeShineSweep 3.6s ease-in-out infinite;
+}
+
+@keyframes arcadeShineSweep {
+  0%, 30% { left: -60%; }
+  70%, 100% { left: 130%; }
+}
+
+@keyframes arcadePrimaryShine {
+  0%, 100% { border-color: rgba(255, 201, 61, 0.46); }
+  50% { border-color: rgba(255, 201, 61, 0.68); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .arcade-home-btn--primary,
+  .arcade-home-btn--primary::after {
+    animation: none !important;
+  }
 }
 
 .arcade-home-btn-icon {

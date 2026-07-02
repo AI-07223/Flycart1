@@ -16,10 +16,10 @@
       TICK_RATE = 30;
       TICK_MS = 1e3 / TICK_RATE;
       CRUISE_SPEED = 92;
-      BOOST_SPEED = 138;
-      ACCEL = 260;
-      TURN_RATE = 1.5;
-      PITCH_RATE = 1.05;
+      BOOST_SPEED = 155;
+      ACCEL = 420;
+      TURN_RATE = 2.2;
+      PITCH_RATE = 1.35;
       PITCH_MAX = 0.5;
       PLANE_RADIUS = 16;
       MAX_HP = 100;
@@ -27,7 +27,7 @@
       BULLET_DAMAGE = 25;
       BULLET_LIFE = 2.3;
       BULLET_RADIUS = 4;
-      FIRE_COOLDOWN = 0.34;
+      FIRE_COOLDOWN = 0.3;
       RESPAWN_DELAY = 1.2;
       MAP_HALF = 1800;
       MAP_EDGE_SOFT = 260;

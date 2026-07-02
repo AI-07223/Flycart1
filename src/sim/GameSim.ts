@@ -57,6 +57,15 @@ function steerToward(from: S.Vec3, to: S.Vec3, maxTurn: number): S.Vec3 {
   return S.slerp(from, to, t);
 }
 
+/** Clamp a position into the arena envelope (horizontal bounds + altitude band). */
+function clampToArena(pos: S.Vec3): S.Vec3 {
+  return {
+    x: S.clamp(pos.x, -C.MAP_HALF, C.MAP_HALF),
+    y: S.clamp(pos.y, C.MIN_ALT, C.MAX_ALT),
+    z: S.clamp(pos.z, -C.MAP_HALF, C.MAP_HALF),
+  };
+}
+
 // ---------------------------------------------------------------------------
 // GameSim
 // ---------------------------------------------------------------------------
@@ -756,6 +765,13 @@ export class GameSim {
           if (b.freeze && applied && victim.alive) {
             victim.frozenLeft = C.FREEZE_DURATION;
           }
+          // Hit knockback: nudge a surviving victim along the bullet's travel
+          // direction. Skip on kill (they explode anyway) and skip when damage()
+          // was blocked (star/shield/spawn-invuln/TDM-friendly-fire — no hit landed).
+          if (applied && victim.alive) {
+            const knocked = S.add(getP(victim), S.scale(fwd, C.HIT_KNOCKBACK));
+            setP(victim, clampToArena(knocked));
+          }
         }
         this.bullets.delete(key);
         this.bulletLife.delete(key);
@@ -796,7 +812,14 @@ export class GameSim {
     for (const [pid, p] of this.players) {
       if (!p.alive) continue;
       if (S.distance(minePos, getP(p)) <= C.MINE_BLAST_RADIUS) {
-        this.damage(p, pid, mine.owner, C.MINE_DAMAGE);
+        const applied = this.damage(p, pid, mine.owner, C.MINE_DAMAGE);
+        // Mine knockback: push a surviving damaged plane away from the blast
+        // center horizontally. Skip on kill and skip when damage() was blocked.
+        if (applied && p.alive) {
+          const away = normalizeHorizontal(S.sub(getP(p), minePos));
+          const knocked = S.add(getP(p), S.scale(away, C.MINE_KNOCKBACK));
+          setP(p, clampToArena(knocked));
+        }
       }
     }
   }

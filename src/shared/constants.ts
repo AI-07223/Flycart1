@@ -6,10 +6,10 @@ export const TICK_MS = 1000 / TICK_RATE;
 
 // Flight model: slow, readable, altitude-aware.
 export const CRUISE_SPEED = 92;
-export const BOOST_SPEED = 138;
-export const ACCEL = 260;
-export const TURN_RATE = 1.5;
-export const PITCH_RATE = 1.05;
+export const BOOST_SPEED = 155; // was 138 — punchier top end
+export const ACCEL = 420;       // was 260 — punchy speed changes
+export const TURN_RATE = 2.2;   // was 1.5 — hard arcade turns
+export const PITCH_RATE = 1.35; // was 1.05
 export const PITCH_MAX = 0.5;
 
 // Combat.
@@ -19,8 +19,13 @@ export const BULLET_SPEED = 322; // was 215 (+50%)
 export const BULLET_DAMAGE = 25;
 export const BULLET_LIFE = 2.3;  // was 2.1 — scaled up so effective range is similar at higher speed
 export const BULLET_RADIUS = 4;
-export const FIRE_COOLDOWN = 0.34;
+export const FIRE_COOLDOWN = 0.30; // was 0.34
 export const RESPAWN_DELAY = 1.2;
+
+// Impact feedback: instant positional nudge on a successful (non-lethal) hit.
+// Applied in GameSim's bullet-hit and mine-explosion paths only — never on a kill.
+export const HIT_KNOCKBACK = 14;  // world units, along bullet travel direction
+export const MINE_KNOCKBACK = 46; // world units, horizontally away from mine center
 
 // Larger hit radius for bullet-vs-plane detection only (not plane-vs-landmark).
 // ~1.6× PLANE_RADIUS so shots feel forgiving without changing collision geometry.

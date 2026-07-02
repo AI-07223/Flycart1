@@ -9,17 +9,17 @@
   };
 
   // src/shared/constants.ts
-  var TICK_RATE, TICK_MS, CRUISE_SPEED, BOOST_SPEED, ACCEL, TURN_RATE, PITCH_RATE, PITCH_MAX, PLANE_RADIUS, MAX_HP, BULLET_SPEED, BULLET_DAMAGE, BULLET_LIFE, BULLET_RADIUS, FIRE_COOLDOWN, RESPAWN_DELAY, BULLET_HIT_RADIUS, AIM_ASSIST_CONE, AIM_ASSIST_RANGE, AIM_ASSIST_TURN, ROUND_SECONDS, ROUND_INTERMISSION, BOT_FILL_TARGET, MAP_HALF, MAP_EDGE_SOFT, GROUND_Y, MIN_ALT, SPAWN_ALT, MAX_ALT, PICKUP_ALT_MIN, PICKUP_ALT_MAX, PICKUP_FIELD_RADIUS, SPAWN_REROLL, BOT_NAMES, COLOR_COUNT, ACCENT_COUNT, TRAIL_COUNT, LIVERY_COUNT, SKIN_COUNT, DEFAULT_BOT_DIFFICULTY, BOT_DIFFICULTY, PICKUP_MAX, PICKUP_INTERVAL, PICKUP_RADIUS, POWERUP_DURATION, SHIELD_CHARGES, RAPID_FACTOR, SPREAD_ANGLE, AFTERBURNER_FACTOR, HOMING_TURN, POWERUP_TYPES, POWERUP_WEIGHTS, MINE_TRIGGER_RADIUS, MINE_BLAST_RADIUS, MINE_DAMAGE, MINE_LIFE, MINE_MAX_PER_OWNER, MINE_DROP_COOLDOWN, MINE_ARM_DELAY, STAR_DURATION, STAR_RAM_RADIUS_FACTOR, EMP_RADIUS, EMP_DURATION, FREEZE_DURATION, SPAWN_INVULN, LOBBY_READY_TIMEOUT, TEAM_COUNT, LANDMARKS;
+  var TICK_RATE, TICK_MS, CRUISE_SPEED, BOOST_SPEED, ACCEL, TURN_RATE, PITCH_RATE, PITCH_MAX, PLANE_RADIUS, MAX_HP, BULLET_SPEED, BULLET_DAMAGE, BULLET_LIFE, BULLET_RADIUS, FIRE_COOLDOWN, RESPAWN_DELAY, HIT_KNOCKBACK, MINE_KNOCKBACK, BULLET_HIT_RADIUS, AIM_ASSIST_CONE, AIM_ASSIST_RANGE, AIM_ASSIST_TURN, ROUND_SECONDS, ROUND_INTERMISSION, BOT_FILL_TARGET, MAP_HALF, MAP_EDGE_SOFT, GROUND_Y, MIN_ALT, SPAWN_ALT, MAX_ALT, PICKUP_ALT_MIN, PICKUP_ALT_MAX, PICKUP_FIELD_RADIUS, SPAWN_REROLL, BOT_NAMES, COLOR_COUNT, ACCENT_COUNT, TRAIL_COUNT, LIVERY_COUNT, SKIN_COUNT, DEFAULT_BOT_DIFFICULTY, BOT_DIFFICULTY, PICKUP_MAX, PICKUP_INTERVAL, PICKUP_RADIUS, POWERUP_DURATION, SHIELD_CHARGES, RAPID_FACTOR, SPREAD_ANGLE, AFTERBURNER_FACTOR, HOMING_TURN, POWERUP_TYPES, POWERUP_WEIGHTS, MINE_TRIGGER_RADIUS, MINE_BLAST_RADIUS, MINE_DAMAGE, MINE_LIFE, MINE_MAX_PER_OWNER, MINE_DROP_COOLDOWN, MINE_ARM_DELAY, STAR_DURATION, STAR_RAM_RADIUS_FACTOR, EMP_RADIUS, EMP_DURATION, FREEZE_DURATION, SPAWN_INVULN, LOBBY_READY_TIMEOUT, TEAM_COUNT, LANDMARKS;
   var init_constants = __esm({
     "src/shared/constants.ts"() {
       "use strict";
       TICK_RATE = 30;
       TICK_MS = 1e3 / TICK_RATE;
       CRUISE_SPEED = 92;
-      BOOST_SPEED = 138;
-      ACCEL = 260;
-      TURN_RATE = 1.5;
-      PITCH_RATE = 1.05;
+      BOOST_SPEED = 155;
+      ACCEL = 420;
+      TURN_RATE = 2.2;
+      PITCH_RATE = 1.35;
       PITCH_MAX = 0.5;
       PLANE_RADIUS = 16;
       MAX_HP = 100;
@@ -27,8 +27,10 @@
       BULLET_DAMAGE = 25;
       BULLET_LIFE = 2.3;
       BULLET_RADIUS = 4;
-      FIRE_COOLDOWN = 0.34;
+      FIRE_COOLDOWN = 0.3;
       RESPAWN_DELAY = 1.2;
+      HIT_KNOCKBACK = 14;
+      MINE_KNOCKBACK = 46;
       BULLET_HIT_RADIUS = 26;
       AIM_ASSIST_CONE = 0.35;
       AIM_ASSIST_RANGE = 700;
@@ -283,6 +285,13 @@
     if (angle < 1e-5) return normalize(to);
     const t = Math.min(1, maxTurn / angle);
     return slerp(from, to, t);
+  }
+  function clampToArena(pos) {
+    return {
+      x: clamp(pos.x, -MAP_HALF, MAP_HALF),
+      y: clamp(pos.y, MIN_ALT, MAX_ALT),
+      z: clamp(pos.z, -MAP_HALF, MAP_HALF)
+    };
   }
   function isRecord(value) {
     return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -904,6 +913,10 @@
                 if (b.freeze && applied && victim.alive) {
                   victim.frozenLeft = FREEZE_DURATION;
                 }
+                if (applied && victim.alive) {
+                  const knocked = add(getP(victim), scale(fwd, HIT_KNOCKBACK));
+                  setP(victim, clampToArena(knocked));
+                }
               }
               this.bullets.delete(key);
               this.bulletLife.delete(key);
@@ -941,7 +954,12 @@
           for (const [pid, p] of this.players) {
             if (!p.alive) continue;
             if (distance(minePos, getP(p)) <= MINE_BLAST_RADIUS) {
-              this.damage(p, pid, mine.owner, MINE_DAMAGE);
+              const applied = this.damage(p, pid, mine.owner, MINE_DAMAGE);
+              if (applied && p.alive) {
+                const away = normalizeHorizontal(sub(getP(p), minePos));
+                const knocked = add(getP(p), scale(away, MINE_KNOCKBACK));
+                setP(p, clampToArena(knocked));
+              }
             }
           }
         }
