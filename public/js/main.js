@@ -2665,11 +2665,11 @@
                 <span class="arcade-panel-badge">Ready</span>
               </div>
               <div class="arcade-command-stack">
-                <button type="button" class="arcade-command-btn arcade-command-btn--major" data-arcade-nav="play">
+                <button type="button" class="arcade-command-btn arcade-command-btn--major" data-arcade-nav="lan">
                   <span class="arcade-command-icon">01</span>
                   <span class="arcade-command-copy">
-                    <strong>Launch Match</strong>
-                    <span>Public, private, and hotspot dogfights branch from one proper start screen.</span>
+                    <strong>Local Wi-Fi Party</strong>
+                    <span>Host on one device, friends scan and tap to join. Everyone on the same hotspot \u2014 zero server lag.</span>
                   </span>
                   <span class="arcade-command-tag">Primary</span>
                 </button>
@@ -2681,16 +2681,8 @@
                   </span>
                   <span class="arcade-command-tag">Fast</span>
                 </button>
-                <button type="button" class="arcade-command-btn" data-arcade-nav="lan">
-                  <span class="arcade-command-icon">03</span>
-                  <span class="arcade-command-copy">
-                    <strong>Local Wi-Fi Ops</strong>
-                    <span>Host on one device, scan on nearby phones, and keep hotspot matches one tap away.</span>
-                  </span>
-                  <span class="arcade-command-tag">OpsX</span>
-                </button>
                 <button type="button" class="arcade-command-btn" data-arcade-nav="leaders">
-                  <span class="arcade-command-icon">04</span>
+                  <span class="arcade-command-icon">03</span>
                   <span class="arcade-command-copy">
                     <strong>Leaderboard</strong>
                     <span>Check the all-time aces before rolling out to the runway.</span>
@@ -2700,60 +2692,6 @@
               </div>
             </section>
           </div>
-        </section>
-
-        <section class="${ARCADE_MENU_SCREEN_CLASS}" id="${arcadeScreenId("play")}">
-          <header class="arcade-screen-header">
-            <button type="button" class="arcade-back-btn" data-arcade-back>Back</button>
-            <div class="arcade-screen-title-wrap">
-              <p class="arcade-panel-kicker">Launch Bay</p>
-              <h2 class="arcade-screen-title">Pick A Match Type</h2>
-              <p class="arcade-screen-copy">Your aircraft stays armed. Choose the room style that matches how people are joining.</p>
-            </div>
-          </header>
-
-          <div class="arcade-banner">
-            <span class="arcade-banner-label">Current loadout</span>
-            <p id="arcade-play-loadout-summary">Viper Fighter - Scarlet - Clean - White Smoke</p>
-          </div>
-
-          <div class="arcade-mode-grid">
-            <button type="button" id="arcade-quick-play-btn" class="arcade-command-btn arcade-command-btn--major">
-              <span class="arcade-command-icon">A</span>
-              <span class="arcade-command-copy">
-                <strong>Public Scramble</strong>
-                <span>Instant action. Launch straight into the live public fight with your current plane.</span>
-              </span>
-              <span class="arcade-command-tag">Fastest</span>
-            </button>
-            <button type="button" id="arcade-private-room-btn" class="arcade-command-btn">
-              <span class="arcade-command-icon">B</span>
-              <span class="arcade-command-copy">
-                <strong>Private Squad Room</strong>
-                <span>Create an invite code, wait in the lobby, and launch when your squad is ready.</span>
-              </span>
-              <span class="arcade-command-tag">Invite</span>
-            </button>
-            <button type="button" class="arcade-command-btn" data-arcade-nav="lan">
-              <span class="arcade-command-icon">C</span>
-              <span class="arcade-command-copy">
-                <strong>Local Wi-Fi Field Play</strong>
-                <span>For couch sessions and hotspot matches. One host creates the room, everyone else scans.</span>
-              </span>
-              <span class="arcade-command-tag">Nearby</span>
-            </button>
-          </div>
-
-          <section class="arcade-panel arcade-route-panel">
-            <div class="arcade-panel-header">
-              <div>
-                <p class="arcade-panel-kicker">Route Guide</p>
-                <h3 class="arcade-panel-title">Which Button Should Players Use?</h3>
-              </div>
-              <span class="arcade-panel-badge arcade-panel-badge--subtle">Briefing</span>
-            </div>
-            <p class="arcade-panel-copy">Public Scramble is for immediate matchmaking. Private Squad Room is for invited players. Local Wi-Fi Field Play is the dedicated hotspot path and keeps the OpsX local-play flow front and center.</p>
-          </section>
         </section>
 
         <section class="${ARCADE_MENU_SCREEN_CLASS}" id="${arcadeScreenId("join")}">
@@ -3371,9 +3309,6 @@
         selectedPlaneName: menuDollar("arcade-selected-plane-name", "selected-plane-name"),
         selectedPlaneSummary: menuDollar("arcade-selected-plane-summary", "selected-plane-summary"),
         selectedPlaneChips: menuDollar("arcade-selected-plane-chips", "selected-plane-chips"),
-        quickPlayBtn: menuDollar("arcade-quick-play-btn", "quick-play-btn"),
-        privateRoomBtn: menuDollar("arcade-private-room-btn", "private-room-btn"),
-        playLoadoutSummary: menuDollar("arcade-play-loadout-summary", "play-loadout-summary"),
         localLoadoutSummary: menuDollar("arcade-local-loadout-summary", "local-loadout-summary"),
         customizeSummaryName: menuDollar("arcade-customize-summary-name", "customize-summary-name"),
         customizeSummaryText: menuDollar("arcade-customize-summary-text", "customize-summary-text"),
@@ -3796,7 +3731,7 @@
         els.status.textContent = text;
       }
       function setBusy(busy) {
-        [els.lanQuick, els.lanFriends, els.localCreateBtn, els.localScanBtn, els.quickPlayBtn, els.privateRoomBtn, els.joinCodeSubmit].forEach((button) => {
+        [els.lanQuick, els.lanFriends, els.localCreateBtn, els.localScanBtn, els.joinCodeSubmit].forEach((button) => {
           button.disabled = busy;
         });
       }
@@ -3872,7 +3807,7 @@
         saveLanOrigin(origin);
         return origin;
       }
-      var MENU_SCREENS = ["home", "play", "join", "lan", "leaders", "customize"];
+      var MENU_SCREENS = ["home", "join", "lan", "leaders", "customize"];
       var navStack = ["home"];
       function currentMenuScreen() {
         return navStack[navStack.length - 1] || "home";
@@ -4222,7 +4157,6 @@
         const rows = getLoadoutDetailRows(selectedCosmetics);
         els.selectedPlaneName.textContent = summary.title;
         els.selectedPlaneSummary.textContent = summary.subtitle;
-        els.playLoadoutSummary.textContent = `${summary.title} \xB7 ${rows.map((row) => row.value).join(" \xB7 ")}`;
         els.localLoadoutSummary.textContent = `${summary.title} \xB7 ${rows.map((row) => row.value).join(" \xB7 ")}`;
         els.lobbyPlaneSummary.textContent = `${summary.title} \xB7 ${rows.map((row) => row.value).join(" \xB7 ")}`;
         els.customizeSummaryName.textContent = summary.title;
@@ -5252,7 +5186,7 @@
               localStorage.setItem("smashcart.name", els.name.value);
             } catch {
             }
-            navGo("play");
+            navGo("lan");
           }
         });
         els.lanServer.addEventListener("input", () => updateMenuMeta(true));
@@ -5333,14 +5267,6 @@
         });
         els.settingsScreen.addEventListener("click", (e) => {
           if (e.target === els.settingsScreen) hideSettings();
-        });
-        els.quickPlayBtn.addEventListener("click", () => {
-          window.SFX.uiClick();
-          startGame("PUBLIC");
-        });
-        els.privateRoomBtn.addEventListener("click", () => {
-          window.SFX.uiClick();
-          startGame(genCode());
         });
         els.customizeRandomize.addEventListener("click", () => {
           window.SFX.uiClick();

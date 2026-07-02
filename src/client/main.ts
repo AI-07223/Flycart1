@@ -155,9 +155,6 @@ const els = {
   selectedPlaneName: menuDollar("arcade-selected-plane-name", "selected-plane-name"),
   selectedPlaneSummary: menuDollar("arcade-selected-plane-summary", "selected-plane-summary"),
   selectedPlaneChips: menuDollar("arcade-selected-plane-chips", "selected-plane-chips"),
-  quickPlayBtn: menuDollar("arcade-quick-play-btn", "quick-play-btn") as HTMLButtonElement,
-  privateRoomBtn: menuDollar("arcade-private-room-btn", "private-room-btn") as HTMLButtonElement,
-  playLoadoutSummary: menuDollar("arcade-play-loadout-summary", "play-loadout-summary"),
   localLoadoutSummary: menuDollar("arcade-local-loadout-summary", "local-loadout-summary"),
   customizeSummaryName: menuDollar("arcade-customize-summary-name", "customize-summary-name"),
   customizeSummaryText: menuDollar("arcade-customize-summary-text", "customize-summary-text"),
@@ -630,7 +627,7 @@ function setStatus(text = ""): void {
 }
 
 function setBusy(busy: boolean): void {
-  [els.lanQuick, els.lanFriends, els.localCreateBtn, els.localScanBtn, els.quickPlayBtn, els.privateRoomBtn, els.joinCodeSubmit].forEach((button) => {
+  [els.lanQuick, els.lanFriends, els.localCreateBtn, els.localScanBtn, els.joinCodeSubmit].forEach((button) => {
     button.disabled = busy;
   });
 }
@@ -719,7 +716,7 @@ function resolveLanOrigin(): string | null {
 // ─── MENU SCREEN ROUTER ──────────────────────────────────────────────────────
 // Operates ONLY over the active menu shell, whether arcade or legacy fallback.
 // Does NOT disturb mode/applyMode — those control top-level screen visibility.
-const MENU_SCREENS = ["home", "play", "join", "lan", "leaders", "customize"] as const;
+const MENU_SCREENS = ["home", "join", "lan", "leaders", "customize"] as const;
 let navStack: string[] = ["home"];
 
 function currentMenuScreen(): string {
@@ -1119,7 +1116,6 @@ function renderLoadoutUI(): void {
   const rows = getLoadoutDetailRows(selectedCosmetics);
   els.selectedPlaneName.textContent = summary.title;
   els.selectedPlaneSummary.textContent = summary.subtitle;
-  els.playLoadoutSummary.textContent = `${summary.title} · ${rows.map((row) => row.value).join(" · ")}`;
   els.localLoadoutSummary.textContent = `${summary.title} · ${rows.map((row) => row.value).join(" · ")}`;
   els.lobbyPlaneSummary.textContent = `${summary.title} · ${rows.map((row) => row.value).join(" · ")}`;
   els.customizeSummaryName.textContent = summary.title;
@@ -2339,7 +2335,7 @@ function init(): void {
     if (e.key === "Enter") {
       e.preventDefault();
       try { localStorage.setItem("smashcart.name", els.name.value); } catch {}
-      navGo("play");
+      navGo("lan");
     }
   });
   els.lanServer.addEventListener("input", () => updateMenuMeta(true));
@@ -2427,14 +2423,6 @@ function init(): void {
   });
 
   // ─── LOADOUT QUICK ACTIONS ────────────────────────────────────────────────
-  els.quickPlayBtn.addEventListener("click", () => {
-    window.SFX.uiClick();
-    startGame("PUBLIC");
-  });
-  els.privateRoomBtn.addEventListener("click", () => {
-    window.SFX.uiClick();
-    startGame(genCode());
-  });
   els.customizeRandomize.addEventListener("click", () => {
     window.SFX.uiClick();
     updateSelectedLoadout(randomizeLoadout(), "Random loadout armed.");
