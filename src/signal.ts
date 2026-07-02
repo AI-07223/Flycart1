@@ -33,7 +33,7 @@ import { log } from "./logger";
 
 const MAX_MSG_BYTES = 16 * 1024;   // 16 KB — SDP is typically < 4 KB
 const MAX_ROOMS = 500;
-const MAX_GUESTS_PER_ROOM = 8;
+const MAX_GUESTS_PER_ROOM = 19;  // host + 19 guests = 20-player rooms
 const ROOM_TTL_MS = 30_000;        // prune rooms idle for 30 s
 
 // ─── Types ───────────────────────────────────────────────────────────────────

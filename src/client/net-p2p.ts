@@ -24,7 +24,7 @@ const INPUT_HZ        = 25;            // guest → host input rate
 const SNAP_BUFFER_MS  = 1400;
 const MAX_EXTRAP_MS   = 120;
 const SNAP_DISTANCE   = 140;
-const MAX_GUESTS      = 6;
+const MAX_GUESTS      = 19;           // host + 19 guests = 20-player rooms
 const ICE_SERVER      = "stun:stun.l.google.com:19302";
 const STUN_ICE: RTCIceServer[] = [{ urls: ICE_SERVER }];
 const DC_OPEN_TIMEOUT = 2000;          // ms — iOS DataChannel open watchdog

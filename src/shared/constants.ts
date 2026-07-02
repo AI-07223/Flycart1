@@ -34,8 +34,12 @@ export const AIM_ASSIST_TURN  = 0.55; // radians/sec the bullet curves toward ta
 // Match flow.
 export const ROUND_SECONDS = 150;
 export const ROUND_INTERMISSION = 8;
-export const MAX_CLIENTS = 8;
+export const MAX_CLIENTS = 20;
 export const MIN_PLAYERS = 4;
+// Bots pad the room up to this many total players; each joining human instantly
+// displaces a bot ("swap"). Humans beyond this grow the room (up to MAX_CLIENTS)
+// with no bots left to displace — SmashKarts-style room fill.
+export const BOT_FILL_TARGET = 8;
 
 // Arena envelope.
 export const MAP_HALF = 1800;

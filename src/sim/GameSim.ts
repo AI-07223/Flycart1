@@ -1074,15 +1074,23 @@ export class GameSim {
       return;
     }
 
-    const total = this.players.size;
-    if (total < C.MIN_PLAYERS) {
-      this.addBot();
-      return;
+    // Bots pad the room to BOT_FILL_TARGET total players. Humans always fit:
+    // when a human joins a padded room, a bot is removed IMMEDIATELY (swap),
+    // and once humans exceed the target the room simply grows bot-free.
+    let humans = 0;
+    for (const [, p] of this.players) if (!p.bot) humans++;
+    const target = Math.max(C.BOT_FILL_TARGET, humans);
+
+    // Swap down instantly: every human past the pad displaces a bot this tick.
+    while (this.players.size > target && this.bots.size > 0) {
+      const firstBot = this.bots.keys().next().value as string | undefined;
+      if (!firstBot) break;
+      this.removePlayer(firstBot);
     }
 
-    if (this.bots.size > 0 && total > C.MIN_PLAYERS) {
-      const firstBot = this.bots.keys().next().value as string | undefined;
-      if (firstBot) this.removePlayer(firstBot);
+    // Pad up one per tick (keeps spawn pacing gentle).
+    if (this.players.size < C.BOT_FILL_TARGET) {
+      this.addBot();
     }
   }
 

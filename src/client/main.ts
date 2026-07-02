@@ -57,12 +57,6 @@ const els = {
   respawn: dollar("respawn"),
   start: menuRoot,
   name: menuDollar("arcade-name-input", "name-input") as HTMLInputElement,
-  lanServer: menuDollar("arcade-lan-server-input", "lan-server-input") as HTMLInputElement,
-  lanQuick: menuDollar("arcade-lan-quick-btn", "lan-quick-btn") as HTMLButtonElement,
-  lanFriends: menuDollar("arcade-lan-friends-btn", "lan-friends-btn") as HTMLButtonElement,
-  lanHint: menuDollar("arcade-lan-hint", "lan-hint"),
-  serverBadge: menuDollar("arcade-menu-server-badge", "menu-server-badge"),
-  roomChip: menuDollar("arcade-room-code-chip", "room-code-chip"),
   orientationNote: menuDollar("arcade-orientation-note", "orientation-note"),
   friendsNote: menuDollar("arcade-friends-note", "friends-note"),
   status: menuDollar("arcade-status", "status"),
@@ -73,6 +67,7 @@ const els = {
   pauseSettings: dollar("pause-settings-btn") as HTMLButtonElement,
   share: dollar("share-bar"),
   shareLink: dollar("share-link") as HTMLInputElement,
+  shareCodeBar: dollar("share-qr-code-bar"),
   qrBtn: dollar("qr-btn") as HTMLButtonElement,
   copy: dollar("copy-btn") as HTMLButtonElement,
   shareQrOverlay: dollar("share-qr-overlay"),
@@ -110,15 +105,9 @@ const els = {
   connMsg: dollar("conn-msg"),
   connRetry: dollar("conn-retry") as HTMLButtonElement,
   connMenu: dollar("conn-menu") as HTMLButtonElement,
-  bots: menuDollar("arcade-bots-check", "bots-check") as HTMLInputElement,
   localBots: menuDollar("arcade-local-bots-check", "arcade-local-bots-check") as HTMLInputElement,
   countdown: dollar("countdown"),
   interLeave: dollar("intermission-leave") as HTMLButtonElement,
-  p2pOfflineBtn: menuDollar("arcade-p2p-offline-btn", "p2p-offline-btn") as HTMLButtonElement,
-  p2pOfflineCanvas: menuDollar("arcade-p2p-offline-canvas", "p2p-offline-canvas") as HTMLCanvasElement,
-  p2pAnswerInput: menuDollar("arcade-p2p-answer-input", "p2p-answer-input") as HTMLInputElement,
-  p2pAnswerSubmit: menuDollar("arcade-p2p-answer-submit", "p2p-answer-submit") as HTMLButtonElement,
-  p2pOfflineSection: menuDollar("arcade-p2p-offline-section", "p2p-offline-section"),
   hostLeftOverlay: dollar("host-left-overlay"),
   hostLeftMenuBtn: dollar("host-left-menu-btn") as HTMLButtonElement,
   p2pMigratingOverlay: dollar("p2p-migrating-overlay"),
@@ -151,11 +140,6 @@ const els = {
   lobbyRoomChip: dollar("lobby-room-chip"),
   lobbyModeChip: dollar("lobby-mode-chip"),
   lobbyPlaneSummary: dollar("lobby-plane-summary"),
-  customizeOpenBtn: menuDollar("arcade-customize-open-btn", "customize-open-btn") as HTMLButtonElement,
-  selectedPlaneName: menuDollar("arcade-selected-plane-name", "selected-plane-name"),
-  selectedPlaneSummary: menuDollar("arcade-selected-plane-summary", "selected-plane-summary"),
-  selectedPlaneChips: menuDollar("arcade-selected-plane-chips", "selected-plane-chips"),
-  localLoadoutSummary: menuDollar("arcade-local-loadout-summary", "local-loadout-summary"),
   customizeSummaryName: menuDollar("arcade-customize-summary-name", "customize-summary-name"),
   customizeSummaryText: menuDollar("arcade-customize-summary-text", "customize-summary-text"),
   customizeSummaryGrid: menuDollar("arcade-customize-summary-grid", "customize-summary-grid"),
@@ -310,167 +294,47 @@ function genCode(): string {
   return out;
 }
 
-function isPrivateHost(hostname: string): boolean {
-  const host = String(hostname || "").toLowerCase();
-  if (!host) return false;
-  if (host === "localhost" || host === "::1" || host.endsWith(".local")) return true;
-  if (/^127\./.test(host) || /^10\./.test(host) || /^192\.168\./.test(host)) return true;
-  const parts = host.split(".");
-  if (parts.length === 4 && parts[0] === "172") {
-    const second = Number(parts[1]);
-    if (second >= 16 && second <= 31) return true;
-  }
-  return false;
-}
-
-function toPageOrigin(origin: string): string {
-  const url = new URL(origin);
-  if (url.protocol === "ws:") url.protocol = "http:";
-  if (url.protocol === "wss:") url.protocol = "https:";
-  return url.origin;
-}
-
-function toSocketOrigin(origin: string): string {
-  const url = new URL(origin);
-  if (url.protocol === "http:") url.protocol = "ws:";
-  if (url.protocol === "https:") url.protocol = "wss:";
-  return url.origin;
-}
-
-function normalizeServerOrigin(raw: string | null | undefined): string | null {
-  const trimmed = String(raw || "").trim();
-  if (!trimmed) return null;
-  let candidate = trimmed;
-  if (!/^[a-z][a-z0-9+.-]*:\/\//i.test(candidate)) candidate = `http://${candidate}`;
-  try {
-    const url = new URL(candidate);
-    if (!["http:", "https:", "ws:", "wss:"].includes(url.protocol)) return null;
-    if (!url.hostname) return null;
-    url.username = "";
-    url.password = "";
-    url.pathname = "";
-    url.search = "";
-    url.hash = "";
-    if (!url.port && (url.protocol === "http:" || url.protocol === "ws:")) url.port = location.port || "2567";
-    return url.origin;
-  } catch {
-    return null;
-  }
-}
-
-function secureMismatch(origin: string): boolean {
-  return location.protocol === "https:" && toSocketOrigin(origin).startsWith("ws://");
-}
-
 function readInviteFromUrl(): void {
   const params = new URLSearchParams(location.search);
-  const room = params.get("room");
-  inviteRoom = room ? room.toUpperCase().slice(0, 6) : null;
-  inviteServer = normalizeServerOrigin(params.get("server"));
 
   // P2P invite: ?p2p=P-XXXXXX
   const p2pParam = params.get("p2p");
   if (p2pParam) {
     const p2pCode = p2pParam.trim().toUpperCase().slice(0, 8); // "P-" + 6 chars
     if (p2pCode.startsWith("P-")) {
-      // Override inviteRoom with the P2P code so Quick Play routes through P2P
       inviteRoom = p2pCode;
-      inviteServer = null;
     }
   }
-}
-
-function loadSavedLanOrigin(): string {
-  try {
-    return localStorage.getItem("smashcart.lanServer") || "";
-  } catch {
-    return "";
-  }
-}
-
-function saveLanOrigin(origin: string | null): void {
-  try {
-    if (origin) localStorage.setItem("smashcart.lanServer", toPageOrigin(origin));
-    else localStorage.removeItem("smashcart.lanServer");
-  } catch {}
-}
-
-function setInviteState(code: string | null, serverOrigin: string | null): void {
-  inviteRoom = code;
-  inviteServer = code ? serverOrigin : null;
-  updateBrowserUrl(code, serverOrigin);
-}
-
-function updateBrowserUrl(code: string | null, serverOrigin: string | null): void {
-  const url = new URL(location.href);
-  url.searchParams.delete("room");
-  url.searchParams.delete("server");
-  if (code) {
-    url.searchParams.set("room", code);
-    if (serverOrigin && toPageOrigin(serverOrigin) !== location.origin) url.searchParams.set("server", toPageOrigin(serverOrigin));
-  }
-  const search = url.searchParams.toString();
-  history.replaceState(null, "", url.pathname + (search ? `?${search}` : ""));
-}
-
-function currentLanInputOrigin(): string | null {
-  return normalizeServerOrigin(els.lanServer.value);
-}
-
-function currentLanConnectOrigin(): string | null {
-  return currentLanInputOrigin() || (isPrivateHost(location.hostname) ? location.origin : null);
-}
-
-function buildShareUrl(code: string, serverOrigin: string | null): string {
-  const base = serverOrigin ? toPageOrigin(serverOrigin) : location.origin;
-  const url = new URL(location.pathname, base.endsWith("/") ? base : base + "/");
-  url.searchParams.set("room", code);
-  return url.toString();
 }
 
 function hideShareQr(): void {
   els.shareQrOverlay.classList.add("hidden");
 }
 
-async function copyShareLink(): Promise<boolean> {
-  const value = activeShareUrl || els.shareLink.value;
+// Room codes are always transported as "P-XXXXXX" internally (P2P host/join
+// protocol prefix). Everywhere a code is shown to a human, strip the prefix
+// so players only ever see/share the 6-char core, e.g. "ABCDEF".
+function roomCodeCore(code: string): string {
+  return code.startsWith("P-") ? code.slice(2) : code;
+}
+
+// Copies just the 6-char room code (not the full invite URL) — the code is
+// the primary invite surface now. The QR button still encodes the full URL
+// so a phone camera scan can auto-join.
+async function copyShareCode(): Promise<boolean> {
+  const value = els.shareQrCode.textContent || (currentLobbyCode ? roomCodeCore(currentLobbyCode) : "");
   if (!value) return false;
-  try { els.shareLink.select(); } catch {}
-  try { els.shareQrLink.select(); } catch {}
   try {
     if (navigator.clipboard) await navigator.clipboard.writeText(value);
-    else document.execCommand("copy");
+    else {
+      els.shareQrLink.value = value;
+      els.shareQrLink.select();
+      document.execCommand("copy");
+      els.shareQrLink.value = activeShareUrl || "";
+    }
     return true;
   } catch {
     return false;
-  }
-}
-
-function updateShareInvite(code: string, serverOrigin: string | null): void {
-  const shareUrl = buildShareUrl(code, serverOrigin);
-  const shareHost = new URL(serverOrigin ? toPageOrigin(serverOrigin) : location.origin).host;
-  const shareHostname = new URL(shareUrl).hostname;
-  activeShareUrl = shareUrl;
-  els.shareLink.value = shareUrl;
-  els.shareQrLink.value = shareUrl;
-  els.shareQrRoom.textContent = `Room ${code}`;
-  els.shareQrCode.textContent = code;
-  els.shareQrNote.textContent = isPrivateHost(shareHostname)
-    ? `Scan on the same hotspot to join ${code} at ${shareHost}.`
-    : `Scan to open room ${code} on ${shareHost}.`;
-  els.copy.disabled = false;
-  els.shareQrCopy.disabled = false;
-  try {
-    window.QR.render(els.shareQrCanvas, shareUrl, {
-      size: window.Input.isTouchDevice() ? 220 : 256,
-      errorCorrectionLevel: "M",
-    });
-    els.qrBtn.disabled = false;
-  } catch {
-    els.qrBtn.disabled = true;
-    els.shareQrNote.textContent = `Copy the link to join ${code} on ${shareHost}.`;
-    els.shareQrCanvas.width = 0;
-    els.shareQrCanvas.height = 0;
   }
 }
 
@@ -478,6 +342,7 @@ function clearShareInvite(): void {
   activeShareUrl = null;
   els.shareLink.value = "";
   els.shareQrLink.value = "";
+  els.shareCodeBar.textContent = "";
   els.shareQrRoom.textContent = "Room";
   els.shareQrCode.textContent = "";
   els.shareQrNote.textContent = "Scan to join this room.";
@@ -486,8 +351,8 @@ function clearShareInvite(): void {
   els.copy.disabled = true;
   els.shareQrCopy.disabled = true;
   els.qrBtn.disabled = true;
-  els.copy.textContent = "Copy";
-  els.shareQrCopy.textContent = "Copy Link";
+  els.copy.textContent = "Copy code";
+  els.shareQrCopy.textContent = "Copy code";
   hideShareQr();
 }
 
@@ -503,7 +368,8 @@ function hideRoomChip(): void {
 
 function updateRoomChip(): void {
   if (!_isP2PSession || !currentLobbyCode) { hideRoomChip(); return; }
-  els.hudRoomChip.textContent = "📶 " + (currentRoomFriendlyName || currentLobbyCode);
+  const core = roomCodeCore(currentLobbyCode);
+  els.hudRoomChip.textContent = currentRoomFriendlyName ? `📶 ${currentRoomFriendlyName} · ${core}` : `📶 ${core}`;
   els.hudRoomChip.classList.remove("hidden");
 }
 
@@ -511,7 +377,7 @@ function updateLobbyMeta(): void {
   const state = window.Net.state;
   const modeLabel = state?.mode === "tdm" ? "Team Deathmatch" : "Free-for-all";
   const roundLength = typeof state?.roundLength === "number" ? state.roundLength : 150;
-  const roomLabel = currentLobbyCode ? `Code ${currentLobbyCode}` : (_isP2PSession ? "Wi-Fi live" : "Private room");
+  const roomLabel = currentLobbyCode ? `Code ${roomCodeCore(currentLobbyCode)}` : (_isP2PSession ? "Wi-Fi live" : "Private room");
   els.lobbyRoomChip.textContent = roomLabel;
   els.lobbyModeChip.textContent = `${modeLabel} · ${formatClock(roundLength)}`;
 }
@@ -528,7 +394,7 @@ function renderLobbyRoster(): void {
   if (stateName) {
     els.lobbyTitle.textContent = stateName;
   } else if (currentLobbyCode) {
-    els.lobbyTitle.textContent = `Room ${currentLobbyCode}`;
+    els.lobbyTitle.textContent = `Room ${roomCodeCore(currentLobbyCode)}`;
   }
   updateLobbyMeta();
 
@@ -631,15 +497,12 @@ function setStatus(text = ""): void {
 }
 
 function setBusy(busy: boolean): void {
-  [els.lanQuick, els.lanFriends, els.localCreateBtn, els.localScanBtn, els.joinCodeSubmit].forEach((button) => {
+  [els.localCreateBtn, els.localScanBtn, els.joinCodeSubmit].forEach((button) => {
     button.disabled = busy;
   });
 }
 
 function updateMenuMeta(preserveStatus = true): void {
-  const lanOrigin = currentLanConnectOrigin();
-  els.serverBadge.textContent = lanOrigin ? `LAN ${new URL(toPageOrigin(lanOrigin)).host}` : "Local play";
-
   const portrait = !!(window.matchMedia && window.matchMedia("(orientation: portrait)").matches);
   if (!window.Input.isTouchDevice()) {
     els.orientationNote.textContent = "Keyboard flight: A/D steer, W/S climb, Shift boost, Space fire.";
@@ -650,77 +513,18 @@ function updateMenuMeta(preserveStatus = true): void {
   }
 
   if (inviteRoom) {
-    els.roomChip.textContent = `Invite ${inviteRoom}`;
-    els.roomChip.dataset.state = "invite";
-    const inviteHost = inviteServer ? new URL(toPageOrigin(inviteServer)).host : location.host;
-    if (els.friendsNote) els.friendsNote.textContent = `Invite ready for room ${inviteRoom} on ${inviteHost}. Open Join / Scan to connect.`;
-    if (!preserveStatus || !els.status.textContent) setStatus(`Invite ready: room ${inviteRoom}`);
+    if (els.friendsNote) els.friendsNote.textContent = `Invite ready for room ${roomCodeCore(inviteRoom)}. Joining…`;
+    if (!preserveStatus || !els.status.textContent) setStatus(`Invite ready: room ${roomCodeCore(inviteRoom)}`);
   } else {
-    els.roomChip.textContent = lanOrigin ? "LAN ready" : "Deck local";
-    els.roomChip.dataset.state = lanOrigin ? "lan" : "local";
     if (els.friendsNote) els.friendsNote.textContent = "";
     if (!preserveStatus) setStatus("");
   }
-
-  const typed = els.lanServer.value.trim();
-  const lanInput = currentLanInputOrigin();
-  if (typed && !lanInput) {
-    els.lanHint.textContent = "Enter a valid server address like 192.168.1.10:2567 or http://192.168.1.10:2567.";
-  } else if (lanInput && secureMismatch(lanInput)) {
-    els.lanHint.textContent = "This page is HTTPS. Insecure LAN servers will be blocked here. Open the game from the hotspot host address instead.";
-  } else if (lanInput) {
-    const url = new URL(toPageOrigin(lanInput));
-    els.lanHint.textContent = isPrivateHost(url.hostname)
-      ? `LAN target ready: ${url.host}. Share that local address with everyone on the hotspot.`
-      : `Custom server selected: ${url.host}. Latency only improves if that server is on the same local network.`;
-  } else if (isPrivateHost(location.hostname)) {
-    els.lanHint.textContent = `This device is already serving the game locally at ${location.host}. Use the LAN buttons or share this address.`;
-  } else {
-    els.lanHint.textContent = "For hotspot play, run the game on the host device and enter its local address here.";
-  }
-}
-
-function primeLanInput(): void {
-  const preferred = inviteServer ? toPageOrigin(inviteServer) : loadSavedLanOrigin() || (isPrivateHost(location.hostname) ? location.origin : "");
-  els.lanServer.value = preferred;
-}
-
-function commitLanInput(): void {
-  const normalized = currentLanInputOrigin();
-  if (normalized) {
-    els.lanServer.value = toPageOrigin(normalized);
-    saveLanOrigin(normalized);
-  } else if (!els.lanServer.value.trim()) {
-    saveLanOrigin(null);
-  }
-  updateMenuMeta(true);
-}
-
-function resolveLanOrigin(): string | null {
-  const raw = els.lanServer.value.trim();
-  const normalized = currentLanInputOrigin();
-  if (raw && !normalized) {
-    setStatus("Enter a valid hotspot address, for example 192.168.1.10:2567.");
-    return null;
-  }
-  const origin = normalized || (isPrivateHost(location.hostname) ? location.origin : null);
-  if (!origin) {
-    setStatus("Enter the hotspot host address first, for example 192.168.1.10:2567.");
-    return null;
-  }
-  if (secureMismatch(origin)) {
-    setStatus("This HTTPS page cannot connect to that insecure LAN server. Open the game from the hotspot host address instead.");
-    return null;
-  }
-  els.lanServer.value = toPageOrigin(origin);
-  saveLanOrigin(origin);
-  return origin;
 }
 
 // ─── MENU SCREEN ROUTER ──────────────────────────────────────────────────────
 // Operates ONLY over the active menu shell, whether arcade or legacy fallback.
 // Does NOT disturb mode/applyMode — those control top-level screen visibility.
-const MENU_SCREENS = ["home", "join", "lan", "leaders", "customize"] as const;
+const MENU_SCREENS = ["home", "create", "join", "leaders", "customize"] as const;
 let navStack: string[] = ["home"];
 
 function currentMenuScreen(): string {
@@ -750,7 +554,7 @@ function navShow(id: string): void {
   menuRoot.scrollTop = 0;
   const menuShell = menuRoot.firstElementChild;
   if (menuShell instanceof HTMLElement) menuShell.scrollTop = 0;
-  if (id === "lan") startLocalScanWithAutoRefresh();
+  if (id === "join") startLocalScanWithAutoRefresh();
   else stopLocalScanInterval();
   syncSceneMode(window.Net?.state);
 }
@@ -868,22 +672,21 @@ function stopScanCamera(): void {
   if (s) { s.getTracks().forEach((t) => t.stop()); vid.srcObject = null; }
 }
 
-function extractCodeFromScanResult(raw: string): string | null {
-  const trimmed = raw.trim();
-  if (!trimmed) return null;
-  // Try to parse as URL first (invite link with ?p2p= / ?room= / ?code=)
+// Normalize any join input (bare code, "P-XXXXXX", or invite URL with ?p2p=/?room=/?code=)
+// to the 6-char room-code core. All rooms are P2P: joining is always "P-"+core.
+// BUG HISTORY: earlier code sliced "P-ABCDEF" to "P-ABCD" and routed bare codes to the
+// removed VPS lobby — every manual/QR join landed in the wrong (empty) room.
+function normalizeRoomCode(raw: string): string | null {
+  let s = raw.trim();
+  if (!s) return null;
   try {
-    const url = new URL(trimmed);
-    const p2p = url.searchParams.get("p2p");
-    if (p2p) return p2p.trim().toUpperCase().slice(0, 6);
-    const room = url.searchParams.get("room");
-    if (room) return room.trim().toUpperCase().slice(0, 6);
-    const code = url.searchParams.get("code");
-    if (code) return code.trim().toUpperCase().slice(0, 6);
+    const url = new URL(s);
+    s = url.searchParams.get("p2p") || url.searchParams.get("room") || url.searchParams.get("code") || "";
   } catch { /* not a URL — fall through */ }
-  // Bare code: uppercase alphanumeric
-  const bare = trimmed.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6);
-  return bare || null;
+  s = s.trim().toUpperCase();
+  if (s.startsWith("P-")) s = s.slice(2);
+  s = s.replace(/[^A-Z0-9]/g, "");
+  return s.length === 6 ? s : null;
 }
 
 function openScanner(): void {
@@ -925,16 +728,15 @@ function openScanner(): void {
         const img = ctx.getImageData(0, 0, w, h);
         const result = (typeof jsQR !== "undefined" ? jsQR : (window as any).jsQR)?.(img.data, w, h);
         if (result && result.data) {
-          const code = extractCodeFromScanResult(result.data);
-          if (code) {
+          const core = normalizeRoomCode(result.data);
+          if (core) {
             els.scanStatus.textContent = "QR detected — joining…";
             stopScanCamera();
             scannerOpen = false;
             els.scanOverlay.classList.add("hidden");
-            // Route through the existing join path: set input value and call startGame
-            els.joinCodeInput.value = code;
+            els.joinCodeInput.value = core;
             window.SFX.uiClick();
-            startGame(code, null);
+            joinP2PAsGuest("P-" + core);
             return;
           }
         }
@@ -1000,12 +802,6 @@ function setCustomizeFeedback(text: string, sticky = false): void {
 
 function findActivePresetIndex(): number {
   return loadoutStore.presets.findIndex((preset) => sameLoadout(preset, selectedCosmetics));
-}
-
-function renderChipStrip(target: HTMLElement, rows: Array<{ label: string; value: string }>): void {
-  target.innerHTML = rows.map((row) =>
-    `<span class="summary-chip"><span>${escapeHtml(row.label)}</span><strong>${escapeHtml(row.value)}</strong></span>`
-  ).join("");
 }
 
 function renderSummaryGrid(rows: Array<{ label: string; value: string }>): void {
@@ -1118,13 +914,9 @@ function renderOptionGroup<K extends keyof CosmeticLoadout>(
 function renderLoadoutUI(): void {
   const summary = getLoadoutSummary(selectedCosmetics);
   const rows = getLoadoutDetailRows(selectedCosmetics);
-  els.selectedPlaneName.textContent = summary.title;
-  els.selectedPlaneSummary.textContent = summary.subtitle;
-  els.localLoadoutSummary.textContent = `${summary.title} · ${rows.map((row) => row.value).join(" · ")}`;
   els.lobbyPlaneSummary.textContent = `${summary.title} · ${rows.map((row) => row.value).join(" · ")}`;
   els.customizeSummaryName.textContent = summary.title;
   els.customizeSummaryText.textContent = summary.subtitle;
-  renderChipStrip(els.selectedPlaneChips, rows);
   renderSummaryGrid(rows);
   renderPresetGrid();
   renderOptionGroup(els.customizeAirframe, "bodyShape", AIRFRAME_OPTIONS, "cards");
@@ -1132,220 +924,6 @@ function renderLoadoutUI(): void {
   renderOptionGroup(els.customizeAccent, "accent", ACCENT_OPTIONS, "swatches");
   renderOptionGroup(els.customizeLivery, "livery", LIVERY_OPTIONS, "cards");
   renderOptionGroup(els.customizeTrail, "trail", TRAIL_OPTIONS, "swatches");
-}
-
-// ─── PUBLIC QUICK-PLAY (unchanged path) ──────────────────────────────────────
-async function startGame(code: string, serverOrigin: string | null = null): Promise<void> {
-  let roomCode = code;
-  if (roomCode === "PUBLIC" && !botsEnabled) roomCode = "NOBOTS";
-
-  // P2P guest join: codes starting with "P-" go through the WebRTC path
-  if (roomCode.startsWith("P-")) {
-    return joinP2PAsGuest(roomCode);
-  }
-
-  // Only PUBLIC and NOBOTS go through the instant-playing path.
-  // Private codes (anything else) go through the lobby.
-  if (roomCode !== "PUBLIC" && roomCode !== "NOBOTS") {
-    return joinLobby(roomCode, serverOrigin);
-  }
-
-  if (serverOrigin) {
-    const normalized = normalizeServerOrigin(serverOrigin);
-    if (!normalized) {
-      setStatus("The selected server address is not valid.");
-      return;
-    }
-    if (secureMismatch(normalized)) {
-      setStatus("This HTTPS page cannot connect to that insecure LAN server. Open the game from the hotspot host address instead.");
-      return;
-    }
-    serverOrigin = normalized;
-    saveLanOrigin(serverOrigin);
-    els.lanServer.value = toPageOrigin(serverOrigin);
-  }
-
-  window.SFX.unlock();
-  enterImmersive();
-  window.Renderer.startTakeoff && window.Renderer.startTakeoff();
-
-  const name = (els.name.value || "Pilot").slice(0, 14);
-  setStatus("Connecting…");
-  setBusy(true);
-
-  try {
-    await window.Net.connect(name, roomCode, selectedCosmetics, serverOrigin);
-  } catch (e: any) {
-    setStatus("Could not connect: " + (e && e.message ? e.message : e));
-    setBusy(false);
-    return;
-  }
-
-  prevPhase = "playing";
-  prevHp = G.MAX_HP;
-  wasAlive = true;
-  deathTime = -1;
-  wasEmpd = false;
-  wasFrozen = false;
-  applyMode("playing");
-  els.respawn.classList.add("hidden");
-  els.inter.classList.add("hidden");
-  setStatus("");
-  if (window.Input.isTouchDevice()) { els.touch.classList.remove("hidden"); applyControlSchemeUI(window.Input.controlScheme); }
-  if (!engineStarted) {
-    window.SFX.startEngine();
-    engineStarted = true;
-  }
-  if (window.SFX.stopMenuAmbient) window.SFX.stopMenuAmbient();
-  window.SFX.startMusic();
-
-  // Public rooms have no invite share bar
-  setInviteState(null, null);
-  clearShareInvite();
-  els.share.classList.add("hidden");
-}
-
-// ─── PRIVATE LOBBY PATH ───────────────────────────────────────────────────────
-// Called for any non-PUBLIC, non-NOBOTS code: creates or joins via Colyseus
-// and lands in mode='lobby'. The 3D scene keeps drawing behind the lobby card.
-async function joinLobby(code: string, serverOrigin: string | null = null): Promise<void> {
-  if (serverOrigin) {
-    const normalized = normalizeServerOrigin(serverOrigin);
-    if (!normalized) {
-      setStatus("The selected server address is not valid.");
-      return;
-    }
-    if (secureMismatch(normalized)) {
-      setStatus("This HTTPS page cannot connect to that insecure LAN server. Open the game from the hotspot host address instead.");
-      return;
-    }
-    serverOrigin = normalized;
-    saveLanOrigin(serverOrigin);
-    els.lanServer.value = toPageOrigin(serverOrigin);
-  }
-
-  window.SFX.unlock();
-  enterImmersive();
-
-  const name = (els.name.value || "Pilot").slice(0, 14);
-  setStatus("Connecting…");
-  setBusy(true);
-
-  try {
-    await window.Net.connect(name, code, selectedCosmetics, serverOrigin);
-  } catch (e: any) {
-    setStatus("Could not connect: " + (e && e.message ? e.message : e));
-    setBusy(false);
-    return;
-  }
-
-  setStatus("");
-  setBusy(false);
-
-  currentLobbyCode = code;
-  currentLobbyServer = serverOrigin;
-  currentRoomFriendlyName = null;
-
-  // Show the invite share bar so the host can share the link immediately
-  setInviteState(code, serverOrigin);
-  updateShareInvite(code, serverOrigin);
-  els.share.classList.remove("hidden");
-
-  // Wire the state-change callback so roster and phase transitions are reactive
-  window.Net.onStateChange = onLobbyStateChange;
-
-  // Update lobby title
-  els.lobbyTitle.textContent = `Room ${code}`;
-
-  // Initial roster render
-  renderLobbyRoster();
-
-  // Send persisted difficulty so the room starts at the host's chosen tier
-  window.Net?.sendHostSettings?.({ botDifficulty });
-
-  applyMode("lobby");
-
-  // If the server already reports 'playing' by the time we connect (e.g. late
-  // join after host force-started), skip straight to playing.
-  const phase = window.Net.getPhase();
-  if (phase === "playing") {
-    window.Net.onStateChange = null;
-    enterPlayingFromLobby();
-  }
-}
-
-// ─── P2P HOST PATH ────────────────────────────────────────────────────────────
-async function startP2PHost(): Promise<void> {
-  window.SFX.unlock();
-  enterImmersive();
-
-  const name   = (els.name.value || "Pilot").slice(0, 14);
-  const code   = "P-" + genCode();          // e.g. "P-ABCDEF"
-
-  // Save Colyseus Net before swapping
-  if (!_isP2PSession) {
-    _colyseusNet = (window as any).Net;
-  }
-
-  const transport = new WebRtcTransport();
-  (window as any).Net = transport;
-  _isP2PSession = true;
-
-  // Wire callbacks
-  transport.onKill       = onKill;
-  transport.onPickup     = onPickup;
-  transport.onDisconnect = onP2PDisconnect;
-
-  setStatus("Starting P2P host…");
-  setBusy(true);
-
-  try {
-    await (transport as any).startHost(name, code, selectedCosmetics, { bots: botsEnabled });
-  } catch (e: any) {
-    setStatus("Could not start P2P host: " + (e && e.message ? e.message : e));
-    setBusy(false);
-    // Restore Colyseus on failure
-    (window as any).Net = _colyseusNet;
-    _colyseusNet  = null;
-    _isP2PSession = false;
-    return;
-  }
-
-  setStatus("");
-  setBusy(false);
-
-  currentLobbyCode   = code;
-  currentLobbyServer = null;
-  currentRoomFriendlyName = null;
-
-  // Show share overlay with P2P join URL (?p2p=P-XXXXXX)
-  const p2pUrl = buildP2PShareUrl(code);
-  activeShareUrl = p2pUrl;
-  els.shareLink.value         = p2pUrl;
-  els.shareQrLink.value       = p2pUrl;
-  els.shareQrRoom.textContent = `Room ${code}`;
-  els.shareQrCode.textContent = code;
-  els.shareQrNote.textContent = `Scan on the same Wi-Fi to join P2P room ${code}.`;
-  els.copy.disabled           = false;
-  els.shareQrCopy.disabled    = false;
-  try {
-    window.QR.render(els.shareQrCanvas, p2pUrl, {
-      size: window.Input.isTouchDevice() ? 220 : 256,
-      errorCorrectionLevel: "M",
-    });
-    els.qrBtn.disabled = false;
-  } catch {
-    els.qrBtn.disabled = true;
-    els.shareQrCanvas.width = 0;
-  }
-  els.share.classList.remove("hidden");
-
-  transport.onStateChange = onLobbyStateChange;
-  els.lobbyTitle.textContent = `P2P Room ${code}`;
-  renderLobbyRoster();
-  // Send persisted difficulty so the P2P room starts at the host's chosen tier
-  window.Net?.sendHostSettings?.({ botDifficulty });
-  applyMode("lobby");
 }
 
 function buildP2PShareUrl(code: string): string {
@@ -1365,8 +943,8 @@ function randomLocalRoomName(): string {
 }
 
 // ─── LOCAL WI-FI HOST PATH ────────────────────────────────────────────────────
-// Like startP2PHost() but starts continuous FFA immediately (no lobby ready-up gate)
-// and broadcasts a human-readable room name so guests can pick it from the list.
+// Starts continuous FFA immediately (no lobby ready-up gate) and broadcasts a
+// human-readable room name so guests can pick it from the list.
 async function startLocalRoom(): Promise<void> {
   window.SFX.unlock();
   enterImmersive();
@@ -1409,13 +987,15 @@ async function startLocalRoom(): Promise<void> {
   currentLobbyServer = null;
   currentRoomFriendlyName = roomName;
 
-  // Show share bar with P2P join URL
+  // Show share bar — code is the primary invite; QR still encodes the full
+  // join URL so a phone camera can auto-join without typing.
   const p2pUrl = buildP2PShareUrl(code);
   activeShareUrl          = p2pUrl;
   els.shareLink.value     = p2pUrl;
   els.shareQrLink.value   = p2pUrl;
+  els.shareCodeBar.textContent = roomCodeCore(code);
   els.shareQrRoom.textContent = roomName;
-  els.shareQrCode.textContent = code;
+  els.shareQrCode.textContent = roomCodeCore(code);
   els.shareQrNote.textContent = `Scan on the same Wi-Fi to join "${roomName}".`;
   els.copy.disabled           = false;
   els.shareQrCopy.disabled    = false;
@@ -1432,7 +1012,7 @@ async function startLocalRoom(): Promise<void> {
   els.share.classList.remove("hidden");
 
   // Show the room name prominently in the lobby header so the host can read it out
-  els.lobbyTitle.textContent = roomName;
+  els.lobbyTitle.textContent = `${roomName} · ${roomCodeCore(code)}`;
 
   transport.onStateChange = onLobbyStateChange;
   renderLobbyRoster();
@@ -1515,10 +1095,10 @@ async function runLocalScan(): Promise<void> {
 function startLocalScanWithAutoRefresh(): void {
   runLocalScan();
   stopLocalScanInterval();
-  // Auto-refresh every 3s while #screen-lan is the active screen
+  // Auto-refresh every 3s while #arcade-screen-join is the active screen
   _localScanInterval = setInterval(() => {
-    const lanScreen = document.getElementById(menuScreenElementId("lan"));
-    if (!lanScreen || !lanScreen.classList.contains("active")) {
+    const joinScreen = document.getElementById(menuScreenElementId("join"));
+    if (!joinScreen || !joinScreen.classList.contains("active")) {
       stopLocalScanInterval();
       return;
     }
@@ -1567,14 +1147,33 @@ async function joinP2PAsGuest(code: string, friendlyName?: string): Promise<void
   currentLobbyServer = null;
   currentRoomFriendlyName = friendlyName || null;
 
-  // Share bar shows the invite URL (guest can also share it)
+  // Share bar shows the invite (guest can also share it) — code first, QR still
+  // encodes the full join URL so a phone camera can auto-join.
   const p2pUrl = buildP2PShareUrl(code);
+  const core = roomCodeCore(code);
   activeShareUrl = p2pUrl;
   els.shareLink.value = p2pUrl;
+  els.shareQrLink.value = p2pUrl;
+  els.shareCodeBar.textContent = core;
+  els.shareQrRoom.textContent = friendlyName || `Room ${core}`;
+  els.shareQrCode.textContent = core;
+  els.shareQrNote.textContent = `Scan on the same Wi-Fi to join ${core}.`;
+  els.copy.disabled = false;
+  els.shareQrCopy.disabled = false;
+  try {
+    window.QR.render(els.shareQrCanvas, p2pUrl, {
+      size: window.Input.isTouchDevice() ? 220 : 256,
+      errorCorrectionLevel: "M",
+    });
+    els.qrBtn.disabled = false;
+  } catch {
+    els.qrBtn.disabled = true;
+    els.shareQrCanvas.width = 0;
+  }
   els.share.classList.remove("hidden");
 
   transport.onStateChange = onLobbyStateChange;
-  els.lobbyTitle.textContent = friendlyName || `P2P Room ${code}`;
+  els.lobbyTitle.textContent = friendlyName ? `${friendlyName} · ${core}` : `Room ${core}`;
   renderLobbyRoster();
   applyMode("lobby");
 
@@ -2203,7 +1802,6 @@ function updateRotateOverlay(): void {
 
 function init(): void {
   readInviteFromUrl();
-  primeLanInput();
 
   window.Renderer.init(els.canvas);
   window.Input.attach();
@@ -2213,17 +1811,9 @@ function init(): void {
   window.Net.onPickup = onPickup;
   window.Net.onDisconnect = onDisconnect;
 
-  els.bots.checked = botsEnabled;
   els.localBots.checked = botsEnabled;
-  els.bots.addEventListener("change", () => {
-    botsEnabled = els.bots.checked;
-    els.localBots.checked = botsEnabled;
-    try { localStorage.setItem("smashcart.bots", botsEnabled ? "1" : "0"); } catch {}
-    window.SFX.uiClick();
-  });
   els.localBots.addEventListener("change", () => {
     botsEnabled = els.localBots.checked;
-    els.bots.checked = botsEnabled;
     try { localStorage.setItem("smashcart.bots", botsEnabled ? "1" : "0"); } catch {}
     window.SFX.uiClick();
   });
@@ -2287,43 +1877,6 @@ function init(): void {
     showShareQr();
   });
 
-
-
-  // P2P offline QR button — starts host AND renders offer QR in one click
-  els.p2pOfflineBtn.addEventListener("click", async () => {
-    window.SFX.uiClick();
-    // If we don't already have a P2P host running, start one first
-    if (!_isP2PSession) {
-      await startP2PHost();
-    }
-    // Reveal the offline QR section
-    els.p2pOfflineSection.classList.remove("hidden");
-    const transport = (window as any).Net;
-    if (typeof transport.startOfflineQrOffer === "function") {
-      try {
-        await transport.startOfflineQrOffer(els.p2pOfflineCanvas);
-      } catch (e: any) {
-        setStatus(e && e.message ? e.message : "Offline QR error");
-      }
-    }
-  });
-
-  // P2P offline answer paste/submit — host accepts guest answer QR
-  els.p2pAnswerSubmit.addEventListener("click", async () => {
-    const val = els.p2pAnswerInput.value.trim();
-    if (!val) return;
-    window.SFX.uiClick();
-    const transport = (window as any).Net;
-    if (typeof transport.finishOfflineQrOffer === "function") {
-      try {
-        await transport.finishOfflineQrOffer(val);
-        setStatus("Offline P2P connected!");
-      } catch (e: any) {
-        setStatus("Offline answer error: " + (e && e.message ? e.message : e));
-      }
-    }
-  });
-
   // Host-left overlay — main menu button
   els.hostLeftMenuBtn.addEventListener("click", () => {
     window.SFX.uiClick();
@@ -2343,17 +1896,6 @@ function init(): void {
     startLocalScanWithAutoRefresh();
   });
 
-
-  els.lanQuick.addEventListener("click", () => {
-    window.SFX.uiClick();
-    const origin = resolveLanOrigin();
-    if (origin) startGame("PUBLIC", origin);
-  });
-  els.lanFriends.addEventListener("click", () => {
-    window.SFX.uiClick();
-    const origin = resolveLanOrigin();
-    if (origin) startGame(genCode(), origin);
-  });
   // Load persisted call sign
   try {
     const savedName = localStorage.getItem("smashcart.name");
@@ -2370,17 +1912,7 @@ function init(): void {
     if (e.key === "Enter") {
       e.preventDefault();
       try { localStorage.setItem("smashcart.name", els.name.value); } catch {}
-      navGo("lan");
-    }
-  });
-  els.lanServer.addEventListener("input", () => updateMenuMeta(true));
-  els.lanServer.addEventListener("blur", () => commitLanInput());
-  els.lanServer.addEventListener("keydown", (e: KeyboardEvent) => {
-    if (e.key === "Enter") {
-      e.preventDefault();
-      commitLanInput();
-      const origin = resolveLanOrigin();
-      if (origin) startGame(inviteRoom || "PUBLIC", origin);
+      navGo("create");
     }
   });
   els.qrBtn.addEventListener("click", () => {
@@ -2388,17 +1920,17 @@ function init(): void {
     showShareQr();
   });
   els.copy.addEventListener("click", async () => {
-    const copied = await copyShareLink();
+    const copied = await copyShareCode();
     if (copied) {
       els.copy.textContent = "Copied!";
-      setTimeout(() => (els.copy.textContent = "Copy"), 1200);
+      setTimeout(() => (els.copy.textContent = "Copy code"), 1200);
     }
   });
   els.shareQrCopy.addEventListener("click", async () => {
-    const copied = await copyShareLink();
+    const copied = await copyShareCode();
     if (copied) {
       els.shareQrCopy.textContent = "Copied!";
-      setTimeout(() => (els.shareQrCopy.textContent = "Copy Link"), 1200);
+      setTimeout(() => (els.shareQrCopy.textContent = "Copy code"), 1200);
     }
   });
   els.shareQrClose.addEventListener("click", () => hideShareQr());
@@ -2614,35 +2146,20 @@ function init(): void {
       }
     }
   });
-  function resolveJoinInput(): string | null {
-    const raw = els.joinCodeInput.value.trim();
-    if (!raw) return null;
-    // Try to extract from pasted invite URL
-    try {
-      const url = new URL(raw);
-      const p2p = url.searchParams.get("p2p");
-      if (p2p) return p2p.trim().toUpperCase().slice(0, 6);
-      const room = url.searchParams.get("room");
-      if (room) return room.trim().toUpperCase().slice(0, 6);
-      const code = url.searchParams.get("code");
-      if (code) return code.trim().toUpperCase().slice(0, 6);
-    } catch { /* not a URL */ }
-    // Bare code: uppercase alphanumeric, max 6 chars
-    return raw.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6) || null;
-  }
-  els.joinCodeSubmit.addEventListener("click", () => {
-    const code = resolveJoinInput();
-    if (!code) return;
+  function submitJoinCode(): void {
+    const core = normalizeRoomCode(els.joinCodeInput.value);
+    if (!core) {
+      setStatus("Enter the 6-character room code.");
+      return;
+    }
     window.SFX.uiClick();
-    startGame(code, null);
-  });
+    joinP2PAsGuest("P-" + core);
+  }
+  els.joinCodeSubmit.addEventListener("click", submitJoinCode);
   els.joinCodeInput.addEventListener("keydown", (e: KeyboardEvent) => {
     if (e.key === "Enter") {
       e.preventDefault();
-      const code = resolveJoinInput();
-      if (!code) return;
-      window.SFX.uiClick();
-      startGame(code, null);
+      submitJoinCode();
     }
   });
 
@@ -2726,30 +2243,11 @@ function init(): void {
   els.bootOverlay.classList.add("fade-out");
   setTimeout(() => els.bootOverlay.classList.add("hidden"), 450);
 
-  // Check for offline-answer QR param — guest decodes host offer and shows answer QR
-  const _offlineAnswerParam = new URLSearchParams(location.search).get("offline-answer");
-  if (_offlineAnswerParam) {
-    // Guest offline flow: decode offer → create answer → render answer QR in p2pOfflineCanvas
-    (async () => {
-      // Start a bare guest transport (no signaling)
-      if (!_isP2PSession) {
-        _colyseusNet = (window as any).Net;
-      }
-      const transport = new WebRtcTransport();
-      (window as any).Net = transport;
-      _isP2PSession = true;
-      transport.onKill       = onKill;
-      transport.onPickup     = onPickup;
-      transport.onDisconnect = onP2PDisconnect;
-      // Show the offline section and render answer QR
-      els.p2pOfflineSection.classList.remove("hidden");
-      try {
-        await (transport as any).startOfflineQrAnswer(_offlineAnswerParam, els.p2pOfflineCanvas);
-        setStatus("Scan the QR with the host's phone, or paste the text to the host.");
-      } catch (e: any) {
-        setStatus("Offline QR guest error: " + (e && e.message ? e.message : e));
-      }
-    })();
+  // Invite deep link (?p2p=P-XXXXXX from a shared URL/QR): join the room directly —
+  // the menu no longer has a "JOIN <code>" button, so without this the link dead-ends.
+  if (inviteRoom && inviteRoom.startsWith("P-")) {
+    setStatus(`Joining room ${roomCodeCore(inviteRoom)}…`);
+    joinP2PAsGuest(inviteRoom);
   }
 
   requestAnimationFrame((t) => { last = t; loop(t); });

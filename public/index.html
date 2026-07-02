@@ -116,14 +116,15 @@
 
     <div id="share-bar" class="hidden">
       <div class="share-copy">
-        <span class="share-label">Invite route</span>
+        <span class="share-label">Room code</span>
         <div class="share-link-wrap">
-          <span class="share-link-label">Room link</span>
-          <input id="share-link" readonly />
+          <span class="share-link-label">Share this with friends</span>
+          <div id="share-qr-code-bar" class="share-qr-code" aria-label="Room code"></div>
+          <input id="share-link" readonly class="hidden" />
         </div>
         <div class="share-actions">
           <button id="qr-btn" class="secondary">Show QR</button>
-          <button id="copy-btn">Copy</button>
+          <button id="copy-btn">Copy code</button>
         </div>
       </div>
     </div>
@@ -141,8 +142,8 @@
         <canvas id="share-qr-canvas" aria-label="Room invite QR code"></canvas>
         <p class="muted share-qr-caption">Players scan this QR, or enter the code</p>
         <p id="share-qr-note" class="muted">Scan to join this room.</p>
-        <input id="share-qr-link" readonly />
-        <button id="share-qr-copy">Copy Link</button>
+        <input id="share-qr-link" readonly class="hidden" />
+        <button id="share-qr-copy">Copy code</button>
       </div>
     </div>
 
