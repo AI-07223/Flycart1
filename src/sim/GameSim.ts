@@ -320,7 +320,7 @@ export class GameSim {
     if (typeof s.roomName === "string") {
       this.roomName = s.roomName.replace(/[\x00-\x1F\x7F]/g, "").trim().slice(0, 20);
     }
-    if (typeof s.botsInRoom === "boolean" && !this.isPublic) {
+    if (typeof s.botsInRoom === "boolean") {
       this.botsInRoom = s.botsInRoom;
       // Apply immediately: if turned off, remove any existing bots now
       if (!this.botsInRoom) {
@@ -332,8 +332,7 @@ export class GameSim {
       this.mode = s.mode;
     }
     if (typeof s.botDifficulty === "string" &&
-        (s.botDifficulty === "easy" || s.botDifficulty === "medium" || s.botDifficulty === "high") &&
-        !this.isPublic) {
+        (s.botDifficulty === "easy" || s.botDifficulty === "medium" || s.botDifficulty === "high")) {
       this.botDifficulty = s.botDifficulty;
       for (const [, brain] of this.bots) this._applyDifficulty(brain);
     }
@@ -447,6 +446,8 @@ export class GameSim {
       teamScore0: this.teamScore0,
       teamScore1: this.teamScore1,
       botDifficulty: this.botDifficulty,
+      botsEnabled: this.botsEnabled,
+      isPublic: this.isPublic,
     };
   }
 

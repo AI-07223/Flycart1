@@ -88,6 +88,7 @@ interface GameConstants {
   AFTERBURNER_FACTOR: number;
   RAPID_FACTOR: number;
   FIRE_COOLDOWN: number;
+  RESPAWN_DELAY: number;
   BULLET_LIFE: number;
   BULLET_RADIUS: number;
   SPREAD_ANGLE: number;
@@ -304,6 +305,7 @@ interface RendererAPI {
   hitStop(ms: number): void;
   startTakeoff?(): void;
   setMenuSection?(sec: string): void;
+  setSceneMode?(mode: string): void;
   showMenu?(): void;
   hideMenu?(): void;
 }

@@ -98,6 +98,10 @@ export interface SimStateSnapshot {
   teamScore0: number;
   teamScore1: number;
   botDifficulty: string;
+  /** Ctor-only GameSim flags — consumed at construction time by a re-elected
+   *  host, never assigned by _restoreFromSnapshot (they're readonly fields). */
+  botsEnabled?: boolean;
+  isPublic?: boolean;
 }
 
 export interface GameSimOpts {

@@ -521,7 +521,7 @@
           if (typeof s.roomName === "string") {
             this.roomName = s.roomName.replace(/[\x00-\x1F\x7F]/g, "").trim().slice(0, 20);
           }
-          if (typeof s.botsInRoom === "boolean" && !this.isPublic) {
+          if (typeof s.botsInRoom === "boolean") {
             this.botsInRoom = s.botsInRoom;
             if (!this.botsInRoom) {
               for (const id of [...this.bots.keys()]) this.removePlayer(id);
@@ -530,7 +530,7 @@
           if (typeof s.mode === "string" && (s.mode === "ffa" || s.mode === "tdm")) {
             this.mode = s.mode;
           }
-          if (typeof s.botDifficulty === "string" && (s.botDifficulty === "easy" || s.botDifficulty === "medium" || s.botDifficulty === "high") && !this.isPublic) {
+          if (typeof s.botDifficulty === "string" && (s.botDifficulty === "easy" || s.botDifficulty === "medium" || s.botDifficulty === "high")) {
             this.botDifficulty = s.botDifficulty;
             for (const [, brain] of this.bots) this._applyDifficulty(brain);
           }
@@ -620,7 +620,9 @@
             mode: this.mode,
             teamScore0: this.teamScore0,
             teamScore1: this.teamScore1,
-            botDifficulty: this.botDifficulty
+            botDifficulty: this.botDifficulty,
+            botsEnabled: this.botsEnabled,
+            isPublic: this.isPublic
           };
         }
         // ---------------------------------------------------------------------------
@@ -1344,6 +1346,10 @@
           this.teamScore0 = 0;
           this.teamScore1 = 0;
           this.botDifficulty = "medium";
+          // Carried from the host's snapshot so a migration-elected new host can
+          // reconstruct its GameSim with the same botsEnabled/isPublic semantics.
+          this.botsEnabled = false;
+          this.isPublic = false;
         }
       };
       HostTransportState = class {
@@ -1394,10 +1400,12 @@
         constructor() {
           this.ws = null;
           this.queue = [];
+          this.keepaliveTimer = null;
           this.onMessage = null;
           this.onClose = null;
         }
         open(room, role, peerId) {
+          this._stopKeepalive();
           if (this.ws && this.ws.readyState === WebSocket.OPEN) {
             try {
               this.ws.close();
@@ -1415,6 +1423,7 @@
                 if (this.hostRoomName !== void 0) hostMsg.name = this.hostRoomName;
                 if (this.hostCallSign !== void 0) hostMsg.hostName = this.hostCallSign;
                 this.send(hostMsg);
+                this._startKeepalive(room);
               } else {
                 this.send({ type: "join", room, peerId });
               }
@@ -1431,6 +1440,7 @@
             };
             ws.onerror = () => reject(new Error("Signal WS error"));
             ws.onclose = () => {
+              this._stopKeepalive();
               if (this.onClose) this.onClose();
             };
           });
@@ -1448,12 +1458,25 @@
           }
         }
         close() {
+          this._stopKeepalive();
           if (this.ws) {
             try {
               this.ws.close();
             } catch {
             }
             this.ws = null;
+          }
+        }
+        _startKeepalive(room) {
+          this._stopKeepalive();
+          this.keepaliveTimer = setInterval(() => {
+            this._rawSend({ type: "ping", room });
+          }, 12e3);
+        }
+        _stopKeepalive() {
+          if (this.keepaliveTimer !== null) {
+            clearInterval(this.keepaliveTimer);
+            this.keepaliveTimer = null;
           }
         }
       };
@@ -1485,6 +1508,10 @@
           // HOST-only
           this._sim = null;
           this._hostState = null;
+          // Room settings this peer started as host with — carried across host migration
+          // so a re-elected host preserves the original bots/continuous semantics.
+          this._botsEnabled = false;
+          this._continuous = false;
           this._peers = /* @__PURE__ */ new Map();
           this._rafId = null;
           this._lastTick = 0;
@@ -1574,8 +1601,11 @@
           this.sessionId = "host";
           const continuous = opts?.continuous ?? false;
           const roomName = opts?.roomName ?? code;
+          const botsEnabled = !!opts?.bots;
+          this._botsEnabled = botsEnabled;
+          this._continuous = continuous;
           const sim = new GameSim({
-            botsEnabled: false,
+            botsEnabled,
             // Continuous local rooms start in playing/ffa state immediately (same as isPublic).
             isPublic: continuous,
             onEvent: (e) => this._onSimEvent(e)
@@ -1996,7 +2026,9 @@
             mode: gs.mode,
             teamScore0: gs.teamScore0,
             teamScore1: gs.teamScore1,
-            botDifficulty: gs.botDifficulty
+            botDifficulty: gs.botDifficulty,
+            botsEnabled: gs.botsEnabled,
+            isPublic: gs.isPublic
           };
         }
         /**
@@ -2021,6 +2053,8 @@
           const peerId = this._peerId;
           const sig = this._signal ?? new SignalSocket();
           this._signal = sig;
+          if (snap.roomName) sig.hostRoomName = snap.roomName;
+          if (this._savedName) sig.hostCallSign = this._savedName;
           sig.open(room, "host").then(() => {
             const origOnMessage = sig.onMessage;
             sig.onMessage = (msg) => {
@@ -2039,8 +2073,8 @@
         /** After broker confirms hosted, set up the new GameSim and host loop. */
         _onElectedHosted(hostedMsg, snap, peerId) {
           const sim = new GameSim({
-            botsEnabled: false,
-            isPublic: false,
+            botsEnabled: snap.botsEnabled ?? false,
+            isPublic: snap.isPublic ?? false,
             onEvent: (e) => this._onSimEvent(e),
             initialState: snap
           });
@@ -2156,6 +2190,8 @@
             gs.botDifficulty = snap.botDifficulty ?? "medium";
             gs.teamScore0 = snap.teamScore0 ?? 0;
             gs.teamScore1 = snap.teamScore1 ?? 0;
+            gs.botsEnabled = snap.botsEnabled ?? false;
+            gs.isPublic = snap.isPublic ?? false;
             gs.players.mergeFrom(snap.players);
             gs.bullets.mergeFrom(snap.bullets);
             gs.pickups.mergeFrom(snap.pickups);
@@ -2798,6 +2834,10 @@
                 <input id="arcade-local-room-name" class="arcade-input" maxlength="20" placeholder="Room name" aria-label="Room name" />
                 <button type="button" id="arcade-local-create-btn" class="arcade-panel-action">Create Room</button>
               </div>
+              <label class="arcade-switch" for="arcade-local-bots-check">
+                <input type="checkbox" id="arcade-local-bots-check" checked />
+                <span>Fill with bots</span>
+              </label>
             </section>
 
             <section class="arcade-panel arcade-local-panel">
@@ -3197,7 +3237,7 @@
       init_arcadeMenu();
       init_loadout();
       var dollar = (id) => document.getElementById(id);
-      var menuRoot = mountArcadeMenu() || dollar("start-screen");
+      var menuRoot = mountArcadeMenu();
       var useArcadeMenu = menuRoot.id === ARCADE_MENU_HOST_ID;
       var menuDollar = (...ids) => {
         for (const id of ids) {
@@ -3287,6 +3327,7 @@
         connRetry: dollar("conn-retry"),
         connMenu: dollar("conn-menu"),
         bots: menuDollar("arcade-bots-check", "bots-check"),
+        localBots: menuDollar("arcade-local-bots-check", "arcade-local-bots-check"),
         countdown: dollar("countdown"),
         interLeave: dollar("intermission-leave"),
         p2pOfflineBtn: menuDollar("arcade-p2p-offline-btn", "p2p-offline-btn"),
@@ -3349,6 +3390,7 @@
         customizeDone: menuDollar("arcade-customize-done", "customize-done"),
         ingameMenuBtn: dollar("ingame-menu-btn"),
         pauseInviteBtn: dollar("pause-invite-btn"),
+        hudRoomChip: dollar("hud-room-chip"),
         localRoomName: menuDollar("arcade-local-room-name", "local-room-name"),
         localCreateBtn: menuDollar("arcade-local-create-btn", "local-create-btn"),
         localScanBtn: menuDollar("arcade-local-scan-btn", "local-scan-btn"),
@@ -3360,7 +3402,6 @@
       var mode = "menu";
       var sceneMode = "preflight";
       var settingsOpen = false;
-      var joinCodeOpen = false;
       var last = 0;
       var prevPhase = "playing";
       var prevHp = G.MAX_HP;
@@ -3389,6 +3430,7 @@
       var countdownActive = false;
       var currentLobbyCode = null;
       var currentLobbyServer = null;
+      var currentRoomFriendlyName = null;
       var _settingsDebounce = null;
       var _colyseusNet = null;
       var _isP2PSession = false;
@@ -3646,6 +3688,18 @@
         if (!activeShareUrl || els.qrBtn.disabled) return;
         els.shareQrOverlay.classList.remove("hidden");
       }
+      function hideRoomChip() {
+        els.hudRoomChip.classList.add("hidden");
+        els.hudRoomChip.textContent = "";
+      }
+      function updateRoomChip() {
+        if (!_isP2PSession || !currentLobbyCode) {
+          hideRoomChip();
+          return;
+        }
+        els.hudRoomChip.textContent = "\u{1F4F6} " + (currentRoomFriendlyName || currentLobbyCode);
+        els.hudRoomChip.classList.remove("hidden");
+      }
       function updateLobbyMeta() {
         const state = window.Net.state;
         const modeLabel = state?.mode === "tdm" ? "Team Deathmatch" : "Free-for-all";
@@ -3883,6 +3937,8 @@
         els.p2pMigratingOverlay.classList.add("hidden");
         if (mode !== "lobby") els.share.classList.add("hidden");
         if (!isMenu) stopLocalScanInterval();
+        if (mode === "playing") updateRoomChip();
+        else if (isMenu) hideRoomChip();
         syncSceneMode(window.Net?.state);
       }
       function showHostLeftOverlay() {
@@ -3932,9 +3988,6 @@
       function hideSettings() {
         settingsOpen = false;
         els.settingsScreen.classList.add("hidden");
-      }
-      function closeJoinCode() {
-        joinCodeOpen = false;
       }
       function stopScanCamera() {
         if (scanRafId !== null) {
@@ -4009,7 +4062,6 @@
                 scannerOpen = false;
                 els.scanOverlay.classList.add("hidden");
                 els.joinCodeInput.value = code;
-                closeJoinCode();
                 window.SFX.uiClick();
                 startGame(code, null);
                 return;
@@ -4273,6 +4325,7 @@
         setBusy(false);
         currentLobbyCode = code;
         currentLobbyServer = serverOrigin;
+        currentRoomFriendlyName = null;
         setInviteState(code, serverOrigin);
         updateShareInvite(code, serverOrigin);
         els.share.classList.remove("hidden");
@@ -4304,7 +4357,7 @@
         setStatus("Starting P2P host\u2026");
         setBusy(true);
         try {
-          await transport.startHost(name, code, selectedCosmetics);
+          await transport.startHost(name, code, selectedCosmetics, { bots: botsEnabled });
         } catch (e) {
           setStatus("Could not start P2P host: " + (e && e.message ? e.message : e));
           setBusy(false);
@@ -4317,6 +4370,7 @@
         setBusy(false);
         currentLobbyCode = code;
         currentLobbyServer = null;
+        currentRoomFriendlyName = null;
         const p2pUrl = buildP2PShareUrl(code);
         activeShareUrl = p2pUrl;
         els.shareLink.value = p2pUrl;
@@ -4373,7 +4427,7 @@
         setStatus("Starting local room\u2026");
         setBusy(true);
         try {
-          await transport.startHost(name, code, selectedCosmetics, { roomName, continuous: true });
+          await transport.startHost(name, code, selectedCosmetics, { roomName, continuous: true, bots: els.localBots.checked });
         } catch (e) {
           setStatus("Could not start local room: " + (e && e.message ? e.message : e));
           setBusy(false);
@@ -4386,6 +4440,7 @@
         setBusy(false);
         currentLobbyCode = code;
         currentLobbyServer = null;
+        currentRoomFriendlyName = roomName;
         const p2pUrl = buildP2PShareUrl(code);
         activeShareUrl = p2pUrl;
         els.shareLink.value = p2pUrl;
@@ -4524,6 +4579,7 @@
         setBusy(false);
         currentLobbyCode = code;
         currentLobbyServer = null;
+        currentRoomFriendlyName = friendlyName || null;
         const p2pUrl = buildP2PShareUrl(code);
         activeShareUrl = p2pUrl;
         els.shareLink.value = p2pUrl;
@@ -4925,6 +4981,8 @@
         window.Net.onStateChange = null;
         currentLobbyCode = null;
         currentLobbyServer = null;
+        currentRoomFriendlyName = null;
+        hideRoomChip();
         els.p2pMigratingOverlay.classList.add("hidden");
         try {
           window.Net.leave();
@@ -4972,7 +5030,6 @@
         els.lobbyMode.value = "ffa";
         els.hudTeamScore.classList.add("hidden");
         hideSettings();
-        closeJoinCode();
         navReset();
         closeScanner();
         stopLocalScanInterval();
@@ -5050,8 +5107,19 @@
         window.Net.onPickup = onPickup;
         window.Net.onDisconnect = onDisconnect;
         els.bots.checked = botsEnabled;
+        els.localBots.checked = botsEnabled;
         els.bots.addEventListener("change", () => {
           botsEnabled = els.bots.checked;
+          els.localBots.checked = botsEnabled;
+          try {
+            localStorage.setItem("smashcart.bots", botsEnabled ? "1" : "0");
+          } catch {
+          }
+          window.SFX.uiClick();
+        });
+        els.localBots.addEventListener("change", () => {
+          botsEnabled = els.localBots.checked;
+          els.bots.checked = botsEnabled;
           try {
             localStorage.setItem("smashcart.bots", botsEnabled ? "1" : "0");
           } catch {
@@ -5095,6 +5163,10 @@
           togglePause();
         });
         els.pauseInviteBtn.addEventListener("click", () => {
+          window.SFX.uiClick();
+          showShareQr();
+        });
+        els.hudRoomChip.addEventListener("click", () => {
           window.SFX.uiClick();
           showShareQr();
         });

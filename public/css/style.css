@@ -64,12 +64,6 @@ kbd {
   text-align: center;
 }
 
-#start-screen {
-  justify-content: flex-start;
-  overflow-y: auto;
-  padding: 24px;
-}
-
 .menu-shell {
   width: min(1180px, 96vw);
   margin: auto;
@@ -191,7 +185,6 @@ kbd {
   flex-direction: column;
 }
 
-.field-label,
 .picker-label {
   display: block;
   margin-bottom: 8px;
@@ -201,8 +194,6 @@ kbd {
   text-transform: uppercase;
 }
 
-#name-input,
-#lan-server-input,
 #share-link {
   width: 100%;
   padding: 12px 16px;
@@ -213,26 +204,9 @@ kbd {
   font-size: 16px;
 }
 
-#name-input,
-#lan-server-input {
-  margin-bottom: 14px;
-}
-
-#name-input:focus,
-#lan-server-input:focus,
 #share-link:focus { outline: none; border-color: var(--accent); }
 
 .btn-row { display: flex; justify-content: center; gap: 14px; flex-wrap: wrap; }
-.btn-row-tight { justify-content: flex-start; }
-
-.switch {
-  display: inline-flex;
-  gap: 8px;
-  align-items: center;
-  color: #d6dceb;
-  margin-bottom: 16px;
-}
-.switch input { width: 18px; height: 18px; accent-color: var(--accent); }
 
 /* #plane-picker / #plane-swatches / .plane-swatch removed — replaced by #hangar-overlay */
 
@@ -252,24 +226,7 @@ kbd {
   font-size: 13px;
 }
 
-.lan-panel {
-  grid-column: span 6;
-}
-
 /* P2P section inside LAN panel */
-.panel-divider {
-  border: none;
-  border-top: 1px solid rgba(255,255,255,0.1);
-  margin: 16px 0 12px;
-}
-.panel-subhead {
-  font-size: 13px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: rgba(255,255,255,0.55);
-  margin: 0 0 6px;
-}
 #host-left-overlay .fatal-card {
   text-align: center;
 }
@@ -285,49 +242,6 @@ kbd {
   border: 1px solid var(--rim);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
-}
-
-.local-create {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  flex-wrap: wrap;
-}
-.local-create input {
-  flex: 1;
-  min-width: 0;
-  padding: 11px 14px;
-  border-radius: 10px;
-  border: 1px solid rgba(255,255,255,0.2);
-  background: rgba(255,255,255,0.08);
-  color: #fff;
-  font-size: 15px;
-  font-family: inherit;
-  outline: none;
-  transition: border-color 0.15s;
-}
-.local-create input:focus {
-  border-color: var(--accent);
-}
-.local-create input::placeholder {
-  color: rgba(255,255,255,0.38);
-}
-.local-create button {
-  white-space: nowrap;
-  flex-shrink: 0;
-  padding: 11px 20px;
-  font-size: 14px;
-}
-
-.local-scan {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-.local-scan > button {
-  align-self: flex-start;
-  padding: 10px 20px;
-  font-size: 14px;
 }
 
 .local-room-list {
@@ -984,7 +898,6 @@ kbd {
 @media (max-width: 1080px) {
   .menu-hero { grid-template-columns: 1fr; }
   .play-panel { grid-column: span 6; }
-  .lan-panel { grid-column: 1 / -1; }
 }
 
 @media (max-width: 820px) {
@@ -996,14 +909,10 @@ kbd {
 }
 
 @media (max-width: 640px) {
-  #start-screen { padding: 14px; }
   .menu-shell { width: min(100vw - 12px, 1000px); padding: 18px 14px; }
   .menu-grid { grid-template-columns: 1fr; }
   .play-panel,
-  .lan-panel,
   .controls-panel { grid-column: auto; }
-  .btn-row-tight { flex-direction: column; align-items: stretch; }
-  .btn-row-tight button,
   .play-panel button { width: 100%; }
   .touch-only { display: block; }
   #share-bar { flex-wrap: wrap; max-width: 90vw; }
@@ -1101,11 +1010,6 @@ body.touch-device #share-bar {
   display: flex;
   flex-direction: column;
   gap: 8px;
-}
-#menu-leaderboard {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
 }
 
 /* ─── LOBBY SCREEN ──────────────────────────────────────────────────────────── */
@@ -1289,43 +1193,6 @@ body.touch-device #share-bar {
   height: 16px;
 }
 #settings-close-btn2 { align-self: center; }
-
-/* ─── JOIN-CODE MODAL ───────────────────────────────────────────────────────── */
-#join-code-modal {
-  z-index: 30;
-  background: radial-gradient(circle at center, rgba(14, 24, 40, 0.82), rgba(8, 12, 20, 0.96));
-}
-.join-code-card {
-  width: min(92vw, 400px);
-  padding: 28px 24px;
-  border-radius: 20px;
-  background: rgba(10, 17, 28, 0.92);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  box-shadow: var(--shadow);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 16px;
-  text-align: center;
-}
-#join-code-input {
-  width: 100%;
-  max-width: 260px;
-  padding: 14px 18px;
-  border-radius: 10px;
-  border: 2px solid rgba(255, 255, 255, 0.18);
-  background: rgba(0, 0, 0, 0.32);
-  color: #fff;
-  font-size: 28px;
-  font-weight: 900;
-  letter-spacing: 8px;
-  text-align: center;
-  text-transform: uppercase;
-}
-#join-code-input:focus {
-  outline: none;
-  border-color: var(--accent);
-}
 
 /* ─── RESPONSIVE ADDITIONS ──────────────────────────────────────────────────── */
 @media (max-width: 1080px) {
@@ -1896,13 +1763,6 @@ body.touch-device #share-bar {
   opacity: 0.85;
 }
 
-/* ─── JOIN-CODE INPUT: wider to accept pasted URLs ──────────────────────────── */
-#join-code-input {
-  max-width: 320px;
-  font-size: 20px;
-  letter-spacing: 4px;
-}
-
 /* ─── SCAN OVERLAY ───────────────────────────────────────────────────────────── */
 #scan-overlay {
   z-index: 40;
@@ -2014,283 +1874,6 @@ body.touch-device #share-bar {
   .scan-card { padding: 14px 16px; gap: 10px; }
 }
 
-/* ═══════════════════════════════════════════════════════════════════════════
-   MENU SCREEN ROUTER  (§F of the game-menu-screens design contract)
-   Targets: .menu-router, section.menu-screen, .screen-head, .screen-back,
-            .menu-nav-btn, .scan-cta, .hud-menu-btn, #pause-invite-btn
-   ═══════════════════════════════════════════════════════════════════════════ */
-
-/* ── Restyle #start-screen to be a plain full-cover anchor ─────────────── */
-/* The old rules added overflow-y:auto and flex centering; the router takes
-   over layout, so we reset to a plain positional container. */
-#start-screen {
-  justify-content: flex-start;
-  overflow: hidden;   /* router handles scroll internally */
-  padding: 0;
-  align-items: stretch;
-}
-
-/* ── Router shell: fills the safe-area of #start-screen ────────────────── */
-.menu-router {
-  position: relative;
-  width: 100%;
-  height: 100%;
-  /* safe-area padding so content isn't under notches/home-bar */
-  padding: max(16px, env(safe-area-inset-top))
-           max(16px, env(safe-area-inset-right))
-           max(16px, env(safe-area-inset-bottom))
-           max(16px, env(safe-area-inset-left));
-  overflow: hidden;
-}
-
-/* ── Individual screens: absolute fill, fade+slide transition ───────────── */
-.menu-screen {
-  position: absolute;
-  inset: 0;
-  /* inherit the router's safe-area padding */
-  padding: max(16px, env(safe-area-inset-top))
-           max(20px, env(safe-area-inset-right))
-           max(16px, env(safe-area-inset-bottom))
-           max(20px, env(safe-area-inset-left));
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  /* hidden by default */
-  opacity: 0;
-  transform: translateX(12px);
-  pointer-events: none;
-  transition: opacity .2s ease, transform .2s ease;
-  overflow: hidden; /* no page scroll; lists scroll internally */
-}
-
-.menu-screen.active {
-  opacity: 1;
-  transform: none;
-  pointer-events: auto;
-}
-
-/* ── #screen-home layout adjustments ───────────────────────────────────── */
-#screen-home {
-  /* give a bit more room at top for the brand block */
-  gap: 10px;
-}
-
-/* Brand heading inside home */
-#screen-home h1 {
-  font-size: clamp(36px, 9vw, 72px);
-  letter-spacing: 4px;
-  line-height: 0.94;
-}
-#screen-home h1 span { color: var(--accent); }
-
-/* Top-right quick-action row (settings + server badge) */
-.home-quick-row {
-  display: flex;
-  justify-content: flex-end;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 2px;
-}
-
-/* ── Screen header (non-home screens) ──────────────────────────────────── */
-.screen-head {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-shrink: 0;
-  padding-bottom: 8px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.screen-back {
-  /* ghost pill — no accent fill, just a rim */
-  background: rgba(255, 255, 255, 0.07);
-  color: #d6e4f5;
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  border-radius: 999px;
-  padding: 8px 16px;
-  font-size: 15px;
-  font-weight: 700;
-  letter-spacing: 0.5px;
-  box-shadow: none;
-  /* generous tap target */
-  min-height: 40px;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  flex-shrink: 0;
-}
-.screen-back:hover {
-  background: rgba(255, 255, 255, 0.13);
-  transform: none;
-  box-shadow: none;
-}
-.screen-back:active {
-  background: rgba(255, 255, 255, 0.06);
-  transform: none;
-  box-shadow: none;
-}
-
-.screen-title {
-  font-size: clamp(18px, 3.5vw, 26px);
-  font-weight: 900;
-  letter-spacing: 2px;
-  text-transform: uppercase;
-  color: #fff;
-}
-
-/* ── Navigation buttons ─────────────────────────────────────────────────── */
-.menu-nav-btn {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  min-height: 56px;
-  padding: 12px 20px;
-  border-radius: 14px;
-  /* glassy using existing tokens */
-  background: rgba(24, 37, 55, 0.52);   /* --glass approximate */
-  border: 1px solid rgba(255, 255, 255, 0.18); /* --rim approximate */
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.12), /* bevel highlight */
-    0 8px 20px rgba(0, 0, 0, 0.32);           /* shadow */
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
-  color: #dce8f8;
-  font-size: 16px;
-  font-weight: 700;
-  letter-spacing: 0.8px;
-  text-align: left;
-  width: 100%;
-  cursor: pointer;
-  transition:
-    background .12s ease,
-    border-color .12s ease,
-    transform .08s ease,
-    box-shadow .08s ease;
-}
-.menu-nav-btn:hover {
-  background: rgba(36, 54, 78, 0.72);
-  border-color: rgba(255, 255, 255, 0.28);
-  transform: translateY(-2px);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.18),
-    0 12px 28px rgba(0, 0, 0, 0.38);
-}
-.menu-nav-btn:active {
-  transform: translateY(2px);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.06),
-    0 2px 6px rgba(0, 0, 0, 0.4);
-  background: rgba(18, 28, 44, 0.72);
-}
-
-/* Emoji / icon span inside nav buttons */
-.menu-nav-btn .nav-icon {
-  font-size: 22px;
-  flex-shrink: 0;
-  line-height: 1;
-}
-
-/* Sub-label / description text inside nav buttons */
-.menu-nav-btn .nav-desc {
-  font-size: 12px;
-  font-weight: 400;
-  color: #8fa3be;
-  letter-spacing: 0;
-  margin-top: 2px;
-}
-
-/* Stack icon and description vertically within the button */
-.menu-nav-btn .nav-label-group {
-  display: flex;
-  flex-direction: column;
-}
-
-/* ── Scan CTA emphasis ──────────────────────────────────────────────────── */
-.scan-cta {
-  border-color: rgba(255, 203, 5, 0.45);
-  background: rgba(255, 203, 5, 0.10);
-  color: #ffe28b;
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.14),
-    0 0 16px rgba(255, 203, 5, 0.18),
-    0 8px 20px rgba(0, 0, 0, 0.32);
-}
-.scan-cta:hover {
-  background: rgba(255, 203, 5, 0.18);
-  border-color: rgba(255, 203, 5, 0.65);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.20),
-    0 0 28px rgba(255, 203, 5, 0.30),
-    0 12px 28px rgba(0, 0, 0, 0.38);
-  transform: translateY(-2px);
-}
-.scan-cta:active {
-  transform: translateY(2px);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 203, 5, 0.08),
-    0 0 8px rgba(255, 203, 5, 0.14),
-    0 2px 6px rgba(0, 0, 0, 0.4);
-}
-
-/* ── Nav button layout: stack on narrow, 2-col on wide landscape ────────── */
-.menu-nav-grid {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  flex: 1;
-  overflow: hidden;  /* no overflow in landscape */
-}
-
-/* On screens wide enough for two columns (landscape phone ~568px+) */
-@media (min-width: 568px) and (orientation: landscape) {
-  .menu-nav-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    align-content: start;
-    gap: 10px;
-  }
-  /* Full-width span for a single featured button (e.g. scan-cta alone) */
-  .menu-nav-grid .scan-cta:only-child,
-  .menu-nav-grid .nav-full {
-    grid-column: 1 / -1;
-  }
-}
-
-/* ── Leaderboard list scrolls internally ────────────────────────────────── */
-#menu-leaderboard {
-  flex: 1;
-  overflow-y: auto;
-  overflow-x: hidden;
-  max-height: calc(100vh - 160px); /* fallback for older browsers */
-  max-height: calc(100dvh - 160px);
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  /* subtle scrollbar */
-  scrollbar-width: thin;
-  scrollbar-color: rgba(255,255,255,0.15) transparent;
-}
-
-/* ── #join-code-input inside #screen-join ───────────────────────────────── */
-/* It's a text input (not a button) — re-apply field styles for this context */
-#screen-join #join-code-input {
-  max-width: 100%;
-  font-size: 20px;
-  letter-spacing: 4px;
-  border-radius: 10px;
-  border: 2px solid rgba(255, 255, 255, 0.18);
-  background: rgba(0, 0, 0, 0.32);
-  color: #fff;
-  padding: 14px 18px;
-  width: 100%;
-  text-transform: uppercase;
-}
-#screen-join #join-code-input:focus {
-  outline: none;
-  border-color: var(--accent);
-}
-
 /* ── In-game hamburger menu button ──────────────────────────────────────── */
 #ingame-menu-btn {
   position: absolute;
@@ -2360,106 +1943,6 @@ body.touch-device #share-bar {
   transform: scale(0.92);
 }
 
-/* ── Pause invite button ────────────────────────────────────────────────── */
-/* #pause-invite-btn already has class .secondary so it inherits that style.
-   No extra rules needed — it sits in .btn-row and matches peers. */
-
-/* ── Landscape phone primary case ──────────────────────────────────────── */
-/* On short landscape screens reduce vertical gaps so everything still fits */
-@media (max-height: 440px) {
-  .menu-screen {
-    gap: 8px;
-    padding-top: max(8px, env(safe-area-inset-top));
-    padding-bottom: max(8px, env(safe-area-inset-bottom));
-  }
-  .screen-head {
-    padding-bottom: 6px;
-  }
-  .menu-nav-btn {
-    min-height: 46px;
-    padding: 8px 16px;
-    font-size: 14px;
-  }
-  .menu-nav-btn .nav-icon {
-    font-size: 18px;
-  }
-  #screen-home h1 {
-    font-size: clamp(28px, 7vw, 52px);
-  }
-}
-
-/* ── Desktop / wide layout ──────────────────────────────────────────────── */
-@media (min-width: 900px) {
-  .menu-screen {
-    /* Centre a max-width column on large screens */
-    max-width: 680px;
-    margin-left: auto;
-    margin-right: auto;
-    left: 0;
-    right: 0;
-  }
-  /* home screen can be wider to show the brand block prominently */
-  #screen-home {
-    max-width: 820px;
-  }
-}
-
-/* ── Old menu layout classes — now safe to leave (no markup uses them)
-      but neutralised to avoid leaking if a stale element persists ────────── */
-/* .menu-shell, .menu-hero, .menu-grid are removed from the new markup.
-   We leave their rules in place (harmless + safe) but override start-screen
-   overflow which conflicted with the router. See the #start-screen reset above. */
-
-/* ═══════════════════════════════════════════════════════════════════════════
-   PREFLIGHT COMMAND SURFACE
-   ═══════════════════════════════════════════════════════════════════════════ */
-#start-screen {
-  background:
-    radial-gradient(circle at 18% 12%, rgba(255, 203, 5, 0.16), transparent 30%),
-    radial-gradient(circle at 84% 20%, rgba(73, 192, 255, 0.12), transparent 26%),
-    linear-gradient(145deg, rgba(5, 10, 18, 0.94), rgba(7, 14, 24, 0.86));
-}
-
-.menu-router::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background:
-    repeating-linear-gradient(90deg, rgba(125, 148, 173, 0.05) 0 1px, transparent 1px 72px),
-    repeating-linear-gradient(0deg, rgba(125, 148, 173, 0.04) 0 1px, transparent 1px 72px),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent 18%);
-  pointer-events: none;
-}
-
-.menu-router > .menu-screen,
-.menu-router > .menu-global-footer {
-  z-index: 1;
-}
-
-.menu-screen {
-  padding-bottom: calc(116px + env(safe-area-inset-bottom));
-  gap: 16px;
-}
-
-.menu-global-footer {
-  position: absolute;
-  left: max(20px, env(safe-area-inset-left));
-  right: max(20px, env(safe-area-inset-right));
-  bottom: max(16px, env(safe-area-inset-bottom));
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  pointer-events: none;
-  z-index: 2;
-}
-
-#orientation-note,
-#friends-note,
-#status {
-  max-width: 780px;
-  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.42);
-}
-
 .panel-surface {
   position: relative;
   border-radius: 22px;
@@ -2486,99 +1969,25 @@ body.touch-device #share-bar {
 
 .eyebrow,
 .deck-label,
-.screen-subtitle,
-.panel-subhead,
 .preset-label {
   font-family: "Bahnschrift SemiCondensed", "Arial Narrow", "Trebuchet MS", sans-serif;
 }
 
-.screen-home-brand h1,
-.screen-title,
-.deck-title,
 .preset-card h4,
 .panel-head h3 {
   font-family: "Bahnschrift Condensed", "Arial Narrow", "Trebuchet MS", sans-serif;
 }
 
-.screen-home-brand {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  max-width: 620px;
-}
-
-.preflight-shell,
-.preflight-deck,
-.screen-join-body,
-.launch-grid,
-.local-command-grid,
-.customize-layout {
-  width: 100%;
-}
-
-.preflight-shell {
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
-}
-
-.preflight-deck {
-  display: grid;
-  gap: 16px;
-}
-
-.screen-home-top {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 18px;
-}
-
-.screen-home-actions {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.preflight-brief,
-.preflight-launch,
-.join-input-card,
-.local-command-card,
-.lan-panel,
-.customize-summary-card,
-.customize-presets,
-.customize-group {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-
-.deck-title {
-  font-size: clamp(28px, 5vw, 42px);
-  letter-spacing: 1px;
-  line-height: 0.94;
-}
-
-.deck-summary,
-.screen-loadout-copy,
-.preset-copy,
-.customize-stage-copy {
+.preset-copy {
   color: #cad7e7;
   line-height: 1.55;
 }
 
-.chip-strip,
 .summary-grid,
 .preset-grid,
-.option-grid,
-.launch-grid,
-.local-command-grid {
+.option-grid {
   display: grid;
   gap: 12px;
-}
-
-.chip-strip {
-  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
 }
 
 .summary-chip {
@@ -2622,111 +2031,6 @@ body.touch-device #share-bar {
   color: rgba(202, 215, 231, 0.68);
 }
 
-.field-wrap {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.screen-home-inputs {
-  display: grid;
-  gap: 12px;
-  align-items: start;
-}
-
-.deck-switch {
-  margin-bottom: 0;
-}
-
-.screen-title-wrap {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 5px;
-}
-
-.screen-subtitle {
-  color: #aabdd3;
-  font-size: 13px;
-  letter-spacing: 0.05em;
-}
-
-.screen-loadout-strip {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 12px 14px;
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.menu-nav-btn {
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 14px;
-  min-height: 82px;
-}
-
-.menu-nav-btn .nav-label-group {
-  flex: 1;
-  min-width: 0;
-}
-
-.menu-nav-btn .nav-title {
-  display: block;
-  font-size: 17px;
-  font-weight: 800;
-  color: #fff;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-
-.menu-nav-btn .nav-desc {
-  display: block;
-  margin-top: 4px;
-  font-size: 12px;
-  color: #9fb2c9;
-  line-height: 1.45;
-}
-
-.nav-kicker {
-  align-self: center;
-  padding: 6px 10px;
-  border-radius: 999px;
-  background: rgba(255, 203, 5, 0.14);
-  border: 1px solid rgba(255, 203, 5, 0.32);
-  color: #ffe28b;
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-}
-
-.menu-nav-btn--feature {
-  border-color: rgba(255, 203, 5, 0.28);
-  background: linear-gradient(180deg, rgba(44, 54, 18, 0.26), rgba(24, 37, 55, 0.74));
-}
-
-.launch-grid {
-  grid-template-columns: 1fr;
-}
-
-.screen-join-body {
-  display: grid;
-  gap: 14px;
-}
-
-.join-input-card #join-code-input {
-  margin: 2px 0 0;
-  max-width: 100%;
-}
-
-.local-command-card .local-create,
-.local-command-card .local-scan {
-  gap: 12px;
-}
-
 .local-room-list {
   gap: 10px;
   max-height: 300px;
@@ -2754,72 +2058,6 @@ body.touch-device #share-bar {
   align-self: flex-start;
 }
 
-#screen-customize {
-  max-width: none;
-  margin: 0;
-  left: 0;
-  right: 0;
-}
-
-.customize-layout {
-  display: grid;
-  gap: 18px;
-  flex: 1;
-  min-height: 0;
-}
-
-.customize-sidebar {
-  display: grid;
-  gap: 14px;
-  min-height: 0;
-  overflow-y: auto;
-  padding-right: 4px;
-}
-
-.customize-stage {
-  position: relative;
-  min-height: 280px;
-  border-radius: 28px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background:
-    linear-gradient(180deg, rgba(9, 16, 26, 0.28), rgba(7, 11, 18, 0.5)),
-    radial-gradient(circle at center, rgba(255, 255, 255, 0.06), transparent 58%);
-  overflow: hidden;
-  pointer-events: none;
-}
-
-.customize-stage-radar {
-  position: absolute;
-  inset: 0;
-  background:
-    radial-gradient(circle at center, rgba(255, 203, 5, 0.08), transparent 44%),
-    repeating-radial-gradient(circle at center, rgba(125, 148, 173, 0.2) 0 1px, transparent 1px 72px),
-    linear-gradient(180deg, transparent 0 88%, rgba(255, 255, 255, 0.18) 88% 89%, transparent 89% 100%);
-  opacity: 0.56;
-}
-
-.customize-stage-label,
-.customize-stage-copy {
-  position: absolute;
-  left: 24px;
-  bottom: 20px;
-  max-width: 300px;
-}
-
-.customize-stage-label {
-  bottom: 72px;
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.72);
-}
-
-.customize-feedback {
-  min-height: 20px;
-}
-
-.customize-action-row,
 .preset-actions {
   display: flex;
   gap: 10px;
@@ -2945,34 +2183,6 @@ body.touch-device #share-bar {
 }
 
 @media (min-width: 900px) {
-  .menu-global-footer {
-    left: 50%;
-    right: auto;
-    width: min(860px, calc(100% - 40px));
-    transform: translateX(-50%);
-  }
-
-  #screen-home {
-    max-width: 860px;
-  }
-
-  .preflight-deck {
-    grid-template-columns: minmax(0, 1.12fr) minmax(320px, 0.88fr);
-  }
-
-  .launch-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-
-  .local-command-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .customize-layout {
-    grid-template-columns: minmax(360px, 460px) minmax(0, 1fr);
-    align-items: stretch;
-  }
-
   .option-grid--cards {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -2982,68 +2192,19 @@ body.touch-device #share-bar {
   }
 }
 
-@media (max-width: 899px) {
-  .screen-home-top,
-  .screen-home-actions {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-
-  .screen-home-actions {
-    width: 100%;
-    flex-direction: row;
-    justify-content: space-between;
-  }
-
-  .customize-stage {
-    min-height: 220px;
-  }
-}
-
 @media (max-width: 640px) {
-  .menu-screen {
-    padding-bottom: calc(132px + env(safe-area-inset-bottom));
-  }
-
   .panel-surface {
     padding: 15px;
     border-radius: 18px;
   }
 
-  .menu-nav-btn {
-    min-height: 72px;
-    padding: 12px 14px;
-  }
-
-  .menu-nav-btn .nav-title {
-    font-size: 15px;
-  }
-
-  .deck-title {
-    font-size: clamp(24px, 8vw, 34px);
-  }
-
-  .customize-action-row,
   .preset-actions {
     flex-direction: column;
   }
 
   .option-grid--cards,
-  .option-grid--swatches,
-  .chip-strip {
+  .option-grid--swatches {
     grid-template-columns: 1fr;
-  }
-}
-
-.screen-home-nav {
-  display: grid;
-  gap: 12px;
-}
-
-@media (min-width: 900px) {
-  .screen-home-inputs {
-    grid-template-columns: minmax(0, 1fr) auto;
-    align-items: end;
   }
 }
 
@@ -3098,37 +2259,6 @@ select {
   color: #fff;
 }
 
-.menu-router::after {
-  content: "";
-  position: absolute;
-  right: 4%;
-  bottom: 10%;
-  width: min(440px, 48vw);
-  height: 160px;
-  border-top: 1px solid rgba(255, 193, 61, 0.18);
-  border-bottom: 1px solid rgba(255, 193, 61, 0.18);
-  background:
-    repeating-linear-gradient(90deg, rgba(255, 193, 61, 0.16) 0 18px, transparent 18px 36px),
-    linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.08), transparent);
-  opacity: 0.42;
-  pointer-events: none;
-  filter: blur(0.2px);
-}
-
-.menu-screen {
-  overflow-y: auto;
-  overflow-x: hidden;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(255,255,255,0.14) transparent;
-}
-
-.screen-home-actions {
-  flex-wrap: wrap;
-  justify-content: flex-end;
-}
-
-.panel-head--split,
-.preflight-brief-actions,
 .lobby-meta-strip,
 .pause-hints {
   display: flex;
@@ -3137,8 +2267,7 @@ select {
   align-items: center;
 }
 
-.signal-chip,
-#room-code-chip {
+.signal-chip {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -3152,8 +2281,7 @@ select {
   font-size: 12px;
   letter-spacing: 0.04em;
 }
-.signal-chip--ready,
-#room-code-chip {
+.signal-chip--ready {
   border-color: rgba(255, 193, 61, 0.32);
   background: rgba(255, 193, 61, 0.12);
   color: #ffe7a6;
@@ -3179,8 +2307,7 @@ select {
     0 24px 50px rgba(0, 0, 0, 0.42);
 }
 
-.panel-head,
-.screen-head {
+.panel-head {
   margin-bottom: 0;
 }
 .panel-head h3,
@@ -3192,40 +2319,8 @@ select {
   text-transform: uppercase;
 }
 
-.route-brief-card,
-.join-guide-card,
-.leaderboard-surface,
 .lobby-roster-panel {
   gap: 12px;
-}
-.route-brief-copy,
-.join-guide-card .muted {
-  line-height: 1.6;
-}
-
-#menu-leaderboard {
-  display: grid;
-  gap: 10px;
-}
-#menu-leaderboard .lb-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 12px;
-  padding: 14px 16px;
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  font-size: 14px;
-}
-#menu-leaderboard .lb-row:nth-child(-n+3) {
-  border-color: rgba(255, 193, 61, 0.24);
-  background: linear-gradient(180deg, rgba(255, 193, 61, 0.12), rgba(255,255,255,0.04));
-}
-#menu-leaderboard .lb-row span:last-child {
-  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
-  color: #fff;
-  font-weight: 800;
 }
 
 .local-state-card {
@@ -3260,35 +2355,6 @@ select {
   text-transform: uppercase;
 }
 
-#screen-customize {
-  overflow-y: auto;
-}
-.customize-stage {
-  min-height: 360px;
-  background:
-    radial-gradient(circle at 50% 38%, rgba(255,255,255,0.08), transparent 36%),
-    linear-gradient(180deg, rgba(8, 17, 27, 0.42), rgba(3, 7, 12, 0.7));
-}
-.customize-stage::after {
-  content: "";
-  position: absolute;
-  inset: auto 12% 18% 12%;
-  height: 54px;
-  border-top: 1px solid rgba(255,255,255,0.2);
-  border-bottom: 1px solid rgba(255,255,255,0.12);
-  background: repeating-linear-gradient(90deg, rgba(255,255,255,0.16) 0 18px, transparent 18px 42px);
-  opacity: 0.42;
-}
-.customize-stage-copy,
-.customize-stage-label {
-  z-index: 1;
-}
-
-.menu-global-footer {
-  padding: 10px 14px;
-  border-radius: 18px;
-  background: linear-gradient(180deg, rgba(6, 12, 21, 0), rgba(6, 12, 21, 0.74));
-}
 #hud {
   top: 0;
   left: 0;
@@ -3316,6 +2382,29 @@ body.touch-device .hud-item--secondary { display: none; }
   align-items: center;
   gap: 10px;
 }
+#hud-room-chip {
+  pointer-events: auto;
+  display: inline-flex;
+  align-items: center;
+  max-width: 160px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgba(11, 19, 30, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  color: #dce8f8;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  box-shadow: none;
+  cursor: pointer;
+}
+#hud-room-chip:hover { transform: none; box-shadow: none; background: rgba(24, 37, 55, 0.80); }
+#hud-room-chip:active { transform: scale(0.96); box-shadow: none; }
 .hud-context {
   color: rgba(228, 240, 252, 0.72);
   font-family: "Bahnschrift SemiCondensed", "Arial Narrow", "Trebuchet MS", sans-serif;
@@ -3626,7 +2715,6 @@ body.touch-device .hud-item--secondary { display: none; }
   align-items: center;
   text-align: center;
 }
-#screen-home .icon-btn,
 #hud .icon-btn,
 .hud-menu-btn {
   border-radius: 14px;
@@ -3674,23 +2762,6 @@ body.touch-device .hud-item--secondary { display: none; }
   #healthbar {
     width: min(280px, 72vw);
   }
-  #screen-customize {
-    overflow-y: auto;
-  }
-  .customize-layout {
-    display: flex;
-    flex-direction: column;
-    flex: none;
-    min-height: auto;
-  }
-  .customize-sidebar {
-    min-height: auto;
-    overflow: visible;
-    padding-right: 0;
-  }
-  .customize-stage {
-    min-height: 260px;
-  }
 }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
@@ -3698,14 +2769,6 @@ body.touch-device .hud-item--secondary { display: none; }
     transition: none !important;
     scroll-behavior: auto !important;
   }
-}
-#room-code-chip[data-state="invite"] {
-  background: rgba(110, 214, 255, 0.14);
-  border-color: rgba(110, 214, 255, 0.34);
-  color: #caf4ff;
-}
-#room-code-chip[data-state="lan"] {
-  background: rgba(255, 193, 61, 0.14);
 }
 body.touch-device #share-bar {
   left: 50%;
@@ -3731,56 +2794,10 @@ body.touch-device #share-bar {
   text-align: left;
 }
 .migrating-card { text-align: center; }
-@media (max-width: 640px) {
-  .screen-home-actions {
-    justify-content: flex-start;
-    align-items: flex-start;
-    width: 100%;
-    gap: 8px;
-  }
-  #room-code-chip,
-  #menu-server-badge {
-    max-width: 100%;
-    white-space: normal;
-  }
-  .menu-screen {
-    padding-bottom: calc(200px + env(safe-area-inset-bottom));
-  }
-  .preflight-shell {
-    padding-bottom: 18px;
-  }
-}
 @media (max-width: 520px) {
-  .screen-home-actions {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto auto;
-    width: 100%;
-    align-items: center;
-  }
-  #room-code-chip {
-    grid-column: 1 / 2;
-    width: max-content;
-  }
-  #menu-server-badge {
-    grid-column: 1 / 2;
-    max-width: 100%;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-  .screen-home-actions .icon-btn:last-child {
-    grid-column: 3 / 4;
-  }
-  .screen-home-actions .icon-btn:first-of-type {
-    grid-column: 2 / 3;
-  }
-  .server-badge,
-  #room-code-chip {
+  .server-badge {
     font-size: 11px;
     padding: 6px 10px;
-  }
-  .menu-global-footer {
-    display: none;
   }
 }
 

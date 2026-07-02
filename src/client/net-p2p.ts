@@ -98,6 +98,10 @@ class GuestTransportState implements TransportState {
   teamScore0  = 0;
   teamScore1  = 0;
   botDifficulty = "medium";
+  // Carried from the host's snapshot so a migration-elected new host can
+  // reconstruct its GameSim with the same botsEnabled/isPublic semantics.
+  botsEnabled = false;
+  isPublic    = false;
 }
 
 // ---------------------------------------------------------------------------
@@ -141,6 +145,7 @@ type SignalMsg =
 class SignalSocket {
   private ws: WebSocket | null = null;
   private queue: SignalMsg[] = [];
+  private keepaliveTimer: ReturnType<typeof setInterval> | null = null;
   onMessage: ((msg: SignalMsg) => void) | null = null;
   onClose: (() => void) | null = null;
 
@@ -150,6 +155,7 @@ class SignalSocket {
 
   open(room: string, role: "host" | "join", peerId?: string): Promise<void> {
     // Close any existing socket before re-opening (migration re-connect path)
+    this._stopKeepalive();
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       try { this.ws.close(); } catch {}
     }
@@ -165,6 +171,11 @@ class SignalSocket {
           if (this.hostRoomName !== undefined) (hostMsg as any).name = this.hostRoomName;
           if (this.hostCallSign !== undefined) (hostMsg as any).hostName = this.hostCallSign;
           this.send(hostMsg);
+          // Keepalive: the broker prunes rooms idle > 30s (ROOM_TTL_MS) and a
+          // continuous host otherwise sends nothing after registering, which
+          // made rooms vanish from the directory (and blocked late joins).
+          // Any message with a valid room code touches the room's TTL.
+          this._startKeepalive(room);
         } else {
           this.send({ type: "join", room, peerId: peerId! });
         }
@@ -182,7 +193,7 @@ class SignalSocket {
       };
 
       ws.onerror   = () => reject(new Error("Signal WS error"));
-      ws.onclose   = () => { if (this.onClose) this.onClose(); };
+      ws.onclose   = () => { this._stopKeepalive(); if (this.onClose) this.onClose(); };
     });
   }
 
@@ -201,7 +212,19 @@ class SignalSocket {
   }
 
   close(): void {
+    this._stopKeepalive();
     if (this.ws) { try { this.ws.close(); } catch {} this.ws = null; }
+  }
+
+  private _startKeepalive(room: string): void {
+    this._stopKeepalive();
+    this.keepaliveTimer = setInterval(() => {
+      this._rawSend({ type: "ping", room } as unknown as SignalMsg);
+    }, 12_000);
+  }
+
+  private _stopKeepalive(): void {
+    if (this.keepaliveTimer !== null) { clearInterval(this.keepaliveTimer); this.keepaliveTimer = null; }
   }
 }
 
@@ -357,6 +380,10 @@ export class WebRtcTransport implements ITransport {
   // HOST-only
   private _sim:         GameSim | null       = null;
   private _hostState:   HostTransportState | null = null;
+  // Room settings this peer started as host with — carried across host migration
+  // so a re-elected host preserves the original bots/continuous semantics.
+  private _botsEnabled: boolean = false;
+  private _continuous:  boolean = false;
   private _peers        = new Map<string, PeerChannels>();
   private _rafId:       number | null = null;
   private _lastTick     = 0;
@@ -441,7 +468,7 @@ export class WebRtcTransport implements ITransport {
     name: string,
     code: string,
     cosmetics: { color: number; bodyShape: number; accent: number; trail: number; livery: number },
-    opts?: { roomName?: string; continuous?: boolean },
+    opts?: { roomName?: string; continuous?: boolean; bots?: boolean },
   ): Promise<void> {
     this._isHost  = true;
     this._room    = code;
@@ -449,9 +476,14 @@ export class WebRtcTransport implements ITransport {
 
     const continuous = opts?.continuous ?? false;
     const roomName   = opts?.roomName   ?? code;
+    const botsEnabled = !!opts?.bots;
+
+    // Remember for host-migration (this peer may later re-host after election).
+    this._botsEnabled = botsEnabled;
+    this._continuous  = continuous;
 
     const sim = new GameSim({
-      botsEnabled: false,
+      botsEnabled,
       // Continuous local rooms start in playing/ffa state immediately (same as isPublic).
       isPublic: continuous,
       onEvent: (e) => this._onSimEvent(e),
@@ -938,6 +970,8 @@ export class WebRtcTransport implements ITransport {
       teamScore0:  gs.teamScore0,
       teamScore1:  gs.teamScore1,
       botDifficulty: gs.botDifficulty,
+      botsEnabled: gs.botsEnabled,
+      isPublic:    gs.isPublic,
     };
   }
 
@@ -966,6 +1000,11 @@ export class WebRtcTransport implements ITransport {
     const sig = this._signal ?? new SignalSocket();
     this._signal = sig;
 
+    // Explicitly carry room name/call sign into the re-registration instead of
+    // relying on the broker's keep-if-absent fallback.
+    if (snap.roomName) sig.hostRoomName = snap.roomName;
+    if (this._savedName) sig.hostCallSign = this._savedName;
+
     // Re-open signaling as host (handles already-open socket by closing+re-opening)
     sig.open(room, "host").then(() => {
       // Wait for 'hosted' reply which now carries a peers list
@@ -992,10 +1031,11 @@ export class WebRtcTransport implements ITransport {
     snap: import("../sim/types").SimStateSnapshot,
     peerId: string,
   ): void {
-    // Create new sim seeded from the migrated snapshot
+    // Create new sim seeded from the migrated snapshot — preserve the
+    // original room's bots/continuous semantics instead of hardcoding them off.
     const sim = new GameSim({
-      botsEnabled: false,
-      isPublic: false,
+      botsEnabled: snap.botsEnabled ?? false,
+      isPublic: snap.isPublic ?? false,
       onEvent: (e) => this._onSimEvent(e),
       initialState: snap,
     });
@@ -1144,6 +1184,8 @@ export class WebRtcTransport implements ITransport {
       gs.botDifficulty = snap.botDifficulty ?? "medium";
       gs.teamScore0  = snap.teamScore0  ?? 0;
       gs.teamScore1  = snap.teamScore1  ?? 0;
+      gs.botsEnabled = snap.botsEnabled ?? false;
+      gs.isPublic    = snap.isPublic    ?? false;
       gs.players.mergeFrom(snap.players as Array<[string, any]>);
       gs.bullets.mergeFrom(snap.bullets as Array<[string, any]>);
       gs.pickups.mergeFrom(snap.pickups as Array<[string, any]>);

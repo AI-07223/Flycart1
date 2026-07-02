@@ -244,6 +244,10 @@ function getArcadeMenuMarkup(): string {
                 <input id="arcade-local-room-name" class="arcade-input" maxlength="20" placeholder="Room name" aria-label="Room name" />
                 <button type="button" id="arcade-local-create-btn" class="arcade-panel-action">Create Room</button>
               </div>
+              <label class="arcade-switch" for="arcade-local-bots-check">
+                <input type="checkbox" id="arcade-local-bots-check" checked />
+                <span>Fill with bots</span>
+              </label>
             </section>
 
             <section class="arcade-panel arcade-local-panel">

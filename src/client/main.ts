@@ -25,7 +25,7 @@ import {
 } from "../shared/loadout";
 
 const dollar = (id: string) => document.getElementById(id)!;
-const menuRoot = mountArcadeMenu() || dollar("start-screen");
+const menuRoot = mountArcadeMenu()!;
 const useArcadeMenu = menuRoot.id === ARCADE_MENU_HOST_ID;
 const menuDollar = (...ids: string[]) => {
   for (const id of ids) {
@@ -111,6 +111,7 @@ const els = {
   connRetry: dollar("conn-retry") as HTMLButtonElement,
   connMenu: dollar("conn-menu") as HTMLButtonElement,
   bots: menuDollar("arcade-bots-check", "bots-check") as HTMLInputElement,
+  localBots: menuDollar("arcade-local-bots-check", "arcade-local-bots-check") as HTMLInputElement,
   countdown: dollar("countdown"),
   interLeave: dollar("intermission-leave") as HTMLButtonElement,
   p2pOfflineBtn: menuDollar("arcade-p2p-offline-btn", "p2p-offline-btn") as HTMLButtonElement,
@@ -173,6 +174,7 @@ const els = {
   customizeDone: menuDollar("arcade-customize-done", "customize-done") as HTMLButtonElement,
   ingameMenuBtn: dollar("ingame-menu-btn") as HTMLButtonElement,
   pauseInviteBtn: dollar("pause-invite-btn") as HTMLButtonElement,
+  hudRoomChip: dollar("hud-room-chip") as HTMLButtonElement,
   localRoomName: menuDollar("arcade-local-room-name", "local-room-name") as HTMLInputElement,
   localCreateBtn: menuDollar("arcade-local-create-btn", "local-create-btn") as HTMLButtonElement,
   localScanBtn: menuDollar("arcade-local-scan-btn", "local-scan-btn") as HTMLButtonElement,
@@ -187,7 +189,6 @@ type SceneMode = "preflight" | "customize" | "lobby" | "results" | "playing" | "
 let mode: "menu" | "lobby" | "playing" | "paused" | "lost" | "error" = "menu";
 let sceneMode: SceneMode = "preflight";
 let settingsOpen = false;
-let joinCodeOpen = false;
 let last = 0;
 let prevPhase = "playing";
 let prevHp = G.MAX_HP;
@@ -219,6 +220,7 @@ let boostLevel: number = 0;
 let countdownActive = false;
 let currentLobbyCode: string | null = null;
 let currentLobbyServer: string | null = null;
+let currentRoomFriendlyName: string | null = null;
 let _settingsDebounce: ReturnType<typeof setTimeout> | null = null;
 let _colyseusNet: any = null;
 let _isP2PSession = false;
@@ -493,6 +495,17 @@ function clearShareInvite(): void {
 function showShareQr(): void {
   if (!activeShareUrl || els.qrBtn.disabled) return;
   els.shareQrOverlay.classList.remove("hidden");
+}
+
+function hideRoomChip(): void {
+  els.hudRoomChip.classList.add("hidden");
+  els.hudRoomChip.textContent = "";
+}
+
+function updateRoomChip(): void {
+  if (!_isP2PSession || !currentLobbyCode) { hideRoomChip(); return; }
+  els.hudRoomChip.textContent = "📶 " + (currentRoomFriendlyName || currentLobbyCode);
+  els.hudRoomChip.classList.remove("hidden");
 }
 
 function updateLobbyMeta(): void {
@@ -777,6 +790,8 @@ function applyMode(nextMode: typeof mode): void {
   els.p2pMigratingOverlay.classList.add("hidden");
   if (mode !== "lobby") els.share.classList.add("hidden");
   if (!isMenu) stopLocalScanInterval();
+  if (mode === "playing") updateRoomChip();
+  else if (isMenu) hideRoomChip();
   syncSceneMode(window.Net?.state);
 }
 
@@ -842,18 +857,6 @@ function showSettings(): void {
 function hideSettings(): void {
   settingsOpen = false;
   els.settingsScreen.classList.add("hidden");
-}
-
-// ─── JOIN-BY-CODE MODAL (now a screen, not a modal — these become no-ops) ────
-function openJoinCode(): void {
-  // #join-code-modal removed; join is now #screen-join inside the nav router.
-  // Kept to avoid breaking any remaining call sites; navGo("join") is the new entry point.
-  joinCodeOpen = false;
-}
-
-function closeJoinCode(): void {
-  // No-op: modal no longer exists. navBack() handles back-navigation from the join screen.
-  joinCodeOpen = false;
 }
 
 // ─── CAMERA QR SCANNER ────────────────────────────────────────────────────────
@@ -929,7 +932,6 @@ function openScanner(): void {
             els.scanOverlay.classList.add("hidden");
             // Route through the existing join path: set input value and call startGame
             els.joinCodeInput.value = code;
-            closeJoinCode();
             window.SFX.uiClick();
             startGame(code, null);
             return;
@@ -1240,6 +1242,7 @@ async function joinLobby(code: string, serverOrigin: string | null = null): Prom
 
   currentLobbyCode = code;
   currentLobbyServer = serverOrigin;
+  currentRoomFriendlyName = null;
 
   // Show the invite share bar so the host can share the link immediately
   setInviteState(code, serverOrigin);
@@ -1295,7 +1298,7 @@ async function startP2PHost(): Promise<void> {
   setBusy(true);
 
   try {
-    await (transport as any).startHost(name, code, selectedCosmetics);
+    await (transport as any).startHost(name, code, selectedCosmetics, { bots: botsEnabled });
   } catch (e: any) {
     setStatus("Could not start P2P host: " + (e && e.message ? e.message : e));
     setBusy(false);
@@ -1311,6 +1314,7 @@ async function startP2PHost(): Promise<void> {
 
   currentLobbyCode   = code;
   currentLobbyServer = null;
+  currentRoomFriendlyName = null;
 
   // Show share overlay with P2P join URL (?p2p=P-XXXXXX)
   const p2pUrl = buildP2PShareUrl(code);
@@ -1386,7 +1390,7 @@ async function startLocalRoom(): Promise<void> {
   setBusy(true);
 
   try {
-    await (transport as any).startHost(name, code, selectedCosmetics, { roomName, continuous: true });
+    await (transport as any).startHost(name, code, selectedCosmetics, { roomName, continuous: true, bots: els.localBots.checked });
   } catch (e: any) {
     setStatus("Could not start local room: " + (e && e.message ? e.message : e));
     setBusy(false);
@@ -1401,6 +1405,7 @@ async function startLocalRoom(): Promise<void> {
 
   currentLobbyCode   = code;
   currentLobbyServer = null;
+  currentRoomFriendlyName = roomName;
 
   // Show share bar with P2P join URL
   const p2pUrl = buildP2PShareUrl(code);
@@ -1558,6 +1563,7 @@ async function joinP2PAsGuest(code: string, friendlyName?: string): Promise<void
 
   currentLobbyCode   = code;
   currentLobbyServer = null;
+  currentRoomFriendlyName = friendlyName || null;
 
   // Share bar shows the invite URL (guest can also share it)
   const p2pUrl = buildP2PShareUrl(code);
@@ -2043,6 +2049,8 @@ function resetToMenu(): void {
   window.Net.onStateChange = null;
   currentLobbyCode = null;
   currentLobbyServer = null;
+  currentRoomFriendlyName = null;
+  hideRoomChip();
   // Hide migration overlay if visible (covers the "main menu" path from host-left overlay)
   els.p2pMigratingOverlay.classList.add("hidden");
   try { window.Net.leave(); } catch {}
@@ -2093,7 +2101,6 @@ function resetToMenu(): void {
   els.lobbyMode.value = "ffa";
   els.hudTeamScore.classList.add("hidden");
   hideSettings();
-  closeJoinCode();
   navReset();
   closeScanner();
   stopLocalScanInterval();
@@ -2176,8 +2183,16 @@ function init(): void {
   window.Net.onDisconnect = onDisconnect;
 
   els.bots.checked = botsEnabled;
+  els.localBots.checked = botsEnabled;
   els.bots.addEventListener("change", () => {
     botsEnabled = els.bots.checked;
+    els.localBots.checked = botsEnabled;
+    try { localStorage.setItem("smashcart.bots", botsEnabled ? "1" : "0"); } catch {}
+    window.SFX.uiClick();
+  });
+  els.localBots.addEventListener("change", () => {
+    botsEnabled = els.localBots.checked;
+    els.bots.checked = botsEnabled;
     try { localStorage.setItem("smashcart.bots", botsEnabled ? "1" : "0"); } catch {}
     window.SFX.uiClick();
   });
@@ -2231,6 +2246,12 @@ function init(): void {
 
   // ─── PAUSE INVITE BUTTON (§E) ─────────────────────────────────────────────
   els.pauseInviteBtn.addEventListener("click", () => {
+    window.SFX.uiClick();
+    showShareQr();
+  });
+
+  // ─── IN-GAME ROOM CHIP (P2P/local room name, tap to show invite) ──────────
+  els.hudRoomChip.addEventListener("click", () => {
     window.SFX.uiClick();
     showShareQr();
   });

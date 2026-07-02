@@ -31,7 +31,7 @@ interface TiltState {
   permissionGranted: boolean;
 }
 
-type ControlScheme = "dpad" | "joystick" | "tilt";
+// ControlScheme is declared globally in globals.d.ts.
 
 const Input = {
   turn: 0,
