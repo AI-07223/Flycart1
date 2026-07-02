@@ -22,6 +22,10 @@ const POWERUPS: Record<string, PowerupMeta> = {
   afterburner: { label: "Afterburner", color: 0xff8c42, icon: "🚀" },
   repair:      { label: "Repair",      color: 0xff6b6b, icon: "❤️" },
   homing:      { label: "Homing",      color: 0xc07bff, icon: "🎯" },
+  mine:        { label: "Air Mines",   color: 0x3a4a5a, icon: "💣" },
+  star:        { label: "Star",        color: 0xffd700, icon: "⭐" },
+  emp:         { label: "EMP Burst",   color: 0x66e0ff, icon: "🌀" },
+  freeze:      { label: "Freeze Ray",  color: 0x9fdcff, icon: "❄️" },
 };
 
 (window as any).GAME = {

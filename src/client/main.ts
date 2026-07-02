@@ -190,6 +190,8 @@ let last = 0;
 let prevPhase = "playing";
 let prevHp = G.MAX_HP;
 let lastFireSnd = 0;
+let wasEmpd = false;
+let wasFrozen = false;
 
 // ── Smash-tracking state (replaces old streak/lastKill) ──────────────────
 const smashTrack = new Map<string, { streak: number; last: number; rapid: number }>();
@@ -609,6 +611,8 @@ function enterPlayingFromLobby(): void {
   prevHp = G.MAX_HP;
   wasAlive = true;
   deathTime = -1;
+  wasEmpd = false;
+  wasFrozen = false;
   applyMode("playing");
   els.respawn.classList.add("hidden");
   els.inter.classList.add("hidden");
@@ -1181,6 +1185,8 @@ async function startGame(code: string, serverOrigin: string | null = null): Prom
   prevHp = G.MAX_HP;
   wasAlive = true;
   deathTime = -1;
+  wasEmpd = false;
+  wasFrozen = false;
   applyMode("playing");
   els.respawn.classList.add("hidden");
   els.inter.classList.add("hidden");
@@ -1740,6 +1746,19 @@ function updateHud(state: any, myId: string): void {
     } else {
       els.powerChip.classList.add("hidden");
     }
+
+    // EMP / Freeze local status callouts — rising-edge only (fire once when the
+    // affliction starts, not every frame while it's active).
+    const empLeft = (me as any).empLeft || 0;
+    const frozenLeft = (me as any).frozenLeft || 0;
+    if (empLeft > 0 && !wasEmpd) {
+      showCallout("🌀 EMP'D — guns offline");
+    }
+    wasEmpd = empLeft > 0;
+    if (frozenLeft > 0 && !wasFrozen) {
+      showCallout("❄️ FROZEN");
+    }
+    wasFrozen = frozenLeft > 0;
   }
 
   const isTdm = (state.mode === "tdm");
@@ -1957,7 +1976,23 @@ function onKill(msg: any): void {
 }
 
 function onPickup(msg: any): void {
-  if (!window.Net || msg.by !== window.Net.sessionId) return;
+  if (!window.Net) return;
+  const isSelf = msg.by === window.Net.sessionId;
+
+  // Star is a rare, game-changing pickup — announce it to everyone (SmashKarts-style),
+  // not just the player who grabbed it. Both transports (Colyseus room broadcast and
+  // the P2P _broadcastEvent path) fan the "pickup" event out to all clients, so a
+  // single event-driven toast here covers both netcode paths uniformly.
+  if (msg.type === "star") {
+    if (isSelf) {
+      pushToast("YOU HAVE THE STAR!", "multi");
+    } else {
+      const name = window.Net.state?.players?.get(msg.by)?.name;
+      pushToast(`${name || "Someone"} grabbed the STAR!`, "multi");
+    }
+  }
+
+  if (!isSelf) return;
   window.SFX.pickup();
   const info = G.POWERUPS[msg.type];
   showCallout((info ? `${info.icon} ${info.label}` : "POWERUP") + "!");

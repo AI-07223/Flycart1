@@ -9,7 +9,7 @@
   };
 
   // src/shared/constants.ts
-  var TICK_RATE, TICK_MS, CRUISE_SPEED, BOOST_SPEED, ACCEL, TURN_RATE, PITCH_RATE, PITCH_MAX, PLANE_RADIUS, MAX_HP, BULLET_SPEED, BULLET_DAMAGE, BULLET_LIFE, BULLET_RADIUS, FIRE_COOLDOWN, RESPAWN_DELAY, BULLET_HIT_RADIUS, AIM_ASSIST_CONE, AIM_ASSIST_RANGE, AIM_ASSIST_TURN, ROUND_SECONDS, ROUND_INTERMISSION, MIN_PLAYERS, MAP_HALF, MAP_EDGE_SOFT, GROUND_Y, MIN_ALT, SPAWN_ALT, MAX_ALT, PICKUP_ALT_MIN, PICKUP_ALT_MAX, PICKUP_FIELD_RADIUS, SPAWN_REROLL, BOT_NAMES, COLOR_COUNT, ACCENT_COUNT, TRAIL_COUNT, LIVERY_COUNT, SKIN_COUNT, DEFAULT_BOT_DIFFICULTY, BOT_DIFFICULTY, PICKUP_MAX, PICKUP_INTERVAL, PICKUP_RADIUS, POWERUP_DURATION, SHIELD_CHARGES, RAPID_FACTOR, SPREAD_ANGLE, AFTERBURNER_FACTOR, HOMING_TURN, POWERUP_TYPES, POWERUP_WEIGHTS, SPAWN_INVULN, LOBBY_READY_TIMEOUT, TEAM_COUNT, LANDMARKS;
+  var TICK_RATE, TICK_MS, CRUISE_SPEED, BOOST_SPEED, ACCEL, TURN_RATE, PITCH_RATE, PITCH_MAX, PLANE_RADIUS, MAX_HP, BULLET_SPEED, BULLET_DAMAGE, BULLET_LIFE, BULLET_RADIUS, FIRE_COOLDOWN, RESPAWN_DELAY, BULLET_HIT_RADIUS, AIM_ASSIST_CONE, AIM_ASSIST_RANGE, AIM_ASSIST_TURN, ROUND_SECONDS, ROUND_INTERMISSION, MIN_PLAYERS, MAP_HALF, MAP_EDGE_SOFT, GROUND_Y, MIN_ALT, SPAWN_ALT, MAX_ALT, PICKUP_ALT_MIN, PICKUP_ALT_MAX, PICKUP_FIELD_RADIUS, SPAWN_REROLL, BOT_NAMES, COLOR_COUNT, ACCENT_COUNT, TRAIL_COUNT, LIVERY_COUNT, SKIN_COUNT, DEFAULT_BOT_DIFFICULTY, BOT_DIFFICULTY, PICKUP_MAX, PICKUP_INTERVAL, PICKUP_RADIUS, POWERUP_DURATION, SHIELD_CHARGES, RAPID_FACTOR, SPREAD_ANGLE, AFTERBURNER_FACTOR, HOMING_TURN, POWERUP_TYPES, POWERUP_WEIGHTS, MINE_TRIGGER_RADIUS, MINE_BLAST_RADIUS, MINE_DAMAGE, MINE_LIFE, MINE_MAX_PER_OWNER, MINE_DROP_COOLDOWN, MINE_ARM_DELAY, STAR_DURATION, STAR_RAM_RADIUS_FACTOR, EMP_RADIUS, EMP_DURATION, FREEZE_DURATION, SPAWN_INVULN, LOBBY_READY_TIMEOUT, TEAM_COUNT, LANDMARKS;
   var init_constants = __esm({
     "src/shared/constants.ts"() {
       "use strict";
@@ -78,15 +78,31 @@
       SPREAD_ANGLE = 0.12;
       AFTERBURNER_FACTOR = 1.22;
       HOMING_TURN = 1.45;
-      POWERUP_TYPES = ["spread", "rapid", "shield", "afterburner", "repair", "homing"];
+      POWERUP_TYPES = ["spread", "rapid", "shield", "afterburner", "repair", "homing", "mine", "star", "emp", "freeze"];
       POWERUP_WEIGHTS = {
         spread: 1,
         rapid: 1,
         shield: 1,
         afterburner: 1,
         repair: 0.7,
-        homing: 0.55
+        homing: 0.55,
+        mine: 0.9,
+        star: 0.4,
+        emp: 0.7,
+        freeze: 0.8
       };
+      MINE_TRIGGER_RADIUS = 55;
+      MINE_BLAST_RADIUS = 90;
+      MINE_DAMAGE = 50;
+      MINE_LIFE = 20;
+      MINE_MAX_PER_OWNER = 3;
+      MINE_DROP_COOLDOWN = 0.8;
+      MINE_ARM_DELAY = 1.5;
+      STAR_DURATION = 5;
+      STAR_RAM_RADIUS_FACTOR = 2.2;
+      EMP_RADIUS = 350;
+      EMP_DURATION = 3;
+      FREEZE_DURATION = 2.2;
       SPAWN_INVULN = 1.2;
       LOBBY_READY_TIMEOUT = 120;
       TEAM_COUNT = 2;
@@ -319,6 +335,8 @@
           this.powerUntil = /* @__PURE__ */ new Map();
           this.shield = /* @__PURE__ */ new Map();
           this.invulnUntil = /* @__PURE__ */ new Map();
+          /** Mines: per-owner last-drop timestamp, for MINE_DROP_COOLDOWN gating. */
+          this.lastMineDrop = /* @__PURE__ */ new Map();
           // Scalar sim state.
           this.now = 0;
           this.bulletSeq = 0;
@@ -420,7 +438,9 @@
             accent: opts.accent,
             trail: opts.trail,
             livery: opts.livery,
-            team: -1
+            team: -1,
+            frozenLeft: 0,
+            empLeft: 0
           };
           if (this.isPublic) {
             this.spawn(id, p);
@@ -472,6 +492,7 @@
           this.powerUntil.delete(id);
           this.shield.delete(id);
           this.invulnUntil.delete(id);
+          this.lastMineDrop.delete(id);
           return id;
         }
         /**
@@ -578,6 +599,7 @@
               this.stepPlane(id, p, dt, playing);
             }
             this.stepBullets(dt, playing);
+            this.stepStarRams();
             this.collectPickups();
             this.expirePowers();
           }
@@ -662,7 +684,18 @@
           this.timeLeft = ROUND_SECONDS;
         }
         stepPlane(id, p, dt, playing) {
-          const input = this.inputs.get(id) ?? ZERO_INPUT;
+          if (p.frozenLeft > 0) p.frozenLeft = Math.max(0, p.frozenLeft - dt);
+          if (p.empLeft > 0) p.empLeft = Math.max(0, p.empLeft - dt);
+          const rawInput = this.inputs.get(id) ?? ZERO_INPUT;
+          const frozen = p.frozenLeft > 0;
+          const empd = p.empLeft > 0;
+          const input = frozen || empd ? {
+            seq: rawInput.seq,
+            turn: frozen ? 0 : rawInput.turn,
+            climb: frozen ? 0 : rawInput.climb,
+            boost: empd ? false : rawInput.boost,
+            fire: frozen || empd ? false : rawInput.fire
+          } : rawInput;
           let pos = getP(p);
           let fwd = normalize(getF(p));
           const angles = yawPitchFromForward(fwd);
@@ -672,7 +705,7 @@
           p.turn = input.turn;
           p.climb = input.climb;
           p.boosting = input.boost;
-          p.seq = Math.max(p.seq, input.seq);
+          p.seq = Math.max(p.seq, rawInput.seq);
           let targetSpeed = input.boost ? BOOST_SPEED : CRUISE_SPEED;
           if (p.power === "afterburner") targetSpeed *= AFTERBURNER_FACTOR;
           const delta = targetSpeed - p.speed;
@@ -703,21 +736,26 @@
         }
         tryFire(id, p) {
           this.invulnUntil.delete(id);
+          if (p.power === "mine") {
+            this.tryDropMine(id, p);
+            return;
+          }
           const last = this.lastShot.get(id) ?? -999;
           const cooldown = FIRE_COOLDOWN * (p.power === "rapid" ? RAPID_FACTOR : 1);
           if (this.now - last < cooldown) return;
           this.lastShot.set(id, this.now);
           const pos = getP(p);
           const fwd = getF(p);
+          const freeze = p.power === "freeze";
           if (p.power === "spread") {
-            this.spawnBullet(id, pos, turn(pos, fwd, -SPREAD_ANGLE), false);
-            this.spawnBullet(id, pos, fwd, false);
-            this.spawnBullet(id, pos, turn(pos, fwd, SPREAD_ANGLE), false);
+            this.spawnBullet(id, pos, turn(pos, fwd, -SPREAD_ANGLE), false, freeze);
+            this.spawnBullet(id, pos, fwd, false, freeze);
+            this.spawnBullet(id, pos, turn(pos, fwd, SPREAD_ANGLE), false, freeze);
           } else {
-            this.spawnBullet(id, pos, fwd, p.power === "homing");
+            this.spawnBullet(id, pos, fwd, p.power === "homing", freeze);
           }
         }
-        spawnBullet(owner, pos, fwd, homing) {
+        spawnBullet(owner, pos, fwd, homing, freeze = false) {
           const b = {
             px: 0,
             py: 0,
@@ -726,7 +764,9 @@
             fy: 0,
             fz: 0,
             owner,
-            homing
+            homing,
+            kind: "",
+            freeze
           };
           const start = add(pos, scale(normalize(fwd), PLANE_RADIUS + 10));
           setP(b, start);
@@ -735,15 +775,62 @@
           this.bulletLife.set(key, BULLET_LIFE);
           this.bullets.set(key, b);
         }
+        /**
+         * Mine powerup: fire input drops a stationary mine instead of shooting.
+         * Respects MINE_DROP_COOLDOWN and caps live mines per owner at MINE_MAX_PER_OWNER
+         * (oldest expires to make room).
+         */
+        tryDropMine(id, p) {
+          const last = this.lastMineDrop.get(id) ?? -999;
+          if (this.now - last < MINE_DROP_COOLDOWN) return;
+          const ownerMines = [];
+          for (const [key2, b] of this.bullets) {
+            if (b.kind === "mine" && b.owner === id) {
+              ownerMines.push({ key: key2, life: this.bulletLife.get(key2) ?? MINE_LIFE });
+            }
+          }
+          if (ownerMines.length >= MINE_MAX_PER_OWNER) {
+            ownerMines.sort((a, b) => a.life - b.life);
+            const oldest = ownerMines[0];
+            this.bullets.delete(oldest.key);
+            this.bulletLife.delete(oldest.key);
+          }
+          this.lastMineDrop.set(id, this.now);
+          const pos = getP(p);
+          const fwd = normalize(getF(p));
+          const behind = scale(fwd, -1);
+          const dropPos = add(pos, scale(behind, PLANE_RADIUS + 12));
+          const mine = {
+            px: 0,
+            py: 0,
+            pz: 0,
+            fx: 1,
+            fy: 0,
+            fz: 0,
+            owner: id,
+            homing: false,
+            kind: "mine"
+          };
+          setP(mine, dropPos);
+          setF(mine, fwd);
+          const key = `b${this.bulletSeq++}`;
+          this.bulletLife.set(key, MINE_LIFE);
+          this.bullets.set(key, mine);
+        }
         stepBullets(dt, playing) {
           for (const [key, b] of this.bullets) {
-            const life = (this.bulletLife.get(key) ?? BULLET_LIFE) - dt;
+            const isMine = b.kind === "mine";
+            const life = (this.bulletLife.get(key) ?? (isMine ? MINE_LIFE : BULLET_LIFE)) - dt;
             if (life <= 0) {
               this.bullets.delete(key);
               this.bulletLife.delete(key);
               continue;
             }
             this.bulletLife.set(key, life);
+            if (isMine) {
+              if (playing) this.stepMine(key, b, life);
+              continue;
+            }
             let pos = getP(b);
             let fwd = normalize(getF(b));
             if (b.homing) {
@@ -812,7 +899,12 @@
               }
             }
             if (victim || blocked) {
-              if (victim) this.damage(victim, victimId, b.owner);
+              if (victim) {
+                const applied = this.damage(victim, victimId, b.owner);
+                if (b.freeze && applied && victim.alive) {
+                  victim.frozenLeft = FREEZE_DURATION;
+                }
+              }
               this.bullets.delete(key);
               this.bulletLife.delete(key);
               continue;
@@ -826,12 +918,46 @@
             setF(b, fwd);
           }
         }
-        damage(p, victimId, killerId) {
+        /**
+         * Mine proximity fuse: stationary once dropped, arms after MINE_ARM_DELAY,
+         * then explodes when any alive plane (including the owner) enters MINE_TRIGGER_RADIUS.
+         * Explosion applies radial damage via the normal damage()/kill path so kill feed/streaks work.
+         */
+        stepMine(key, mine, life) {
+          const age = MINE_LIFE - life;
+          if (age < MINE_ARM_DELAY) return;
+          const minePos = getP(mine);
+          let triggered = false;
+          for (const [, p] of this.players) {
+            if (!p.alive) continue;
+            if (distance(minePos, getP(p)) <= MINE_TRIGGER_RADIUS) {
+              triggered = true;
+              break;
+            }
+          }
+          if (!triggered) return;
+          this.bullets.delete(key);
+          this.bulletLife.delete(key);
+          for (const [pid, p] of this.players) {
+            if (!p.alive) continue;
+            if (distance(minePos, getP(p)) <= MINE_BLAST_RADIUS) {
+              this.damage(p, pid, mine.owner, MINE_DAMAGE);
+            }
+          }
+        }
+        /**
+         * Applies damage to a victim, handling TDM friendly-fire, spawn invuln, star
+         * invulnerability, shield charges, HP reduction, and kill crediting.
+         * Returns true iff HP was actually reduced (i.e. not blocked by any gate) —
+         * callers use this to decide whether secondary effects (e.g. freeze) apply.
+         */
+        damage(p, victimId, killerId, amount = BULLET_DAMAGE) {
           if (this.mode === "tdm") {
             const killer2 = this.players.get(killerId);
-            if (killer2 && killer2.team >= 0 && p.team >= 0 && killer2.team === p.team) return;
+            if (killer2 && killer2.team >= 0 && p.team >= 0 && killer2.team === p.team) return false;
           }
-          if (this.now < (this.invulnUntil.get(victimId) ?? 0)) return;
+          if (this.now < (this.invulnUntil.get(victimId) ?? 0)) return false;
+          if (p.power === "star" && p.powerLeft > 0) return false;
           const shield = this.shield.get(victimId) ?? 0;
           if (shield > 0) {
             this.shield.set(victimId, shield - 1);
@@ -839,10 +965,10 @@
               this.shield.delete(victimId);
               if (p.power === "shield") this.clearPower(victimId, p);
             }
-            return;
+            return false;
           }
-          p.hp -= BULLET_DAMAGE;
-          if (p.hp > 0) return;
+          p.hp -= amount;
+          if (p.hp > 0) return true;
           p.hp = 0;
           p.alive = false;
           p.boosting = false;
@@ -866,6 +992,7 @@
             killerName: killer ? killer.name : "?",
             victimName: p.name
           });
+          return true;
         }
         maintainPickups() {
           if (this.pickups.size >= PICKUP_MAX || this.now < this.pickupAt) return;
@@ -920,10 +1047,21 @@
             p.hp = MAX_HP;
             return;
           }
+          if (type === "emp") {
+            for (const [pid, victim] of this.players) {
+              if (pid === id || !victim.alive) continue;
+              if (this.mode === "tdm" && victim.team >= 0 && p.team >= 0 && victim.team === p.team) continue;
+              if (distance(getP(p), getP(victim)) <= EMP_RADIUS) {
+                victim.empLeft = EMP_DURATION;
+              }
+            }
+            return;
+          }
+          const duration = type === "star" ? STAR_DURATION : POWERUP_DURATION;
           this.shield.delete(id);
           p.power = type;
-          p.powerLeft = POWERUP_DURATION;
-          this.powerUntil.set(id, this.now + POWERUP_DURATION);
+          p.powerLeft = duration;
+          this.powerUntil.set(id, this.now + duration);
           if (type === "shield") this.shield.set(id, SHIELD_CHARGES);
         }
         clearPower(id, p) {
@@ -945,6 +1083,24 @@
             else p.powerLeft = Math.max(0, until - this.now);
           }
         }
+        /**
+         * Star powerup: each tick, a starred player instantly destroys any enemy
+         * plane within PLANE_RADIUS*STAR_RAM_RADIUS_FACTOR, crediting the kill to
+         * the starred player. Starred-vs-starred and spawn-invuln victims are skipped
+         * (damage() itself gates on star/invuln/TDM-team, so we just route through it).
+         */
+        stepStarRams() {
+          const ramRadius = PLANE_RADIUS * STAR_RAM_RADIUS_FACTOR;
+          for (const [id, p] of this.players) {
+            if (!p.alive || p.power !== "star" || p.powerLeft <= 0) continue;
+            const myPos = getP(p);
+            for (const [vid, victim] of this.players) {
+              if (vid === id || !victim.alive) continue;
+              if (distance(myPos, getP(victim)) > ramRadius) continue;
+              this.damage(victim, vid, id, 999);
+            }
+          }
+        }
         spawn(id, p) {
           const pos = this.pickSpawnPoint();
           const center = normalizeHorizontal({ x: -pos.x, y: 0, z: -pos.z });
@@ -960,6 +1116,8 @@
           p.hp = MAX_HP;
           p.alive = true;
           p.boosting = false;
+          p.frozenLeft = 0;
+          p.empLeft = 0;
           this.clearPower(id, p);
           this.lastShot.delete(id);
           this.invulnUntil.set(id, this.now + SPAWN_INVULN);
@@ -1073,7 +1231,9 @@
             accent: Math.floor(Math.random() * ACCENT_COUNT),
             trail: Math.floor(Math.random() * TRAIL_COUNT),
             livery: Math.floor(Math.random() * LIVERY_COUNT),
-            team: -1
+            team: -1,
+            frozenLeft: 0,
+            empLeft: 0
           };
           if (this.mode === "tdm" && this.phase === "playing") {
             let t0 = 0;
@@ -3341,6 +3501,8 @@
       var prevPhase = "playing";
       var prevHp = G.MAX_HP;
       var lastFireSnd = 0;
+      var wasEmpd = false;
+      var wasFrozen = false;
       var smashTrack = /* @__PURE__ */ new Map();
       function getTrack(id) {
         let t = smashTrack.get(id);
@@ -3712,6 +3874,8 @@
         prevHp = G.MAX_HP;
         wasAlive = true;
         deathTime = -1;
+        wasEmpd = false;
+        wasFrozen = false;
         applyMode("playing");
         els.respawn.classList.add("hidden");
         els.inter.classList.add("hidden");
@@ -4210,6 +4374,8 @@
         prevHp = G.MAX_HP;
         wasAlive = true;
         deathTime = -1;
+        wasEmpd = false;
+        wasFrozen = false;
         applyMode("playing");
         els.respawn.classList.add("hidden");
         els.inter.classList.add("hidden");
@@ -4655,6 +4821,16 @@
           } else {
             els.powerChip.classList.add("hidden");
           }
+          const empLeft = me.empLeft || 0;
+          const frozenLeft = me.frozenLeft || 0;
+          if (empLeft > 0 && !wasEmpd) {
+            showCallout("\u{1F300} EMP'D \u2014 guns offline");
+          }
+          wasEmpd = empLeft > 0;
+          if (frozenLeft > 0 && !wasFrozen) {
+            showCallout("\u2744\uFE0F FROZEN");
+          }
+          wasFrozen = frozenLeft > 0;
         }
         const isTdm = state.mode === "tdm";
         if (isTdm) {
@@ -4834,7 +5010,17 @@
         }
       }
       function onPickup(msg) {
-        if (!window.Net || msg.by !== window.Net.sessionId) return;
+        if (!window.Net) return;
+        const isSelf = msg.by === window.Net.sessionId;
+        if (msg.type === "star") {
+          if (isSelf) {
+            pushToast("YOU HAVE THE STAR!", "multi");
+          } else {
+            const name = window.Net.state?.players?.get(msg.by)?.name;
+            pushToast(`${name || "Someone"} grabbed the STAR!`, "multi");
+          }
+        }
+        if (!isSelf) return;
         window.SFX.pickup();
         const info = G.POWERUPS[msg.type];
         showCallout((info ? `${info.icon} ${info.label}` : "POWERUP") + "!");

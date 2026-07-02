@@ -28,6 +28,10 @@ export interface SimPlayer {
   livery: number;
   /** TDM team assignment: 0=blue, 1=red. -1 = unassigned (FFA or pre-match). */
   team: number;
+  /** Freeze ray: turn/climb forced to 0 and fire blocked while > 0 (ticks down each frame). Synced. */
+  frozenLeft: number;
+  /** EMP burst: fire and boost blocked while > 0 (ticks down each frame). Synced. */
+  empLeft: number;
 }
 
 export interface SimBullet {
@@ -39,6 +43,10 @@ export interface SimBullet {
   fz: number;
   owner: string;
   homing: boolean;
+  /** "" = normal bullet, "mine" = stationary air mine. Synced. */
+  kind: string;
+  /** Sim-side only (not synced): true if fired while owner held the freeze powerup. */
+  freeze?: boolean;
 }
 
 export interface SimPickup {

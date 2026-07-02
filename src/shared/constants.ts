@@ -87,7 +87,7 @@ export const RAPID_FACTOR = 0.55;
 export const SPREAD_ANGLE = 0.12;
 export const AFTERBURNER_FACTOR = 1.22;
 export const HOMING_TURN = 1.45;
-export const POWERUP_TYPES = ["spread", "rapid", "shield", "afterburner", "repair", "homing"];
+export const POWERUP_TYPES = ["spread", "rapid", "shield", "afterburner", "repair", "homing", "mine", "star", "emp", "freeze"];
 export const POWERUP_WEIGHTS: Record<string, number> = {
   spread: 1,
   rapid: 1,
@@ -95,7 +95,31 @@ export const POWERUP_WEIGHTS: Record<string, number> = {
   afterburner: 1,
   repair: 0.7,
   homing: 0.55,
+  mine: 0.9,
+  star: 0.4,
+  emp: 0.7,
+  freeze: 0.8,
 };
+
+// Mines (air mine powerup).
+export const MINE_TRIGGER_RADIUS = 55;
+export const MINE_BLAST_RADIUS = 90;
+export const MINE_DAMAGE = 50;
+export const MINE_LIFE = 20;
+export const MINE_MAX_PER_OWNER = 3;
+export const MINE_DROP_COOLDOWN = 0.8;
+export const MINE_ARM_DELAY = 1.5;
+
+// Star (invulnerable ram powerup).
+export const STAR_DURATION = 5;
+export const STAR_RAM_RADIUS_FACTOR = 2.2;
+
+// EMP burst (instant area disable).
+export const EMP_RADIUS = 350;
+export const EMP_DURATION = 3;
+
+// Freeze ray (bullets that lock victim controls).
+export const FREEZE_DURATION = 2.2;
 
 // Hardening.
 export const DT_MAX = 0.05;

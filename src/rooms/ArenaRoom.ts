@@ -310,6 +310,8 @@ export class ArenaRoom extends Room<ArenaState> {
       schemaPlayer.trail = sp.trail;
       schemaPlayer.livery = sp.livery;
       schemaPlayer.team = sp.team;
+      schemaPlayer.frozenLeft = sp.frozenLeft;
+      schemaPlayer.empLeft = sp.empLeft;
     }
     for (const id of this.state.players.keys()) {
       if (!state.players.has(id)) this.state.players.delete(id);
@@ -330,6 +332,7 @@ export class ArenaRoom extends Room<ArenaState> {
       schemaBullet.fz = sb.fz;
       schemaBullet.owner = sb.owner;
       schemaBullet.homing = sb.homing;
+      schemaBullet.kind = sb.kind;
     }
     for (const key of this.state.bullets.keys()) {
       if (!state.bullets.has(key)) this.state.bullets.delete(key);

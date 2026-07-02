@@ -30,6 +30,10 @@ export class Player extends Schema {
   @type("number") livery = 0;
   /** TDM team: 0=blue, 1=red, -1=unassigned (FFA). Appended last to preserve field order. */
   @type("number") team = -1;
+  /** Freeze ray: turn/climb forced to 0 and fire blocked while > 0. Appended last to preserve field order. */
+  @type("number") frozenLeft = 0;
+  /** EMP burst: fire and boost blocked while > 0. Appended last to preserve field order. */
+  @type("number") empLeft = 0;
 }
 
 export class Bullet extends Schema {
@@ -41,6 +45,8 @@ export class Bullet extends Schema {
   @type("number") fz = 0;
   @type("string") owner = "";
   @type("boolean") homing = false;
+  /** "" = normal bullet, "mine" = stationary air mine. Appended last to preserve field order. */
+  @type("string") kind = "";
 }
 
 export class Pickup extends Schema {

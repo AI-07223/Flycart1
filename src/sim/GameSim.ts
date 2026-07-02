@@ -76,6 +76,8 @@ export class GameSim {
   private powerUntil = new Map<string, number>();
   private shield = new Map<string, number>();
   private invulnUntil = new Map<string, number>();
+  /** Mines: per-owner last-drop timestamp, for MINE_DROP_COOLDOWN gating. */
+  private lastMineDrop = new Map<string, number>();
 
   // Scalar sim state.
   now = 0;
@@ -208,6 +210,8 @@ export class GameSim {
       trail: opts.trail,
       livery: opts.livery,
       team: -1,
+      frozenLeft: 0,
+      empLeft: 0,
     };
 
     if (this.isPublic) {
@@ -264,6 +268,7 @@ export class GameSim {
     this.powerUntil.delete(id);
     this.shield.delete(id);
     this.invulnUntil.delete(id);
+    this.lastMineDrop.delete(id);
 
     return id;
   }
@@ -387,6 +392,7 @@ export class GameSim {
       }
 
       this.stepBullets(dt, playing);
+      this.stepStarRams();
       this.collectPickups();
       this.expirePowers();
     }
@@ -502,7 +508,23 @@ export class GameSim {
   }
 
   private stepPlane(id: string, p: SimPlayer, dt: number, playing: boolean): void {
-    const input = this.inputs.get(id) ?? ZERO_INPUT;
+    // Freeze/EMP status ticks down every tick regardless of phase, then gates input below.
+    if (p.frozenLeft > 0) p.frozenLeft = Math.max(0, p.frozenLeft - dt);
+    if (p.empLeft > 0) p.empLeft = Math.max(0, p.empLeft - dt);
+
+    const rawInput = this.inputs.get(id) ?? ZERO_INPUT;
+    const frozen = p.frozenLeft > 0;
+    const empd = p.empLeft > 0;
+    const input: Input = frozen || empd
+      ? {
+          seq: rawInput.seq,
+          turn: frozen ? 0 : rawInput.turn,
+          climb: frozen ? 0 : rawInput.climb,
+          boost: empd ? false : rawInput.boost,
+          fire: (frozen || empd) ? false : rawInput.fire,
+        }
+      : rawInput;
+
     let pos = getP(p);
     let fwd = S.normalize(getF(p));
 
@@ -514,7 +536,7 @@ export class GameSim {
     p.turn = input.turn;
     p.climb = input.climb;
     p.boosting = input.boost;
-    p.seq = Math.max(p.seq, input.seq);
+    p.seq = Math.max(p.seq, rawInput.seq);
 
     let targetSpeed = input.boost ? C.BOOST_SPEED : C.CRUISE_SPEED;
     if (p.power === "afterburner") targetSpeed *= C.AFTERBURNER_FACTOR;
@@ -554,6 +576,12 @@ export class GameSim {
 
   private tryFire(id: string, p: SimPlayer): void {
     this.invulnUntil.delete(id);
+
+    if (p.power === "mine") {
+      this.tryDropMine(id, p);
+      return;
+    }
+
     const last = this.lastShot.get(id) ?? -999;
     const cooldown = C.FIRE_COOLDOWN * (p.power === "rapid" ? C.RAPID_FACTOR : 1);
     if (this.now - last < cooldown) return;
@@ -561,21 +589,24 @@ export class GameSim {
 
     const pos = getP(p);
     const fwd = getF(p);
+    const freeze = p.power === "freeze";
     if (p.power === "spread") {
-      this.spawnBullet(id, pos, S.turn(pos, fwd, -C.SPREAD_ANGLE), false);
-      this.spawnBullet(id, pos, fwd, false);
-      this.spawnBullet(id, pos, S.turn(pos, fwd, C.SPREAD_ANGLE), false);
+      this.spawnBullet(id, pos, S.turn(pos, fwd, -C.SPREAD_ANGLE), false, freeze);
+      this.spawnBullet(id, pos, fwd, false, freeze);
+      this.spawnBullet(id, pos, S.turn(pos, fwd, C.SPREAD_ANGLE), false, freeze);
     } else {
-      this.spawnBullet(id, pos, fwd, p.power === "homing");
+      this.spawnBullet(id, pos, fwd, p.power === "homing", freeze);
     }
   }
 
-  spawnBullet(owner: string, pos: S.Vec3, fwd: S.Vec3, homing: boolean): void {
+  spawnBullet(owner: string, pos: S.Vec3, fwd: S.Vec3, homing: boolean, freeze = false): void {
     const b: SimBullet = {
       px: 0, py: 0, pz: 0,
       fx: 1, fy: 0, fz: 0,
       owner,
       homing,
+      kind: "",
+      freeze,
     };
     const start = S.add(pos, S.scale(S.normalize(fwd), C.PLANE_RADIUS + 10));
     setP(b, start);
@@ -585,15 +616,66 @@ export class GameSim {
     this.bullets.set(key, b);
   }
 
+  /**
+   * Mine powerup: fire input drops a stationary mine instead of shooting.
+   * Respects MINE_DROP_COOLDOWN and caps live mines per owner at MINE_MAX_PER_OWNER
+   * (oldest expires to make room).
+   */
+  private tryDropMine(id: string, p: SimPlayer): void {
+    const last = this.lastMineDrop.get(id) ?? -999;
+    if (this.now - last < C.MINE_DROP_COOLDOWN) return;
+
+    // Enforce per-owner cap: find this owner's live mines, oldest first.
+    const ownerMines: Array<{ key: string; life: number }> = [];
+    for (const [key, b] of this.bullets) {
+      if (b.kind === "mine" && b.owner === id) {
+        ownerMines.push({ key, life: this.bulletLife.get(key) ?? C.MINE_LIFE });
+      }
+    }
+    if (ownerMines.length >= C.MINE_MAX_PER_OWNER) {
+      // Oldest mine = lowest remaining life (it was armed/ticking longest).
+      ownerMines.sort((a, b) => a.life - b.life);
+      const oldest = ownerMines[0];
+      this.bullets.delete(oldest.key);
+      this.bulletLife.delete(oldest.key);
+    }
+
+    this.lastMineDrop.set(id, this.now);
+
+    const pos = getP(p);
+    const fwd = S.normalize(getF(p));
+    const behind = S.scale(fwd, -1);
+    const dropPos = S.add(pos, S.scale(behind, C.PLANE_RADIUS + 12));
+
+    const mine: SimBullet = {
+      px: 0, py: 0, pz: 0,
+      fx: 1, fy: 0, fz: 0,
+      owner: id,
+      homing: false,
+      kind: "mine",
+    };
+    setP(mine, dropPos);
+    setF(mine, fwd);
+    const key = `b${this.bulletSeq++}`;
+    this.bulletLife.set(key, C.MINE_LIFE);
+    this.bullets.set(key, mine);
+  }
+
   private stepBullets(dt: number, playing: boolean): void {
     for (const [key, b] of this.bullets) {
-      const life = (this.bulletLife.get(key) ?? C.BULLET_LIFE) - dt;
+      const isMine = b.kind === "mine";
+      const life = (this.bulletLife.get(key) ?? (isMine ? C.MINE_LIFE : C.BULLET_LIFE)) - dt;
       if (life <= 0) {
         this.bullets.delete(key);
         this.bulletLife.delete(key);
         continue;
       }
       this.bulletLife.set(key, life);
+
+      if (isMine) {
+        if (playing) this.stepMine(key, b, life);
+        continue;
+      }
 
       let pos = getP(b);
       let fwd = S.normalize(getF(b));
@@ -667,7 +749,14 @@ export class GameSim {
       }
 
       if (victim || blocked) {
-        if (victim) this.damage(victim, victimId, b.owner);
+        if (victim) {
+          const applied = this.damage(victim, victimId, b.owner);
+          // Freeze bullets deal normal damage AND lock the victim's controls
+          // (skip if the hit was blocked entirely, or if it killed them — no need to freeze a corpse).
+          if (b.freeze && applied && victim.alive) {
+            victim.frozenLeft = C.FREEZE_DURATION;
+          }
+        }
         this.bullets.delete(key);
         this.bulletLife.delete(key);
         continue;
@@ -684,14 +773,51 @@ export class GameSim {
     }
   }
 
-  private damage(p: SimPlayer, victimId: string, killerId: string): void {
-    // TDM friendly-fire gate: bullets do NOT damage teammates.
+  /**
+   * Mine proximity fuse: stationary once dropped, arms after MINE_ARM_DELAY,
+   * then explodes when any alive plane (including the owner) enters MINE_TRIGGER_RADIUS.
+   * Explosion applies radial damage via the normal damage()/kill path so kill feed/streaks work.
+   */
+  private stepMine(key: string, mine: SimBullet, life: number): void {
+    const age = C.MINE_LIFE - life;
+    if (age < C.MINE_ARM_DELAY) return; // not armed yet — cannot hit anyone, incl. owner
+
+    const minePos = getP(mine);
+    let triggered = false;
+    for (const [, p] of this.players) {
+      if (!p.alive) continue;
+      if (S.distance(minePos, getP(p)) <= C.MINE_TRIGGER_RADIUS) { triggered = true; break; }
+    }
+    if (!triggered) return;
+
+    this.bullets.delete(key);
+    this.bulletLife.delete(key);
+
+    for (const [pid, p] of this.players) {
+      if (!p.alive) continue;
+      if (S.distance(minePos, getP(p)) <= C.MINE_BLAST_RADIUS) {
+        this.damage(p, pid, mine.owner, C.MINE_DAMAGE);
+      }
+    }
+  }
+
+  /**
+   * Applies damage to a victim, handling TDM friendly-fire, spawn invuln, star
+   * invulnerability, shield charges, HP reduction, and kill crediting.
+   * Returns true iff HP was actually reduced (i.e. not blocked by any gate) —
+   * callers use this to decide whether secondary effects (e.g. freeze) apply.
+   */
+  private damage(p: SimPlayer, victimId: string, killerId: string, amount: number = C.BULLET_DAMAGE): boolean {
+    // TDM friendly-fire gate: bullets/mines do NOT damage teammates.
     if (this.mode === "tdm") {
       const killer = this.players.get(killerId);
-      if (killer && killer.team >= 0 && p.team >= 0 && killer.team === p.team) return;
+      if (killer && killer.team >= 0 && p.team >= 0 && killer.team === p.team) return false;
     }
 
-    if (this.now < (this.invulnUntil.get(victimId) ?? 0)) return;
+    if (this.now < (this.invulnUntil.get(victimId) ?? 0)) return false;
+    // Star: absolute invulnerability while active — no damage of any kind gets through.
+    if (p.power === "star" && p.powerLeft > 0) return false;
+
     const shield = this.shield.get(victimId) ?? 0;
     if (shield > 0) {
       this.shield.set(victimId, shield - 1);
@@ -699,11 +825,11 @@ export class GameSim {
         this.shield.delete(victimId);
         if (p.power === "shield") this.clearPower(victimId, p);
       }
-      return;
+      return false;
     }
 
-    p.hp -= C.BULLET_DAMAGE;
-    if (p.hp > 0) return;
+    p.hp -= amount;
+    if (p.hp > 0) return true;
 
     p.hp = 0;
     p.alive = false;
@@ -730,6 +856,7 @@ export class GameSim {
       killerName: killer ? killer.name : "?",
       victimName: p.name,
     });
+    return true;
   }
 
   private maintainPickups(): void {
@@ -784,10 +911,24 @@ export class GameSim {
 
   private applyPowerup(id: string, p: SimPlayer, type: string): void {
     if (type === "repair") { p.hp = C.MAX_HP; return; }
+
+    if (type === "emp") {
+      // Instant area effect (no lasting power state for the picker-upper).
+      for (const [pid, victim] of this.players) {
+        if (pid === id || !victim.alive) continue;
+        if (this.mode === "tdm" && victim.team >= 0 && p.team >= 0 && victim.team === p.team) continue;
+        if (S.distance(getP(p), getP(victim)) <= C.EMP_RADIUS) {
+          victim.empLeft = C.EMP_DURATION;
+        }
+      }
+      return;
+    }
+
+    const duration = type === "star" ? C.STAR_DURATION : C.POWERUP_DURATION;
     this.shield.delete(id);
     p.power = type;
-    p.powerLeft = C.POWERUP_DURATION;
-    this.powerUntil.set(id, this.now + C.POWERUP_DURATION);
+    p.powerLeft = duration;
+    this.powerUntil.set(id, this.now + duration);
     if (type === "shield") this.shield.set(id, C.SHIELD_CHARGES);
   }
 
@@ -803,6 +944,25 @@ export class GameSim {
       if (!p) { this.powerUntil.delete(id); continue; }
       if (this.now >= until) this.clearPower(id, p);
       else p.powerLeft = Math.max(0, until - this.now);
+    }
+  }
+
+  /**
+   * Star powerup: each tick, a starred player instantly destroys any enemy
+   * plane within PLANE_RADIUS*STAR_RAM_RADIUS_FACTOR, crediting the kill to
+   * the starred player. Starred-vs-starred and spawn-invuln victims are skipped
+   * (damage() itself gates on star/invuln/TDM-team, so we just route through it).
+   */
+  private stepStarRams(): void {
+    const ramRadius = C.PLANE_RADIUS * C.STAR_RAM_RADIUS_FACTOR;
+    for (const [id, p] of this.players) {
+      if (!p.alive || p.power !== "star" || p.powerLeft <= 0) continue;
+      const myPos = getP(p);
+      for (const [vid, victim] of this.players) {
+        if (vid === id || !victim.alive) continue;
+        if (S.distance(myPos, getP(victim)) > ramRadius) continue;
+        this.damage(victim, vid, id, 999);
+      }
     }
   }
 
@@ -822,6 +982,8 @@ export class GameSim {
     p.hp = C.MAX_HP;
     p.alive = true;
     p.boosting = false;
+    p.frozenLeft = 0;
+    p.empLeft = 0;
     this.clearPower(id, p);
     this.lastShot.delete(id);
     this.invulnUntil.set(id, this.now + C.SPAWN_INVULN);
@@ -948,6 +1110,8 @@ export class GameSim {
       trail: Math.floor(Math.random() * C.TRAIL_COUNT),
       livery: Math.floor(Math.random() * C.LIVERY_COUNT),
       team: -1,
+      frozenLeft: 0,
+      empLeft: 0,
     };
     // If a TDM match is already in progress, assign to the smaller team.
     if (this.mode === "tdm" && this.phase === "playing") {

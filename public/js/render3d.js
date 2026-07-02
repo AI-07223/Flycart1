@@ -329,6 +329,60 @@ import * as THREE from "three";
     );
   }
 
+  // ---- Shared geometries/materials for new powerup visuals (module-level, reused every frame) ----
+  const starAuraGeo = new THREE.SphereGeometry(26, 12, 10);
+  const freezeOverlayGeo = new THREE.SphereGeometry(21, 10, 8);
+  const empRingGeo = new THREE.TorusGeometry(22, 1.6, 8, 24);
+  const mineBodyGeo = new THREE.SphereGeometry(6, 8, 8);
+  const mineSpikeGeo = new THREE.ConeGeometry(1.4, 5, 6);
+  const mineBlinkGeo = new THREE.SphereGeometry(2.2, 6, 6);
+
+  function makeStarAura() {
+    return new THREE.Mesh(
+      starAuraGeo,
+      new THREE.MeshBasicMaterial({ color: 0xffd700, transparent: true, opacity: 0.32, depthWrite: false, blending: THREE.AdditiveBlending })
+    );
+  }
+
+  function makeFreezeOverlay() {
+    return new THREE.Mesh(
+      freezeOverlayGeo,
+      new THREE.MeshBasicMaterial({ color: 0x9fdcff, transparent: true, opacity: 0.35, depthWrite: false })
+    );
+  }
+
+  function makeEmpRing() {
+    const ring = new THREE.Mesh(
+      empRingGeo,
+      new THREE.MeshBasicMaterial({ color: 0x66e0ff, transparent: true, opacity: 0.55, depthWrite: false })
+    );
+    ring.rotation.x = Math.PI / 2;
+    return ring;
+  }
+
+  function makeMine() {
+    const group = new THREE.Group();
+    const bodyMat = new THREE.MeshStandardMaterial({ color: 0x232b33, roughness: 0.6, metalness: 0.3 });
+    const body = new THREE.Mesh(mineBodyGeo, bodyMat);
+    group.add(body);
+    for (let i = 0; i < 4; i++) {
+      const spikeMat = new THREE.MeshStandardMaterial({ color: 0x2c343d, roughness: 0.6, metalness: 0.3 });
+      const spike = new THREE.Mesh(mineSpikeGeo, spikeMat);
+      const a = (i / 4) * Math.PI * 2;
+      spike.position.set(Math.cos(a) * 5.5, Math.sin(a) * 5.5, 0);
+      spike.rotation.z = a + Math.PI / 2;
+      group.add(spike);
+    }
+    const blinkMat = new THREE.MeshBasicMaterial({ color: 0xff3b30, transparent: true, opacity: 1 });
+    const blink = new THREE.Mesh(mineBlinkGeo, blinkMat);
+    blink.position.set(0, 0, 6.2);
+    group.add(blink);
+    group.userData.blinkMat = blinkMat;
+    group.userData.phase = Math.random() * Math.PI * 2;
+    scene.add(group);
+    return group;
+  }
+
   function makeBullet(homing) {
     const group = new THREE.Group();
     const color = homing ? 0xc07bff : 0xffd86b;
@@ -393,8 +447,9 @@ import * as THREE from "three";
     });
   }
 
-  function explodeAt(pos, color) {
-    for (let i = 0; i < 14; i++) addParticle(pos, color);
+  function explodeAt(pos, color, count) {
+    const n = count || 14;
+    for (let i = 0; i < n; i++) addParticle(pos, color);
   }
 
   function worldToScreen(pos) {
@@ -764,6 +819,9 @@ import * as THREE from "three";
           view = {
             mesh: makePlane({ color: p.skin || 0, bodyShape: p.bodyShape || 0, accent: p.accent || 0, trail: p.trail || 0, livery: p.livery || 0 }),
             shield: null,
+            starAura: null,
+            freezeOverlay: null,
+            empRing: null,
             bank: 0,
             wasAlive: !!p.alive,
             pose: null,
@@ -824,6 +882,46 @@ import * as THREE from "three";
         } else if (view.shield) {
           view.shield.visible = false;
         }
+
+        // STAR: golden pulsing invulnerability aura
+        if (p.power === "star" && pose.alive) {
+          if (!view.starAura) {
+            view.starAura = makeStarAura();
+            scene.add(view.starAura);
+          }
+          view.starAura.visible = true;
+          view.starAura.position.set(pose.p.x, pose.p.y, pose.p.z);
+          const pulse = 1 + 0.12 * Math.sin(time * 8);
+          view.starAura.scale.setScalar(pulse);
+        } else if (view.starAura) {
+          view.starAura.visible = false;
+        }
+
+        // FREEZE (victim): ice-blue overlay while frozen
+        if ((p.frozenLeft || 0) > 0 && pose.alive) {
+          if (!view.freezeOverlay) {
+            view.freezeOverlay = makeFreezeOverlay();
+            scene.add(view.freezeOverlay);
+          }
+          view.freezeOverlay.visible = true;
+          view.freezeOverlay.position.set(pose.p.x, pose.p.y, pose.p.z);
+        } else if (view.freezeOverlay) {
+          view.freezeOverlay.visible = false;
+        }
+
+        // EMP (victim): rotating cyan ring, opacity pulsing
+        if ((p.empLeft || 0) > 0 && pose.alive) {
+          if (!view.empRing) {
+            view.empRing = makeEmpRing();
+            scene.add(view.empRing);
+          }
+          view.empRing.visible = true;
+          view.empRing.position.set(pose.p.x, pose.p.y, pose.p.z);
+          view.empRing.rotation.z += step * 2.4;
+          view.empRing.material.opacity = 0.35 + 0.35 * (0.5 + 0.5 * Math.sin(time * 10));
+        } else if (view.empRing) {
+          view.empRing.visible = false;
+        }
       });
 
       for (const [id, view] of stateMaps.views) {
@@ -834,6 +932,18 @@ import * as THREE from "three";
           scene.remove(view.shield);
           disposeObject(view.shield);
         }
+        if (view.starAura) {
+          scene.remove(view.starAura);
+          disposeObject(view.starAura);
+        }
+        if (view.freezeOverlay) {
+          scene.remove(view.freezeOverlay);
+          disposeObject(view.freezeOverlay);
+        }
+        if (view.empRing) {
+          scene.remove(view.empRing);
+          disposeObject(view.empRing);
+        }
         stateMaps.views.delete(id);
       }
 
@@ -843,25 +953,41 @@ import * as THREE from "three";
         let mesh = stateMaps.bullets.get(key);
         const authP = { x: b.px, y: b.py, z: b.pz };
         const authF = { x: b.fx, y: b.fy, z: b.fz };
+        const isMine = (b.kind || "") === "mine";
         if (!mesh) {
-          mesh = makeBullet(b.homing);
+          mesh = isMine ? makeMine() : makeBullet(b.homing);
           mesh.userData.pose = { p: authP, f: authF, ax: b.px, ay: b.py, az: b.pz };
+          mesh.userData.isMine = isMine;
           stateMaps.bullets.set(key, mesh);
         }
         const pose = mesh.userData.pose;
-        if (pose.ax === b.px && pose.ay === b.py && pose.az === b.pz) {
-          pose.p = SP.advance(pose.p, pose.f, G.BULLET_SPEED * step * 0.45).p;
-        } else {
+        if (isMine) {
+          // Mines are stationary — just sit at the authoritative position, no interpolation needed.
           pose.p = authP;
-          pose.ax = b.px;
-          pose.ay = b.py;
-          pose.az = b.pz;
+          mesh.position.set(authP.x, authP.y, authP.z);
+          if (mesh.userData.blinkMat) {
+            const blinkT = 0.5 + 0.5 * Math.sin(time * 9 + mesh.userData.phase);
+            mesh.userData.blinkMat.opacity = 0.25 + blinkT * 0.75;
+          }
+        } else {
+          if (pose.ax === b.px && pose.ay === b.py && pose.az === b.pz) {
+            pose.p = SP.advance(pose.p, pose.f, G.BULLET_SPEED * step * 0.45).p;
+          } else {
+            pose.p = authP;
+            pose.ax = b.px;
+            pose.ay = b.py;
+            pose.az = b.pz;
+          }
+          pose.f = authF;
+          orientTrail(mesh, pose.p, pose.f);
         }
-        pose.f = authF;
-        orientTrail(mesh, pose.p, pose.f);
       });
       for (const [key, mesh] of stateMaps.bullets) {
         if (bulletSeen.has(key)) continue;
+        if (mesh.userData.isMine) {
+          const lastP = mesh.userData.pose.p;
+          explodeAt(new THREE.Vector3(lastP.x, lastP.y, lastP.z), 0xff9f43, 22);
+        }
         scene.remove(mesh);
         disposeObject(mesh);
         stateMaps.bullets.delete(key);
@@ -918,6 +1044,9 @@ import * as THREE from "three";
       for (const [, view] of stateMaps.views) {
         view.mesh.visible = false;
         if (view.shield) view.shield.visible = false;
+        if (view.starAura) view.starAura.visible = false;
+        if (view.freezeOverlay) view.freezeOverlay.visible = false;
+        if (view.empRing) view.empRing.visible = false;
       }
       // Hide all name labels during menu
       for (const [, div] of nameLabelPool) div.style.display = "none";
