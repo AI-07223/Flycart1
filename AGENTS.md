@@ -10,12 +10,14 @@ SmashCart is a Node.js/TypeScript local Wi-Fi air-combat game with a server-auth
 - `src/shared/protocol.ts` defines the frozen wire contract between client and server.
 - `src/shared/` also holds gameplay constants and shared 3D vector math.
 - `src/client/` is the source for browser TypeScript (`menu.ts`, `net-ws.ts`, ...); `public/js/*.js` is generated from it.
-- `public/js/render3d.js` is the hand-authored Three.js renderer for the flat battlefield.
+- `src/client/render3d.ts` is the Three.js renderer for the flat battlefield. It is the one ESM
+  entry: `index.html` loads `js/render3d.js` with `<script type="module">` and resolves its bare
+  `three` import through the page's import map, so it is emitted as ESM with `three` external.
 - `public/` also contains HTML, CSS, audio, images, and vendored browser libraries.
-- `tests/` contains Vitest coverage for shared math and RoomHost protocol behavior.
+- `tests/` contains Vitest coverage for shared math, the combat loop, all 12 powerups, and RoomHost protocol behavior.
 - `openspec/changes/archive/` stores historical proposals, designs, specs, and task lists.
 
-Do not edit generated client files in `public/js/` except `render3d.js`.
+Do not edit generated client files in `public/js/` — every one of them is built from `src/client/`.
 
 ## Build, Test, and Development Commands
 

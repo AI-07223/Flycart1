@@ -1,5 +1,5 @@
 // Graphics quality tiers + adaptive FPS scaling.
-// render3d.js reads cfg() for renderer/pipeline settings and calls sample(dt) each
+// render3d.ts reads cfg() for renderer/pipeline settings and calls sample(dt) each
 // frame; main.js drives set() from the settings UI. Auto-downscales (never up).
 
 interface TierConfig {

@@ -19,9 +19,12 @@ const OUT_DIR = join(ROOT, "public", "js");
 // net-ws.ts and transport.ts are NOT entry points — they are imported by main.ts
 // and bundled into main.js automatically. Do NOT add them here. (net-ws IS built
 // standalone so js/net-ws.js exists for debugging, but index.html does not load it;
-// window.Net is assigned by main.js.) render3d.js is hand-written JS and is not
-// compiled by this script.
-const ENTRY_NAMES = [
+// window.Net is assigned by main.js.)
+//
+// render3d is the one ESM entry: index.html loads it with <script type="module"> and
+// resolves its bare "three" import through the page's import map, so it must be emitted
+// as ESM with "three" left external rather than wrapped in an IIFE.
+const IIFE_ENTRIES = [
   "sphere",
   "constants",
   "quality",
@@ -32,6 +35,8 @@ const ENTRY_NAMES = [
   "qr",
   "main",
 ];
+const ESM_ENTRIES = ["render3d"];
+const ENTRY_NAMES = [...IIFE_ENTRIES, ...ESM_ENTRIES];
 
 const availableFiles = new Set(
   readdirSync(SRC_DIR).filter((f) => f.endsWith(".ts") && !f.endsWith(".d.ts"))
@@ -50,6 +55,7 @@ const entries = ENTRY_NAMES
     entry: join(SRC_DIR, `${name}.ts`),
     outfile: join(OUT_DIR, `${name}.js`),
     name,
+    format: ESM_ENTRIES.includes(name) ? "esm" : "iife",
   }));
 
 if (entries.length === 0) {
@@ -62,11 +68,11 @@ console.log(`Building ${entries.length} client file(s)...`);
 try {
   // Build all entries in parallel
   await Promise.all(
-    entries.map(({ entry, outfile, name }) =>
+    entries.map(({ entry, outfile, name, format }) =>
       build({
         entryPoints: [entry],
         outfile,
-        format: "iife",
+        format,
         bundle: true,
         target: "es2020",
         sourcemap: false,
@@ -75,7 +81,7 @@ try {
         external: ["three", "three/*", "colyseus.js"],
         // Ensure window.* assignments work in IIFE
         platform: "browser",
-      }).then(() => console.log(`  ✓ ${name}.ts → js/${name}.js`))
+      }).then(() => console.log(`  ✓ ${name}.ts → js/${name}.js (${format})`))
     )
   );
 

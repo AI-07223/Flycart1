@@ -1,6 +1,6 @@
 // Single raw-WebSocket transport for SmashCart local-only mode.
 // Implements ITransport (same shape the Colyseus Net and WebRtc transports had)
-// so main.ts / render3d.js work unchanged with window.Net pointing at this.
+// so main.ts / render3d.ts work unchanged with window.Net pointing at this.
 //
 // Wire format: JSON text frames per src/shared/protocol.ts. The page is always
 // served BY the game server, so the socket URL is just ws(s)://location.host/ws.
@@ -48,7 +48,7 @@ interface LocalPose {
 }
 
 // ---------------------------------------------------------------------------
-// StableMap — a Map whose object reference never changes so render3d.js
+// StableMap — a Map whose object reference never changes so render3d.ts
 // cannot hold a stale reference. Keys/values are mutated in-place.
 // ---------------------------------------------------------------------------
 

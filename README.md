@@ -123,10 +123,10 @@ src/
   shared/protocol.ts       frozen wire contract (client ⇄ server messages)
   shared/constants.ts      gameplay tuning constants
   shared/                  shared vector math, flight model, loadout data
-  client/                  browser TypeScript sources (menu.ts, net-ws.ts, ...)
+  client/                  browser TypeScript sources (menu.ts, net-ws.ts, render3d.ts, ...)
 public/
   index.html               menu and HUD shell
-  js/                      generated client bundles + hand-authored render3d.js
+  js/                      generated client bundles (all built from src/client/)
   css/                     UI styling
   vendor/                  vendored three.js browser runtime
   assets/                  audio and art assets
