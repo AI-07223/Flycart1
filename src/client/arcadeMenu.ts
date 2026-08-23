@@ -58,13 +58,10 @@ function getArcadeMenuMarkup(): string {
         </section>
 
         <section class="${ARCADE_MENU_SCREEN_CLASS}" id="${arcadeScreenId("create")}">
-          <header class="arcade-screen-header">
-            <button type="button" class="arcade-back-btn" data-arcade-back>Back</button>
-            <div class="arcade-screen-title-wrap">
-              <p class="arcade-panel-kicker">Host On This Device</p>
-              <h2 class="arcade-screen-title">Create Room</h2>
-              <p class="arcade-screen-copy">Friends on your Wi-Fi join with the room code.</p>
-            </div>
+          <header class="arcade-hangar-header">
+            <button type="button" class="arcade-back-btn arcade-back-btn--compact" data-arcade-back>Back</button>
+            <h2 class="arcade-hangar-title">Create Room</h2>
+            <span class="arcade-header-spacer" aria-hidden="true"></span>
           </header>
 
           <section class="arcade-panel arcade-create-panel">
@@ -76,26 +73,22 @@ function getArcadeMenuMarkup(): string {
               <input type="checkbox" id="arcade-local-bots-check" checked />
               <span>Fill with bots</span>
             </label>
-            <p class="muted arcade-hint">Change bot difficulty in ⚙ Settings.</p>
+            <p class="muted arcade-hint">Friends on your Wi-Fi join with the room code. Bot difficulty: ⚙ Settings.</p>
             <button type="button" id="arcade-local-create-btn" class="arcade-panel-action arcade-panel-action--wide arcade-panel-action--major">✅ Create Room</button>
           </section>
         </section>
 
         <section class="${ARCADE_MENU_SCREEN_CLASS}" id="${arcadeScreenId("join")}">
-          <header class="arcade-screen-header">
-            <button type="button" class="arcade-back-btn" data-arcade-back>Back</button>
-            <div class="arcade-screen-title-wrap">
-              <p class="arcade-panel-kicker">Join Console</p>
-              <h2 class="arcade-screen-title">Join Room</h2>
-              <p class="arcade-screen-copy">Rooms on your Wi-Fi show up automatically. No code needed to scan.</p>
-            </div>
+          <header class="arcade-hangar-header">
+            <button type="button" class="arcade-back-btn arcade-back-btn--compact" data-arcade-back>Back</button>
+            <h2 class="arcade-hangar-title">Join Room</h2>
+            <span class="arcade-header-spacer" aria-hidden="true"></span>
           </header>
 
           <section class="arcade-panel arcade-join-scan-panel">
             <div class="arcade-panel-header">
               <div>
-                <p class="arcade-panel-kicker">Nearby Rooms</p>
-                <h3 class="arcade-panel-title">Live On Your Hotspot</h3>
+                <h3 class="arcade-panel-title">Nearby Rooms</h3>
               </div>
               <button type="button" id="arcade-local-scan-btn" class="arcade-panel-action arcade-panel-action--secondary">↻ Re-scan</button>
             </div>
@@ -116,20 +109,16 @@ function getArcadeMenuMarkup(): string {
         </section>
 
         <section class="${ARCADE_MENU_SCREEN_CLASS}" id="${arcadeScreenId("leaders")}">
-          <header class="arcade-screen-header">
-            <button type="button" class="arcade-back-btn" data-arcade-back>Back</button>
-            <div class="arcade-screen-title-wrap">
-              <p class="arcade-panel-kicker">Aces Board</p>
-              <h2 class="arcade-screen-title">All-Time Leaders</h2>
-              <p class="arcade-screen-copy">Persistent pilot rankings with enough weight to feel like part of the game front-end.</p>
-            </div>
+          <header class="arcade-hangar-header">
+            <button type="button" class="arcade-back-btn arcade-back-btn--compact" data-arcade-back>Back</button>
+            <h2 class="arcade-hangar-title">Leaderboard</h2>
+            <span class="arcade-header-spacer" aria-hidden="true"></span>
           </header>
 
           <section class="arcade-panel arcade-leaderboard-panel">
             <div class="arcade-panel-header">
               <div>
-                <p class="arcade-panel-kicker">Top Pilots</p>
-                <h3 class="arcade-panel-title">Current Scoreline</h3>
+                <h3 class="arcade-panel-title">Top Pilots</h3>
               </div>
               <span class="arcade-panel-badge arcade-panel-badge--subtle">Top 10</span>
             </div>
@@ -139,112 +128,46 @@ function getArcadeMenuMarkup(): string {
           </section>
         </section>
 
-        <section class="${ARCADE_MENU_SCREEN_CLASS}" id="${arcadeScreenId("customize")}">
-          <header class="arcade-screen-header">
-            <button type="button" class="arcade-back-btn" data-arcade-back>Back</button>
-            <div class="arcade-screen-title-wrap">
-              <p class="arcade-panel-kicker">Hangar</p>
-              <h2 class="arcade-screen-title">Customize Your Plane</h2>
-              <p class="arcade-screen-copy">A proper loadout system: save presets, swap airframes, and carry the same plane into every local room.</p>
+        <section class="${ARCADE_MENU_SCREEN_CLASS} arcade-hangar-screen" id="${arcadeScreenId("customize")}">
+          <header class="arcade-hangar-header">
+            <button type="button" class="arcade-back-btn arcade-back-btn--compact" data-arcade-back>Back</button>
+            <h2 class="arcade-hangar-title">Hangar</h2>
+            <div class="arcade-hangar-header-actions">
+              <button type="button" id="arcade-customize-randomize" class="arcade-icon-btn" aria-label="Randomize loadout" title="Randomize">🎲</button>
+              <button type="button" id="arcade-customize-done" class="arcade-panel-action arcade-panel-action--compact" data-arcade-back>Done</button>
             </div>
           </header>
 
-          <div class="arcade-customize-layout">
-            <aside class="arcade-customize-sidebar">
-              <section class="arcade-panel arcade-hangar-panel">
-                <div class="arcade-panel-header">
-                  <div>
-                    <p class="arcade-panel-kicker">Armed Loadout</p>
-                    <h3 id="arcade-customize-summary-name" class="arcade-panel-title">Viper Fighter</h3>
-                  </div>
-                  <span class="arcade-panel-badge">Live</span>
-                </div>
-                <p id="arcade-customize-summary-text" class="arcade-panel-copy">Scarlet paint, Midnight accent, Clean livery, White Smoke trail</p>
-                <div id="arcade-customize-summary-grid" class="summary-grid"></div>
-                <div class="arcade-fallback-actions">
-                  <button type="button" id="arcade-customize-randomize" class="arcade-panel-action arcade-panel-action--secondary">Randomize</button>
-                  <button type="button" id="arcade-customize-reset" class="arcade-panel-action arcade-panel-action--secondary">Reset</button>
-                  <button type="button" id="arcade-customize-done" class="arcade-panel-action" data-arcade-back>Done</button>
-                </div>
-                <p id="arcade-customize-feedback" class="muted arcade-hint">Cosmetics are visual only. No effect on flight or damage.</p>
-              </section>
+          <div class="arcade-hangar-stage" aria-hidden="true"></div>
 
-              <section class="arcade-panel">
-                <div class="arcade-panel-header">
-                  <div>
-                    <p class="arcade-panel-kicker">Preset Slots</p>
-                    <h3 class="arcade-panel-title">Save And Swap</h3>
-                  </div>
-                  <span class="arcade-panel-badge arcade-panel-badge--subtle">4 slots</span>
-                </div>
-                <div id="arcade-preset-grid" class="preset-grid"></div>
-              </section>
-            </aside>
+          <p class="arcade-hangar-summary">
+            <span id="arcade-customize-summary-name">Viper Fighter</span>
+            <span id="arcade-customize-summary-text" class="arcade-hangar-summary-text">Scarlet paint, Midnight accent, Clean livery, White Smoke trail</span>
+          </p>
 
-            <div class="arcade-customize-main">
-              <section class="arcade-panel arcade-stage-panel">
-                <div class="arcade-stage-grid">
-                  <div class="arcade-stage-radar"></div>
-                  <div>
-                    <p class="arcade-panel-kicker">Runway Camera</p>
-                    <h3 class="arcade-panel-title">Live Preview Behind The UI</h3>
-                    <p class="arcade-panel-copy">The 3D scene keeps the selected aircraft visible while you tune paint, airframe, livery, and trail from a real hangar screen instead of a settings list.</p>
-                  </div>
-                </div>
-              </section>
+          <div class="arcade-hangar-sheet">
+            <div class="arcade-hangar-tabs" role="tablist">
+              <button type="button" class="arcade-hangar-tab is-active" data-hangar-tab="airframe" role="tab" aria-selected="true">✈ Frame</button>
+              <button type="button" class="arcade-hangar-tab" data-hangar-tab="paint" role="tab" aria-selected="false">🎨 Paint</button>
+              <button type="button" class="arcade-hangar-tab" data-hangar-tab="accent" role="tab" aria-selected="false">◆ Accent</button>
+              <button type="button" class="arcade-hangar-tab" data-hangar-tab="livery" role="tab" aria-selected="false">▨ Livery</button>
+              <button type="button" class="arcade-hangar-tab" data-hangar-tab="trail" role="tab" aria-selected="false">✦ Trail</button>
+              <button type="button" class="arcade-hangar-tab" data-hangar-tab="presets" role="tab" aria-selected="false">⭐ Presets</button>
+            </div>
 
-              <div class="arcade-option-columns">
-                <section class="arcade-panel">
-                  <div class="arcade-panel-header">
-                    <div>
-                      <p class="arcade-panel-kicker">Airframe</p>
-                      <h3 class="arcade-panel-title">Choose The Silhouette</h3>
-                    </div>
-                  </div>
-                  <div id="arcade-customize-airframe" class="option-grid option-grid--cards"></div>
-                </section>
-
-                <section class="arcade-panel">
-                  <div class="arcade-panel-header">
-                    <div>
-                      <p class="arcade-panel-kicker">Paint</p>
-                      <h3 class="arcade-panel-title">Primary Finish</h3>
-                    </div>
-                  </div>
-                  <div id="arcade-customize-paint" class="option-grid option-grid--swatches"></div>
-                </section>
-
-                <section class="arcade-panel">
-                  <div class="arcade-panel-header">
-                    <div>
-                      <p class="arcade-panel-kicker">Accent</p>
-                      <h3 class="arcade-panel-title">Trim Color</h3>
-                    </div>
-                  </div>
-                  <div id="arcade-customize-accent" class="option-grid option-grid--swatches"></div>
-                </section>
-
-                <section class="arcade-panel">
-                  <div class="arcade-panel-header">
-                    <div>
-                      <p class="arcade-panel-kicker">Livery</p>
-                      <h3 class="arcade-panel-title">Pattern Layout</h3>
-                    </div>
-                  </div>
-                  <div id="arcade-customize-livery" class="option-grid option-grid--cards"></div>
-                </section>
-
-                <section class="arcade-panel">
-                  <div class="arcade-panel-header">
-                    <div>
-                      <p class="arcade-panel-kicker">Trail</p>
-                      <h3 class="arcade-panel-title">Engine Wake</h3>
-                    </div>
-                  </div>
-                  <div id="arcade-customize-trail" class="option-grid option-grid--swatches"></div>
-                </section>
+            <div class="arcade-hangar-sheet-body">
+              <div id="arcade-customize-airframe" class="arcade-hangar-panel-content option-row option-row--cards is-active" data-hangar-panel="airframe"></div>
+              <div id="arcade-customize-paint" class="arcade-hangar-panel-content option-row option-row--swatches" data-hangar-panel="paint"></div>
+              <div id="arcade-customize-accent" class="arcade-hangar-panel-content option-row option-row--swatches" data-hangar-panel="accent"></div>
+              <div id="arcade-customize-livery" class="arcade-hangar-panel-content option-row option-row--cards" data-hangar-panel="livery"></div>
+              <div id="arcade-customize-trail" class="arcade-hangar-panel-content option-row option-row--swatches" data-hangar-panel="trail"></div>
+              <div class="arcade-hangar-panel-content arcade-hangar-presets-panel" data-hangar-panel="presets">
+                <div id="arcade-preset-grid" class="preset-grid preset-grid--row"></div>
+                <button type="button" id="arcade-customize-reset" class="arcade-hangar-reset-btn">Reset to default</button>
               </div>
             </div>
+
+            <p id="arcade-customize-feedback" class="arcade-hangar-feedback">Cosmetics are visual only. No effect on flight or damage.</p>
           </div>
         </section>
 

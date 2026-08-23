@@ -27,3 +27,6 @@ dump.rdb
 skills-lock.json
 .claude/worktrees/
 .chrome-ui-review-escalated/
+
+deepseek-harness/
+.codex-remote-attachments/

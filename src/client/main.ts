@@ -142,7 +142,6 @@ const els = {
   lobbyPlaneSummary: dollar("lobby-plane-summary"),
   customizeSummaryName: menuDollar("arcade-customize-summary-name", "customize-summary-name"),
   customizeSummaryText: menuDollar("arcade-customize-summary-text", "customize-summary-text"),
-  customizeSummaryGrid: menuDollar("arcade-customize-summary-grid", "customize-summary-grid"),
   customizeFeedback: menuDollar("arcade-customize-feedback", "customize-feedback"),
   presetGrid: menuDollar("arcade-preset-grid", "preset-grid"),
   customizeAirframe: menuDollar("arcade-customize-airframe", "customize-airframe"),
@@ -804,12 +803,6 @@ function findActivePresetIndex(): number {
   return loadoutStore.presets.findIndex((preset) => sameLoadout(preset, selectedCosmetics));
 }
 
-function renderSummaryGrid(rows: Array<{ label: string; value: string }>): void {
-  els.customizeSummaryGrid.innerHTML = rows.map((row) =>
-    `<div class="summary-grid-row"><span>${escapeHtml(row.label)}</span><strong>${escapeHtml(row.value)}</strong></div>`
-  ).join("");
-}
-
 function updateSelectedLoadout(next: CosmeticLoadout, feedback?: string): void {
   selectedCosmetics = cloneLoadout(next);
   loadoutStore.active = selectedCosmetics;
@@ -917,7 +910,6 @@ function renderLoadoutUI(): void {
   els.lobbyPlaneSummary.textContent = `${summary.title} · ${rows.map((row) => row.value).join(" · ")}`;
   els.customizeSummaryName.textContent = summary.title;
   els.customizeSummaryText.textContent = summary.subtitle;
-  renderSummaryGrid(rows);
   renderPresetGrid();
   renderOptionGroup(els.customizeAirframe, "bodyShape", AIRFRAME_OPTIONS, "cards");
   renderOptionGroup(els.customizePaint, "color", PAINT_OPTIONS, "swatches");
@@ -1850,10 +1842,30 @@ function init(): void {
       navBack();
     });
   });
+
+  // ─── HANGAR TAB WIRING ────────────────────────────────────────────────────
+  // Bottom-sheet tabs on the customize screen: exactly one option row visible.
+  menuRoot.querySelectorAll<HTMLElement>("[data-hangar-tab]").forEach((tabEl) => {
+    tabEl.addEventListener("click", () => {
+      const target = tabEl.dataset.hangarTab;
+      if (!target) return;
+      window.SFX.uiClick();
+      menuRoot.querySelectorAll<HTMLElement>("[data-hangar-tab]").forEach((t) => {
+        const active = t === tabEl;
+        t.classList.toggle("is-active", active);
+        t.setAttribute("aria-selected", active ? "true" : "false");
+      });
+      menuRoot.querySelectorAll<HTMLElement>("[data-hangar-panel]").forEach((panel) => {
+        panel.classList.toggle("is-active", panel.dataset.hangarPanel === target);
+      });
+    });
+  });
+
   // Allow direct QA/deep-link entry to a menu screen via location hash (#customize, #lan, etc.)
   const initialHashScreen = location.hash.replace(/^#/, "").toLowerCase();
-  if (MENU_SCREENS.includes(initialHashScreen as (typeof MENU_SCREENS)[number])) {
-    navStack = [initialHashScreen];
+  if (MENU_SCREENS.includes(initialHashScreen as (typeof MENU_SCREENS)[number]) && initialHashScreen !== "home") {
+    // Seed home under the deep-linked screen so Back/Done still work.
+    navStack = ["home", initialHashScreen];
     navShow(initialHashScreen);
   } else {
     navReset();

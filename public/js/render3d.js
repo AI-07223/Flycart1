@@ -42,6 +42,18 @@ import * as THREE from "three";
   let menuDemo = null;
   let sceneMode = "preflight";
   let particles = [];
+  // Hangar turntable (customize mode): fixed stage point the demo plane hovers/spins at,
+  // and a soft ground disc reused across rebuilds. stageBlend eases the cut when entering
+  // customize from the preflight orbit so the camera doesn't snap.
+  let stageShadow = null;
+  let stageBlend = 0;
+  const STAGE_POS = { x: 0, y: 92, z: -40 };
+  // 3/4 hero angle ~27u out: close enough that the plane fills ~35-40% of frame width,
+  // offset up+right so we look slightly down at it; look target sits a touch below the
+  // plane so it lands in the upper-middle of the frame (~40% from top), clear of the
+  // bottom-42% customize sheet.
+  const STAGE_CAM_POS = new THREE.Vector3(STAGE_POS.x + 14.9, STAGE_POS.y + 11.4, STAGE_POS.z + 19.5);
+  const STAGE_CAM_LOOK = new THREE.Vector3(STAGE_POS.x, STAGE_POS.y - 5, STAGE_POS.z);
 
   const camPos = new THREE.Vector3(0, 90, 160);
   const camLook = new THREE.Vector3(0, 30, 0);
@@ -1035,6 +1047,20 @@ import * as THREE from "three";
     menuDemo = null;
   }
 
+  // getStageShadow(): lazily builds a cheap soft ground disc under the hangar turntable
+  // stage point. Reused across mode switches and plane rebuilds — no per-frame allocation.
+  function getStageShadow() {
+    if (stageShadow) return stageShadow;
+    const geo = new THREE.CircleGeometry(30, 24);
+    const mat = new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.32, depthWrite: false });
+    stageShadow = new THREE.Mesh(geo, mat);
+    stageShadow.rotation.x = -Math.PI / 2;
+    stageShadow.renderOrder = -1;
+    stageShadow.visible = false;
+    scene.add(stageShadow);
+    return stageShadow;
+  }
+
   function applySceneModeChrome() {
     const showCombatChrome = sceneMode === "playing";
     if (minimap) minimap.style.display = showCombatChrome ? "block" : "none";
@@ -1449,13 +1475,57 @@ import * as THREE from "three";
 
       applySceneModeChrome();
       const isCustomize = sceneMode === "customize";
-      const radius = isCustomize ? 170 : 300;
-      const rotSpeed = isCustomize ? 0.07 : 0.14;
-      const bobAmp = isCustomize ? 5 : 10;
-      const angle = time * rotSpeed;
-      const pos = { x: Math.cos(angle) * radius, y: 85 + Math.sin(time * 0.8) * bobAmp, z: Math.sin(angle) * radius };
-      const fwd = SP.normalize({ x: -Math.sin(angle), y: Math.cos(time * 0.8) * 0.08, z: Math.cos(angle) });
-      orientPlane(menuDemo, { p: pos, f: fwd }, Math.sin(time * 1.3) * 0.22);
+      // Blend factor eases the hard cut when entering/leaving the hangar stage: ramps
+      // 0->1 over ~350ms so the camera/plane glide into the turntable pose instead of
+      // snapping there on the frame sceneMode flips.
+      const blendTarget = isCustomize ? 1 : 0;
+      const blendRate = menuStep / 0.35;
+      stageBlend = stageBlend + Math.sign(blendTarget - stageBlend) * Math.min(Math.abs(blendTarget - stageBlend), blendRate);
+
+      let pos, fwd, bank, desired, look;
+
+      if (isCustomize || stageBlend > 0) {
+        // --- Hangar turntable: fixed stage point, spins in place, gentle hover bob ---
+        const yaw = time * 0.45;
+        pos = { x: STAGE_POS.x, y: STAGE_POS.y + Math.sin(time * 0.9) * 4, z: STAGE_POS.z };
+        fwd = { x: Math.sin(yaw), y: 0, z: Math.cos(yaw) };
+        bank = 0;
+
+        const stageDesired = STAGE_CAM_POS;
+        const stageLook = STAGE_CAM_LOOK;
+
+        if (stageBlend >= 1) {
+          desired = stageDesired;
+          look = stageLook;
+        } else {
+          // Blend from wherever the orbit camera currently sits into the stage pose.
+          desired = camPos.clone().lerp(stageDesired, stageBlend);
+          look = camLook.clone().lerp(stageLook, stageBlend);
+        }
+      } else {
+        // --- Preflight menu: orbiting flyby, camera trailing behind ---
+        const radius = 300;
+        const rotSpeed = 0.14;
+        const bobAmp = 10;
+        const angle = time * rotSpeed;
+        pos = { x: Math.cos(angle) * radius, y: 85 + Math.sin(time * 0.8) * bobAmp, z: Math.sin(angle) * radius };
+        fwd = SP.normalize({ x: -Math.sin(angle), y: Math.cos(time * 0.8) * 0.08, z: Math.cos(angle) });
+        bank = Math.sin(time * 1.3) * 0.22;
+
+        const camPullBack = 118;
+        const camUp = 44;
+        const camLookAhead = 148;
+        const lateralShift = 72;
+        const right = new THREE.Vector3(-fwd.z, 0, fwd.x).normalize();
+        desired = new THREE.Vector3(
+          pos.x - fwd.x * camPullBack + right.x * lateralShift,
+          pos.y + camUp,
+          pos.z - fwd.z * camPullBack + right.z * lateralShift
+        );
+        look = new THREE.Vector3(pos.x + fwd.x * camLookAhead, pos.y + 8, pos.z + fwd.z * camLookAhead);
+      }
+
+      orientPlane(menuDemo, { p: pos, f: fwd }, bank);
       animatePlaneNose(menuDemo, 0.4 + 0.2 * Math.sin(time * 0.6));
 
       // Animate menu exhaust (gentle idle pulse)
@@ -1466,19 +1536,14 @@ import * as THREE from "three";
         exhaust.visible = true;
       }
 
-      const camPullBack = isCustomize ? 74 : 118;
-      const camUp = isCustomize ? 28 : 44;
-      const camLookAhead = isCustomize ? 84 : 148;
-      const lerpSpeed = isCustomize ? 0.10 : 0.065;
+      // Stage ground disc: only visible once the camera has (mostly) settled into the
+      // hangar pose, faded in with stageBlend so it doesn't pop during the transition.
+      const shadow = getStageShadow();
+      shadow.position.set(STAGE_POS.x, 0.5, STAGE_POS.z);
+      shadow.visible = stageBlend > 0.05;
+      shadow.material.opacity = 0.32 * stageBlend;
 
-      const right = new THREE.Vector3(-fwd.z, 0, fwd.x).normalize();
-      const lateralShift = isCustomize ? 104 : 72;
-      const desired = new THREE.Vector3(
-        pos.x - fwd.x * camPullBack + right.x * lateralShift,
-        pos.y + camUp,
-        pos.z - fwd.z * camPullBack + right.z * lateralShift
-      );
-      const look = new THREE.Vector3(pos.x + fwd.x * camLookAhead, pos.y + 8, pos.z + fwd.z * camLookAhead);
+      const lerpSpeed = isCustomize ? 0.10 : 0.065;
       camPos.lerp(desired, lerpSpeed);
       camLook.lerp(look, lerpSpeed + 0.02);
       camera.position.copy(camPos);
