@@ -1,233 +1,14 @@
 "use strict";
 (() => {
-  var __getOwnPropNames = Object.getOwnPropertyNames;
-  var __esm = (fn, res) => function __init() {
-    return fn && (res = (0, fn[__getOwnPropNames(fn)[0]])(fn = 0)), res;
-  };
-  var __commonJS = (cb, mod) => function __require() {
-    return mod || (0, cb[__getOwnPropNames(cb)[0]])((mod = { exports: {} }).exports, mod), mod.exports;
-  };
-
-  // src/shared/constants.ts
-  var TICK_RATE, TICK_MS, CRUISE_SPEED, BOOST_SPEED, ACCEL, TURN_RATE, PITCH_RATE, PITCH_MAX, PLANE_RADIUS, MAX_HP, BULLET_SPEED, BULLET_DAMAGE, BULLET_LIFE, BULLET_RADIUS, FIRE_COOLDOWN, RESPAWN_DELAY, HIT_KNOCKBACK, MINE_KNOCKBACK, BULLET_HIT_RADIUS, AIM_ASSIST_CONE, AIM_ASSIST_RANGE, AIM_ASSIST_TURN, ROUND_SECONDS, ROUND_INTERMISSION, BOT_FILL_TARGET, MAP_HALF, MAP_EDGE_SOFT, GROUND_Y, MIN_ALT, SPAWN_ALT, MAX_ALT, PICKUP_ALT_MIN, PICKUP_ALT_MAX, PICKUP_FIELD_RADIUS, SPAWN_REROLL, BOT_NAMES, COLOR_COUNT, ACCENT_COUNT, TRAIL_COUNT, LIVERY_COUNT, SKIN_COUNT, DEFAULT_BOT_DIFFICULTY, BOT_DIFFICULTY, PICKUP_MAX, PICKUP_INTERVAL, PICKUP_RADIUS, POWERUP_DURATION, SHIELD_CHARGES, RAPID_FACTOR, SPREAD_ANGLE, AFTERBURNER_FACTOR, HOMING_TURN, POWERUP_TYPES, POWERUP_WEIGHTS, MINE_TRIGGER_RADIUS, MINE_BLAST_RADIUS, MINE_DAMAGE, MINE_LIFE, MINE_MAX_PER_OWNER, MINE_DROP_COOLDOWN, MINE_ARM_DELAY, STAR_DURATION, STAR_RAM_RADIUS_FACTOR, EMP_RADIUS, EMP_DURATION, FREEZE_DURATION, SPAWN_INVULN, LOBBY_READY_TIMEOUT, TEAM_COUNT, LANDMARKS;
-  var init_constants = __esm({
-    "src/shared/constants.ts"() {
-      "use strict";
-      TICK_RATE = 30;
-      TICK_MS = 1e3 / TICK_RATE;
-      CRUISE_SPEED = 92;
-      BOOST_SPEED = 155;
-      ACCEL = 420;
-      TURN_RATE = 2.2;
-      PITCH_RATE = 1.35;
-      PITCH_MAX = 0.5;
-      PLANE_RADIUS = 16;
-      MAX_HP = 100;
-      BULLET_SPEED = 322;
-      BULLET_DAMAGE = 25;
-      BULLET_LIFE = 2.3;
-      BULLET_RADIUS = 4;
-      FIRE_COOLDOWN = 0.3;
-      RESPAWN_DELAY = 1.2;
-      HIT_KNOCKBACK = 14;
-      MINE_KNOCKBACK = 46;
-      BULLET_HIT_RADIUS = 26;
-      AIM_ASSIST_CONE = 0.35;
-      AIM_ASSIST_RANGE = 700;
-      AIM_ASSIST_TURN = 0.55;
-      ROUND_SECONDS = 150;
-      ROUND_INTERMISSION = 8;
-      BOT_FILL_TARGET = 8;
-      MAP_HALF = 1800;
-      MAP_EDGE_SOFT = 260;
-      GROUND_Y = 0;
-      MIN_ALT = 18;
-      SPAWN_ALT = 58;
-      MAX_ALT = 320;
-      PICKUP_ALT_MIN = 28;
-      PICKUP_ALT_MAX = 170;
-      PICKUP_FIELD_RADIUS = 1120;
-      SPAWN_REROLL = 14;
-      BOT_NAMES = [
-        "Maverick",
-        "Goose",
-        "Iceman",
-        "Viper",
-        "Rio",
-        "Jester",
-        "Slider",
-        "Hollywood",
-        "Merlin",
-        "Wolfman"
-      ];
-      COLOR_COUNT = 12;
-      ACCENT_COUNT = 7;
-      TRAIL_COUNT = 5;
-      LIVERY_COUNT = 4;
-      SKIN_COUNT = COLOR_COUNT;
-      DEFAULT_BOT_DIFFICULTY = "medium";
-      BOT_DIFFICULTY = {
-        easy: { aimErr: 0.3, fireCone: 0.12, leadFactor: 0.4, reactMin: 0.8, reactMax: 1.4 },
-        medium: { aimErr: 0.16, fireCone: 0.13, leadFactor: 0.7, reactMin: 0.6, reactMax: 1 },
-        high: { aimErr: 0.07, fireCone: 0.15, leadFactor: 0.9, reactMin: 0.4, reactMax: 0.8 }
-      };
-      PICKUP_MAX = 6;
-      PICKUP_INTERVAL = 5.5;
-      PICKUP_RADIUS = 44;
-      POWERUP_DURATION = 10;
-      SHIELD_CHARGES = 3;
-      RAPID_FACTOR = 0.55;
-      SPREAD_ANGLE = 0.12;
-      AFTERBURNER_FACTOR = 1.22;
-      HOMING_TURN = 1.45;
-      POWERUP_TYPES = ["spread", "rapid", "shield", "afterburner", "repair", "homing", "mine", "star", "emp", "freeze"];
-      POWERUP_WEIGHTS = {
-        spread: 1,
-        rapid: 1,
-        shield: 1,
-        afterburner: 1,
-        repair: 0.7,
-        homing: 0.55,
-        mine: 0.9,
-        star: 0.4,
-        emp: 0.7,
-        freeze: 0.8
-      };
-      MINE_TRIGGER_RADIUS = 55;
-      MINE_BLAST_RADIUS = 90;
-      MINE_DAMAGE = 50;
-      MINE_LIFE = 20;
-      MINE_MAX_PER_OWNER = 3;
-      MINE_DROP_COOLDOWN = 0.8;
-      MINE_ARM_DELAY = 1.5;
-      STAR_DURATION = 5;
-      STAR_RAM_RADIUS_FACTOR = 2.2;
-      EMP_RADIUS = 350;
-      EMP_DURATION = 3;
-      FREEZE_DURATION = 2.2;
-      SPAWN_INVULN = 1.2;
-      LOBBY_READY_TIMEOUT = 120;
-      TEAM_COUNT = 2;
-      LANDMARKS = [
-        { kind: "tower", x: 0, z: 0, radius: 96, height: 170, color: 16747069, cover: true },
-        { kind: "mesa", x: -620, z: -340, radius: 90, height: 56, color: 11636066, cover: true },
-        { kind: "mesa", x: 720, z: -520, radius: 110, height: 62, color: 11636066, cover: true },
-        { kind: "mesa", x: -760, z: 610, radius: 120, height: 60, color: 11636066, cover: true },
-        { kind: "spire", x: 660, z: 660, radius: 54, height: 120, color: 9356031, cover: true },
-        { kind: "spire", x: -180, z: 860, radius: 48, height: 108, color: 9356031, cover: true },
-        { kind: "hangar", x: 940, z: 90, radius: 78, height: 36, color: 8293014, cover: true },
-        { kind: "hangar", x: -980, z: 80, radius: 78, height: 36, color: 8293014, cover: true }
-      ];
-    }
-  });
-
   // src/shared/sphere.ts
+  var dot = (a, b) => a.x * b.x + a.y * b.y + a.z * b.z;
+  var lenSq = (a) => dot(a, a);
+  var len = (a) => Math.sqrt(lenSq(a));
+  var lerp = (a, b, t) => a + (b - a) * t;
   function normalize(a) {
     const l = len(a);
     return l > 1e-9 ? { x: a.x / l, y: a.y / l, z: a.z / l } : { x: 1, y: 0, z: 0 };
   }
-  function rotateAxis(v, k, ang) {
-    const axis = normalize(k);
-    const c = Math.cos(ang);
-    const s = Math.sin(ang);
-    const kv = cross(axis, v);
-    const kd = dot(axis, v) * (1 - c);
-    return {
-      x: v.x * c + kv.x * s + axis.x * kd,
-      y: v.y * c + kv.y * s + axis.y * kd,
-      z: v.z * c + kv.z * s + axis.z * kd
-    };
-  }
-  function advance(p, f, dist) {
-    const dir = normalize(f);
-    return { p: add(p, scale(dir, dist)), f: dir };
-  }
-  function turn(_pos, f, ang) {
-    return normalize(rotateAxis(f, WORLD_UP, ang));
-  }
-  function angBetween(a, b) {
-    const na = normalize(a);
-    const nb = normalize(b);
-    return Math.acos(clamp(dot(na, nb), -1, 1));
-  }
-  function slerp(a, b, t) {
-    const ta = normalize(a);
-    const tb = normalize(b);
-    const d = clamp(dot(ta, tb), -1, 1);
-    if (d > 0.9995 || d < -0.9995) return normalize(lerpVec(ta, tb, t));
-    const th = Math.acos(d);
-    const s = Math.sin(th);
-    const wa = Math.sin((1 - t) * th) / s;
-    const wb = Math.sin(t * th) / s;
-    return normalize({
-      x: ta.x * wa + tb.x * wb,
-      y: ta.y * wa + tb.y * wb,
-      z: ta.z * wa + tb.z * wb
-    });
-  }
-  function signedAngle(normal, from, to) {
-    const n = normalize(normal);
-    const a = normalize(from);
-    const b = normalize(to);
-    return Math.atan2(dot(cross(a, b), n), dot(a, b));
-  }
-  function yawPitchForward(yaw, pitch) {
-    const cp = Math.cos(pitch);
-    return normalize({
-      x: Math.cos(yaw) * cp,
-      y: Math.sin(pitch),
-      z: Math.sin(yaw) * cp
-    });
-  }
-  function yawPitchFromForward(f) {
-    const dir = normalize(f);
-    return {
-      yaw: Math.atan2(dir.z, dir.x),
-      pitch: Math.asin(clamp(dir.y, -1, 1))
-    };
-  }
-  function withPitch(f, pitch) {
-    const { yaw } = yawPitchFromForward(f);
-    return yawPitchForward(yaw, pitch);
-  }
-  function segmentPointT(a, b, p) {
-    const ab = sub(b, a);
-    const ll = lenSq(ab);
-    if (ll < 1e-9) return 0;
-    return clamp(dot(sub(p, a), ab) / ll, 0, 1);
-  }
-  function segmentPointDistance(a, b, p) {
-    const t = segmentPointT(a, b, p);
-    return distance(add(a, scale(sub(b, a), t)), p);
-  }
-  var WORLD_UP, vec, add, sub, scale, dot, cross, lenSq, len, distanceSq, distance, clamp, lerp, lerpVec;
-  var init_sphere = __esm({
-    "src/shared/sphere.ts"() {
-      "use strict";
-      WORLD_UP = { x: 0, y: 1, z: 0 };
-      vec = (x, y, z) => ({ x, y, z });
-      add = (a, b) => ({ x: a.x + b.x, y: a.y + b.y, z: a.z + b.z });
-      sub = (a, b) => ({ x: a.x - b.x, y: a.y - b.y, z: a.z - b.z });
-      scale = (a, s) => ({ x: a.x * s, y: a.y * s, z: a.z * s });
-      dot = (a, b) => a.x * b.x + a.y * b.y + a.z * b.z;
-      cross = (a, b) => ({
-        x: a.y * b.z - a.z * b.y,
-        y: a.z * b.x - a.x * b.z,
-        z: a.x * b.y - a.y * b.x
-      });
-      lenSq = (a) => dot(a, a);
-      len = (a) => Math.sqrt(lenSq(a));
-      distanceSq = (a, b) => lenSq(sub(a, b));
-      distance = (a, b) => Math.sqrt(distanceSq(a, b));
-      clamp = (v, min, max) => Math.max(min, Math.min(max, v));
-      lerp = (a, b, t) => a + (b - a) * t;
-      lerpVec = (a, b, t) => ({
-        x: lerp(a.x, b.x, t),
-        y: lerp(a.y, b.y, t),
-        z: lerp(a.z, b.z, t)
-      });
-    }
-  });
 
   // src/shared/flight.ts
   function resolveLandmarkCollisions(pos, fwd, landmarks, radius) {
@@ -256,2710 +37,677 @@
     }
     return { pos: nextPos, fwd: nextFwd, collided };
   }
-  var init_flight = __esm({
-    "src/shared/flight.ts"() {
-      "use strict";
-      init_sphere();
-    }
-  });
 
-  // src/sim/GameSim.ts
-  function rand(min, max) {
-    return min + Math.random() * (max - min);
-  }
-  function signWithDeadzone(v, deadzone) {
-    return Math.abs(v) <= deadzone ? 0 : Math.sign(v);
-  }
-  function horizontal(v) {
-    return { x: v.x, y: 0, z: v.z };
-  }
-  function normalizeHorizontal(v) {
-    const h = horizontal(v);
-    return lenSq(h) > 1e-9 ? normalize(h) : { x: 1, y: 0, z: 0 };
-  }
-  function signedYaw(from, to) {
-    return signedAngle(WORLD_UP, normalizeHorizontal(from), normalizeHorizontal(to));
-  }
-  function steerToward(from, to, maxTurn) {
-    const angle = angBetween(from, to);
-    if (angle < 1e-5) return normalize(to);
-    const t = Math.min(1, maxTurn / angle);
-    return slerp(from, to, t);
-  }
-  function clampToArena(pos) {
-    return {
-      x: clamp(pos.x, -MAP_HALF, MAP_HALF),
-      y: clamp(pos.y, MIN_ALT, MAX_ALT),
-      z: clamp(pos.z, -MAP_HALF, MAP_HALF)
-    };
-  }
-  function isRecord(value) {
-    return typeof value === "object" && value !== null && !Array.isArray(value);
-  }
-  function applyInputPatch(current, data) {
-    if (!isRecord(data)) return null;
-    const next = { ...current };
-    const seq = typeof data.seq === "number" && Number.isFinite(data.seq) ? Math.floor(data.seq) : current.seq;
-    if (seq < current.seq) return null;
-    next.seq = seq;
-    if (typeof data.turn === "number" && Number.isFinite(data.turn)) next.turn = clamp(data.turn, -1, 1);
-    if (typeof data.climb === "number" && Number.isFinite(data.climb)) next.climb = clamp(data.climb, -1, 1);
-    if (typeof data.boost === "boolean") next.boost = data.boost;
-    if (typeof data.fire === "boolean") next.fire = data.fire;
-    return next;
-  }
-  var ZERO_INPUT, TAU, getP, getF, setP, setF, GameSim;
-  var init_GameSim = __esm({
-    "src/sim/GameSim.ts"() {
-      "use strict";
-      init_constants();
-      init_flight();
-      init_sphere();
-      ZERO_INPUT = { seq: 0, turn: 0, climb: 0, boost: false, fire: false };
-      TAU = Math.PI * 2;
-      getP = (e) => ({ x: e.px, y: e.py, z: e.pz });
-      getF = (e) => ({ x: e.fx, y: e.fy, z: e.fz });
-      setP = (e, v) => {
-        e.px = v.x;
-        e.py = v.y;
-        e.pz = v.z;
-      };
-      setF = (e, v) => {
-        e.fx = v.x;
-        e.fy = v.y;
-        e.fz = v.z;
-      };
-      GameSim = class {
-        constructor(opts) {
-          // Simulation state — plain Maps of plain objects.
-          this.players = /* @__PURE__ */ new Map();
-          this.bullets = /* @__PURE__ */ new Map();
-          this.pickups = /* @__PURE__ */ new Map();
-          // Side-channel Maps (verbatim from ArenaRoom private fields).
-          this.inputs = /* @__PURE__ */ new Map();
-          this.lastShot = /* @__PURE__ */ new Map();
-          this.respawnAt = /* @__PURE__ */ new Map();
-          this.bots = /* @__PURE__ */ new Map();
-          this.bulletLife = /* @__PURE__ */ new Map();
-          this.powerUntil = /* @__PURE__ */ new Map();
-          this.shield = /* @__PURE__ */ new Map();
-          this.invulnUntil = /* @__PURE__ */ new Map();
-          /** Mines: per-owner last-drop timestamp, for MINE_DROP_COOLDOWN gating. */
-          this.lastMineDrop = /* @__PURE__ */ new Map();
-          // Scalar sim state.
-          this.now = 0;
-          this.bulletSeq = 0;
-          this.botSeq = 0;
-          this.pickupSeq = 0;
-          this.pickupAt = 0;
-          this.lobbyElapsed = 0;
-          this.hostId = "";
-          this.botsEnabled = opts.botsEnabled;
-          this.isPublic = opts.isPublic;
-          this.onEvent = opts.onEvent;
-          this.roundLength = ROUND_SECONDS;
-          this.roomName = "";
-          this.botsInRoom = opts.botsEnabled;
-          this.mode = "ffa";
-          this.teamScore0 = 0;
-          this.teamScore1 = 0;
-          this.botDifficulty = DEFAULT_BOT_DIFFICULTY;
-          if (this.isPublic) {
-            this.phase = "playing";
-            this.timeLeft = ROUND_SECONDS;
-          } else {
-            this.phase = "lobby";
-            this.timeLeft = 0;
-            this.lobbyElapsed = 0;
-          }
-          if (opts.initialState) {
-            this._restoreFromSnapshot(opts.initialState);
-          }
-        }
-        /**
-         * Restore all simulation state from a snapshot (used during P2P host migration).
-         * Bullets are skipped (acceptable in-flight loss per design).
-         * Side-channel maps that are not in the snapshot (powerUntil, invulnUntil, etc.)
-         * are left empty — a tolerable loss for a single migration event.
-         */
-        _restoreFromSnapshot(snap) {
-          this.phase = snap.phase ?? this.phase;
-          this.timeLeft = snap.timeLeft ?? this.timeLeft;
-          this.hostId = snap.hostId ?? this.hostId;
-          this.roundLength = snap.roundLength ?? this.roundLength;
-          this.roomName = snap.roomName ?? this.roomName;
-          this.botsInRoom = snap.botsInRoom ?? this.botsInRoom;
-          this.mode = snap.mode ?? this.mode;
-          this.teamScore0 = snap.teamScore0 ?? this.teamScore0;
-          this.teamScore1 = snap.teamScore1 ?? this.teamScore1;
-          this.botDifficulty = snap.botDifficulty ?? this.botDifficulty;
-          this.players.clear();
-          this.inputs.clear();
-          const ZERO = { seq: 0, turn: 0, climb: 0, boost: false, fire: false };
-          if (Array.isArray(snap.players)) {
-            for (const [id, p] of snap.players) {
-              this.players.set(id, { ...p });
-              this.inputs.set(id, { ...ZERO, seq: p.seq ?? 0 });
-            }
-          }
-          this.pickups.clear();
-          if (Array.isArray(snap.pickups)) {
-            for (const [id, pk] of snap.pickups) {
-              this.pickups.set(id, { ...pk });
-            }
-          }
-          this.bullets.clear();
-          this.bulletLife.clear();
-          this.bulletSeq = 0;
-          this.now = 0;
-        }
-        // ---------------------------------------------------------------------------
-        // Public API
-        // ---------------------------------------------------------------------------
-        /**
-         * Add a player to the simulation. Creates a SimPlayer with default values,
-         * then overwrites cosmetics+name from opts. Applies the same spawn/lobby
-         * logic as the old onJoin.
-         */
-        addPlayer(id, opts) {
-          const p = {
-            name: opts.name,
-            px: 0,
-            py: SPAWN_ALT,
-            pz: 0,
-            fx: 1,
-            fy: 0,
-            fz: 0,
-            seq: 0,
-            speed: 0,
-            turn: 0,
-            climb: 0,
-            hp: MAX_HP,
-            score: 0,
-            skin: opts.skin,
-            alive: true,
-            bot: false,
-            boosting: false,
-            power: "",
-            powerLeft: 0,
-            ready: false,
-            bodyShape: opts.bodyShape,
-            accent: opts.accent,
-            trail: opts.trail,
-            livery: opts.livery,
-            team: -1,
-            frozenLeft: 0,
-            empLeft: 0
-          };
-          if (this.isPublic) {
-            this.spawn(id, p);
-          } else {
-            p.alive = false;
-            p.px = 0;
-            p.py = SPAWN_ALT;
-            p.pz = 0;
-            p.fx = 1;
-            p.fy = 0;
-            p.fz = 0;
-            p.speed = 0;
-            p.hp = MAX_HP;
-            if (this.hostId === "") {
-              this.hostId = id;
-            }
-          }
-          this.players.set(id, p);
-          this.inputs.set(id, { ...ZERO_INPUT });
-          return p;
-        }
-        /**
-         * Remove a player from the simulation, cleaning up ALL side-channel Maps
-         * and host reassignment. Returns the id for call-site convenience.
-         */
-        removePlayer(id) {
-          if (id === this.hostId) {
-            let nextHost = "";
-            for (const [pid, p] of this.players) {
-              if (pid !== id && !p.bot) {
-                nextHost = pid;
-                break;
-              }
-            }
-            this.hostId = nextHost;
-          }
-          this.players.delete(id);
-          this.inputs.delete(id);
-          this.lastShot.delete(id);
-          this.respawnAt.delete(id);
-          this.bots.delete(id);
-          this.bulletLife.forEach((_value, key) => {
-            const bullet = this.bullets.get(key);
-            if (bullet && bullet.owner === id) {
-              this.bullets.delete(key);
-              this.bulletLife.delete(key);
-            }
-          });
-          this.powerUntil.delete(id);
-          this.shield.delete(id);
-          this.invulnUntil.delete(id);
-          this.lastMineDrop.delete(id);
-          return id;
-        }
-        /**
-         * Apply a validated input patch. No rate limiting here — that lives in ArenaRoom.
-         */
-        applyInput(id, data) {
-          const cur = this.inputs.get(id);
-          if (!cur) return;
-          const next = applyInputPatch(cur, data);
-          if (!next) return;
-          this.inputs.set(id, next);
-        }
-        /**
-         * Force-zero the input for a player, bypassing seq validation.
-         * Used by the adapter during the reconnect window so the plane doesn't
-         * keep flying with stale input — mirrors the old direct map assignment.
-         */
-        zeroInput(id) {
-          const cur = this.inputs.get(id);
-          if (!cur) return;
-          this.inputs.set(id, { ...ZERO_INPUT, seq: cur.seq });
-        }
-        setPlayerName(id, name) {
-          const p = this.players.get(id);
-          if (p) p.name = name;
-        }
-        setReady(id) {
-          const p = this.players.get(id);
-          if (!p || p.bot) return;
-          p.ready = !p.ready;
-          this.checkAutoStart();
-        }
-        hostStart(callerId) {
-          if (callerId !== this.hostId) return;
-          if (this.phase !== "lobby") return;
-          this.startMatch();
-        }
-        /**
-         * Update host-controlled room settings (round length, room name, and/or bots).
-         * Silently ignores calls from non-hosts.
-         */
-        setHostSettings(callerId, s) {
-          if (callerId !== this.hostId) return;
-          if (typeof s.roundLength === "number" && Number.isFinite(s.roundLength)) {
-            this.roundLength = Math.max(60, Math.min(300, Math.round(s.roundLength)));
-          }
-          if (typeof s.roomName === "string") {
-            this.roomName = s.roomName.replace(/[\x00-\x1F\x7F]/g, "").trim().slice(0, 20);
-          }
-          if (typeof s.botsInRoom === "boolean") {
-            this.botsInRoom = s.botsInRoom;
-            if (!this.botsInRoom) {
-              for (const id of [...this.bots.keys()]) this.removePlayer(id);
-            }
-          }
-          if (typeof s.mode === "string" && (s.mode === "ffa" || s.mode === "tdm")) {
-            this.mode = s.mode;
-          }
-          if (typeof s.botDifficulty === "string" && (s.botDifficulty === "easy" || s.botDifficulty === "medium" || s.botDifficulty === "high")) {
-            this.botDifficulty = s.botDifficulty;
-            for (const [, brain] of this.bots) this._applyDifficulty(brain);
-          }
-        }
-        _applyDifficulty(brain) {
-          const d = BOT_DIFFICULTY[this.botDifficulty] ?? BOT_DIFFICULTY[DEFAULT_BOT_DIFFICULTY];
-          brain.aimErr = d.aimErr;
-          brain.fireCone = d.fireCone;
-          brain.leadFactor = d.leadFactor;
-          brain.reactMin = d.reactMin;
-          brain.reactMax = d.reactMax;
-        }
-        /**
-         * Validates and removes the target player from the sim.
-         * Returns the targetId to kick at the transport layer, or null if invalid.
-         * The actual client.leave() call stays in ArenaRoom.
-         */
-        hostKick(callerId, targetId) {
-          if (callerId !== this.hostId) return null;
-          const target = this.players.get(targetId);
-          if (!target || target.bot) return null;
-          if (targetId === callerId) return null;
-          this.removePlayer(targetId);
-          return targetId;
-        }
-        /**
-         * Advance the simulation by dt seconds. This is the main loop driver.
-         */
-        tick(dt) {
-          this.now += dt;
-          const playing = this.phase === "playing";
-          if (playing) {
-            this.maintainBots();
-            this.maintainPickups();
-          }
-          this.updateTimer(dt);
-          if (playing) {
-            for (const [id, brain] of this.bots) this.thinkBot(id, brain);
-            for (const [id, p] of this.players) {
-              if (!p.alive) {
-                const at = this.respawnAt.get(id) ?? 0;
-                if (this.now >= at) this.spawn(id, p);
-                continue;
-              }
-              this.stepPlane(id, p, dt, playing);
-            }
-            this.stepBullets(dt, playing);
-            this.stepStarRams();
-            this.collectPickups();
-            this.expirePowers();
-          }
-        }
-        /**
-         * Returns readonly references to the Maps and scalar state.
-         * The adapter (ArenaRoom) reads this to sync into the Colyseus Schema.
-         */
-        getState() {
-          return {
-            players: this.players,
-            bullets: this.bullets,
-            pickups: this.pickups,
-            phase: this.phase,
-            timeLeft: this.timeLeft,
-            hostId: this.hostId,
-            roundLength: this.roundLength,
-            roomName: this.roomName,
-            botsInRoom: this.botsInRoom,
-            mode: this.mode,
-            teamScore0: this.teamScore0,
-            teamScore1: this.teamScore1,
-            botDifficulty: this.botDifficulty
-          };
-        }
-        /**
-         * Deep plain-object copy of all state — suitable for P2P snapshot transmission.
-         */
-        snapshot() {
-          return {
-            players: Array.from(this.players.entries()).map(([k, v]) => [k, { ...v }]),
-            bullets: Array.from(this.bullets.entries()).map(([k, v]) => [k, { ...v }]),
-            pickups: Array.from(this.pickups.entries()).map(([k, v]) => [k, { ...v }]),
-            phase: this.phase,
-            timeLeft: this.timeLeft,
-            hostId: this.hostId,
-            roundLength: this.roundLength,
-            roomName: this.roomName,
-            botsInRoom: this.botsInRoom,
-            mode: this.mode,
-            teamScore0: this.teamScore0,
-            teamScore1: this.teamScore1,
-            botDifficulty: this.botDifficulty,
-            botsEnabled: this.botsEnabled,
-            isPublic: this.isPublic
-          };
-        }
-        // ---------------------------------------------------------------------------
-        // Internal simulation methods (moved verbatim from ArenaRoom, substitutions applied)
-        // ---------------------------------------------------------------------------
-        updateTimer(dt) {
-          if (this.phase === "lobby") {
-            let humanCount = 0;
-            for (const [, p] of this.players) if (!p.bot) humanCount++;
-            if (humanCount >= 2) {
-              this.lobbyElapsed += dt;
-              if (this.lobbyElapsed >= LOBBY_READY_TIMEOUT) {
-                this.startMatch();
-              }
-            } else {
-              this.lobbyElapsed = 0;
-            }
-            return;
-          }
-          if (this.phase === "playing") {
-            this.timeLeft = Math.max(0, this.timeLeft - dt);
-            if (this.timeLeft <= 0) {
-              const scores = Array.from(this.players.values()).filter((p) => !p.bot && p.score > 0).map((p) => ({ name: p.name, score: p.score }));
-              this.onEvent({ type: "roundEnd", scores });
-              this.phase = "intermission";
-              this.timeLeft = ROUND_INTERMISSION;
-            }
-            return;
-          }
-          this.timeLeft = Math.max(0, this.timeLeft - dt);
-          if (this.timeLeft > 0) return;
-          for (const [id, p] of this.players) {
-            p.score = 0;
-            this.spawn(id, p);
-          }
-          this.phase = "playing";
-          this.timeLeft = ROUND_SECONDS;
-        }
-        stepPlane(id, p, dt, playing) {
-          if (p.frozenLeft > 0) p.frozenLeft = Math.max(0, p.frozenLeft - dt);
-          if (p.empLeft > 0) p.empLeft = Math.max(0, p.empLeft - dt);
-          const rawInput = this.inputs.get(id) ?? ZERO_INPUT;
-          const frozen = p.frozenLeft > 0;
-          const empd = p.empLeft > 0;
-          const input = frozen || empd ? {
-            seq: rawInput.seq,
-            turn: frozen ? 0 : rawInput.turn,
-            climb: frozen ? 0 : rawInput.climb,
-            boost: empd ? false : rawInput.boost,
-            fire: frozen || empd ? false : rawInput.fire
-          } : rawInput;
-          let pos = getP(p);
-          let fwd = normalize(getF(p));
-          const angles = yawPitchFromForward(fwd);
-          const yaw = angles.yaw + input.turn * TURN_RATE * dt;
-          const pitch = clamp(angles.pitch + input.climb * PITCH_RATE * dt, -PITCH_MAX, PITCH_MAX);
-          fwd = yawPitchForward(yaw, pitch);
-          p.turn = input.turn;
-          p.climb = input.climb;
-          p.boosting = input.boost;
-          p.seq = Math.max(p.seq, rawInput.seq);
-          let targetSpeed = input.boost ? BOOST_SPEED : CRUISE_SPEED;
-          if (p.power === "afterburner") targetSpeed *= AFTERBURNER_FACTOR;
-          const delta = targetSpeed - p.speed;
-          const step = Math.sign(delta) * ACCEL * dt;
-          p.speed = Math.abs(step) >= Math.abs(delta) ? targetSpeed : p.speed + step;
-          const edge = Math.max(Math.abs(pos.x), Math.abs(pos.z));
-          if (edge > MAP_HALF - MAP_EDGE_SOFT) {
-            const edgeT = clamp((edge - (MAP_HALF - MAP_EDGE_SOFT)) / MAP_EDGE_SOFT, 0, 1);
-            const home = normalizeHorizontal({ x: -pos.x, y: 0, z: -pos.z });
-            fwd = normalize({
-              x: lerp(fwd.x, home.x, edgeT * 0.25),
-              y: fwd.y * (1 - edgeT * 0.2),
-              z: lerp(fwd.z, home.z, edgeT * 0.25)
-            });
-          }
-          pos = advance(pos, fwd, p.speed * dt).p;
-          const collision = resolveLandmarkCollisions(pos, fwd, LANDMARKS, PLANE_RADIUS);
-          pos = collision.pos;
-          fwd = collision.fwd;
-          pos.x = clamp(pos.x, -MAP_HALF, MAP_HALF);
-          pos.z = clamp(pos.z, -MAP_HALF, MAP_HALF);
-          pos.y = clamp(pos.y, MIN_ALT, MAX_ALT);
-          if (pos.y <= MIN_ALT + 0.01 && fwd.y < 0) fwd = withPitch(fwd, 0.02);
-          if (pos.y >= MAX_ALT - 0.01 && fwd.y > 0) fwd = withPitch(fwd, -0.02);
-          setP(p, pos);
-          setF(p, normalize(fwd));
-          if (input.fire && playing) this.tryFire(id, p);
-        }
-        tryFire(id, p) {
-          this.invulnUntil.delete(id);
-          if (p.power === "mine") {
-            this.tryDropMine(id, p);
-            return;
-          }
-          const last = this.lastShot.get(id) ?? -999;
-          const cooldown = FIRE_COOLDOWN * (p.power === "rapid" ? RAPID_FACTOR : 1);
-          if (this.now - last < cooldown) return;
-          this.lastShot.set(id, this.now);
-          const pos = getP(p);
-          const fwd = getF(p);
-          const freeze = p.power === "freeze";
-          if (p.power === "spread") {
-            this.spawnBullet(id, pos, turn(pos, fwd, -SPREAD_ANGLE), false, freeze);
-            this.spawnBullet(id, pos, fwd, false, freeze);
-            this.spawnBullet(id, pos, turn(pos, fwd, SPREAD_ANGLE), false, freeze);
-          } else {
-            this.spawnBullet(id, pos, fwd, p.power === "homing", freeze);
-          }
-        }
-        spawnBullet(owner, pos, fwd, homing, freeze = false) {
-          const b = {
-            px: 0,
-            py: 0,
-            pz: 0,
-            fx: 1,
-            fy: 0,
-            fz: 0,
-            owner,
-            homing,
-            kind: "",
-            freeze
-          };
-          const start = add(pos, scale(normalize(fwd), PLANE_RADIUS + 10));
-          setP(b, start);
-          setF(b, normalize(fwd));
-          const key = `b${this.bulletSeq++}`;
-          this.bulletLife.set(key, BULLET_LIFE);
-          this.bullets.set(key, b);
-        }
-        /**
-         * Mine powerup: fire input drops a stationary mine instead of shooting.
-         * Respects MINE_DROP_COOLDOWN and caps live mines per owner at MINE_MAX_PER_OWNER
-         * (oldest expires to make room).
-         */
-        tryDropMine(id, p) {
-          const last = this.lastMineDrop.get(id) ?? -999;
-          if (this.now - last < MINE_DROP_COOLDOWN) return;
-          const ownerMines = [];
-          for (const [key2, b] of this.bullets) {
-            if (b.kind === "mine" && b.owner === id) {
-              ownerMines.push({ key: key2, life: this.bulletLife.get(key2) ?? MINE_LIFE });
-            }
-          }
-          if (ownerMines.length >= MINE_MAX_PER_OWNER) {
-            ownerMines.sort((a, b) => a.life - b.life);
-            const oldest = ownerMines[0];
-            this.bullets.delete(oldest.key);
-            this.bulletLife.delete(oldest.key);
-          }
-          this.lastMineDrop.set(id, this.now);
-          const pos = getP(p);
-          const fwd = normalize(getF(p));
-          const behind = scale(fwd, -1);
-          const dropPos = add(pos, scale(behind, PLANE_RADIUS + 12));
-          const mine = {
-            px: 0,
-            py: 0,
-            pz: 0,
-            fx: 1,
-            fy: 0,
-            fz: 0,
-            owner: id,
-            homing: false,
-            kind: "mine"
-          };
-          setP(mine, dropPos);
-          setF(mine, fwd);
-          const key = `b${this.bulletSeq++}`;
-          this.bulletLife.set(key, MINE_LIFE);
-          this.bullets.set(key, mine);
-        }
-        stepBullets(dt, playing) {
-          for (const [key, b] of this.bullets) {
-            const isMine = b.kind === "mine";
-            const life = (this.bulletLife.get(key) ?? (isMine ? MINE_LIFE : BULLET_LIFE)) - dt;
-            if (life <= 0) {
-              this.bullets.delete(key);
-              this.bulletLife.delete(key);
-              continue;
-            }
-            this.bulletLife.set(key, life);
-            if (isMine) {
-              if (playing) this.stepMine(key, b, life);
-              continue;
-            }
-            let pos = getP(b);
-            let fwd = normalize(getF(b));
-            if (b.homing) {
-              const target = this.closestTarget(b.owner, pos);
-              if (target) {
-                const desired = normalize(sub(getP(target.player), pos));
-                fwd = steerToward(fwd, desired, HOMING_TURN * dt);
-              }
-            } else {
-              const ownerPlayer = this.players.get(b.owner);
-              if (ownerPlayer && !ownerPlayer.bot) {
-                let bestAssistDist = Infinity;
-                let assistTarget = null;
-                for (const [pid, p] of this.players) {
-                  if (!p.alive || pid === b.owner) continue;
-                  const toTarget = sub(getP(p), pos);
-                  const dist = len(toTarget);
-                  if (dist > AIM_ASSIST_RANGE) continue;
-                  const angle = angBetween(fwd, normalize(toTarget));
-                  if (angle > AIM_ASSIST_CONE) continue;
-                  if (dist < bestAssistDist) {
-                    bestAssistDist = dist;
-                    assistTarget = p;
-                  }
-                }
-                if (assistTarget) {
-                  const desired = normalize(sub(getP(assistTarget), pos));
-                  fwd = steerToward(fwd, desired, AIM_ASSIST_TURN * dt);
-                }
-              }
-            }
-            const prev = pos;
-            pos = advance(pos, fwd, BULLET_SPEED * dt).p;
-            let bestT = Infinity;
-            let victim = null;
-            let victimId = "";
-            let blocked = false;
-            if (playing) {
-              for (const [pid, p] of this.players) {
-                if (!p.alive || pid === b.owner) continue;
-                const targetPos = getP(p);
-                const hitDist = BULLET_HIT_RADIUS + BULLET_RADIUS;
-                if (segmentPointDistance(prev, pos, targetPos) > hitDist) continue;
-                const t = segmentPointT(prev, pos, targetPos);
-                if (t < bestT) {
-                  bestT = t;
-                  victim = p;
-                  victimId = pid;
-                  blocked = false;
-                }
-              }
-            }
-            for (const landmark of LANDMARKS) {
-              if (!landmark.cover) continue;
-              const cylPoint = { x: landmark.x, y: 0, z: landmark.z };
-              const flatA = { x: prev.x, y: 0, z: prev.z };
-              const flatB = { x: pos.x, y: 0, z: pos.z };
-              if (segmentPointDistance(flatA, flatB, cylPoint) > landmark.radius + BULLET_RADIUS) continue;
-              const t = segmentPointT(flatA, flatB, cylPoint);
-              const y = lerp(prev.y, pos.y, t);
-              if (y > landmark.height + BULLET_RADIUS) continue;
-              if (t < bestT) {
-                bestT = t;
-                victim = null;
-                blocked = true;
-              }
-            }
-            if (victim || blocked) {
-              if (victim) {
-                const applied = this.damage(victim, victimId, b.owner);
-                if (b.freeze && applied && victim.alive) {
-                  victim.frozenLeft = FREEZE_DURATION;
-                }
-                if (applied && victim.alive) {
-                  const knocked = add(getP(victim), scale(fwd, HIT_KNOCKBACK));
-                  setP(victim, clampToArena(knocked));
-                }
-              }
-              this.bullets.delete(key);
-              this.bulletLife.delete(key);
-              continue;
-            }
-            if (Math.abs(pos.x) > MAP_HALF || Math.abs(pos.z) > MAP_HALF || pos.y < GROUND_Y || pos.y > MAX_ALT + 40) {
-              this.bullets.delete(key);
-              this.bulletLife.delete(key);
-              continue;
-            }
-            setP(b, pos);
-            setF(b, fwd);
-          }
-        }
-        /**
-         * Mine proximity fuse: stationary once dropped, arms after MINE_ARM_DELAY,
-         * then explodes when any alive plane (including the owner) enters MINE_TRIGGER_RADIUS.
-         * Explosion applies radial damage via the normal damage()/kill path so kill feed/streaks work.
-         */
-        stepMine(key, mine, life) {
-          const age = MINE_LIFE - life;
-          if (age < MINE_ARM_DELAY) return;
-          const minePos = getP(mine);
-          let triggered = false;
-          for (const [, p] of this.players) {
-            if (!p.alive) continue;
-            if (distance(minePos, getP(p)) <= MINE_TRIGGER_RADIUS) {
-              triggered = true;
-              break;
-            }
-          }
-          if (!triggered) return;
-          this.bullets.delete(key);
-          this.bulletLife.delete(key);
-          for (const [pid, p] of this.players) {
-            if (!p.alive) continue;
-            if (distance(minePos, getP(p)) <= MINE_BLAST_RADIUS) {
-              const applied = this.damage(p, pid, mine.owner, MINE_DAMAGE);
-              if (applied && p.alive) {
-                const away = normalizeHorizontal(sub(getP(p), minePos));
-                const knocked = add(getP(p), scale(away, MINE_KNOCKBACK));
-                setP(p, clampToArena(knocked));
-              }
-            }
-          }
-        }
-        /**
-         * Applies damage to a victim, handling TDM friendly-fire, spawn invuln, star
-         * invulnerability, shield charges, HP reduction, and kill crediting.
-         * Returns true iff HP was actually reduced (i.e. not blocked by any gate) —
-         * callers use this to decide whether secondary effects (e.g. freeze) apply.
-         */
-        damage(p, victimId, killerId, amount = BULLET_DAMAGE) {
-          if (this.mode === "tdm") {
-            const killer2 = this.players.get(killerId);
-            if (killer2 && killer2.team >= 0 && p.team >= 0 && killer2.team === p.team) return false;
-          }
-          if (this.now < (this.invulnUntil.get(victimId) ?? 0)) return false;
-          if (p.power === "star" && p.powerLeft > 0) return false;
-          const shield = this.shield.get(victimId) ?? 0;
-          if (shield > 0) {
-            this.shield.set(victimId, shield - 1);
-            if (shield - 1 <= 0) {
-              this.shield.delete(victimId);
-              if (p.power === "shield") this.clearPower(victimId, p);
-            }
-            return false;
-          }
-          p.hp -= amount;
-          if (p.hp > 0) return true;
-          p.hp = 0;
-          p.alive = false;
-          p.boosting = false;
-          p.turn = 0;
-          p.climb = 0;
-          this.clearPower(victimId, p);
-          this.respawnAt.set(victimId, this.now + RESPAWN_DELAY);
-          const killer = this.players.get(killerId);
-          if (killer && killerId !== victimId) {
-            killer.score += 1;
-            if (this.mode === "tdm" && killer.team === 0) {
-              this.teamScore0 += 1;
-            } else if (this.mode === "tdm" && killer.team === 1) {
-              this.teamScore1 += 1;
-            }
-          }
-          this.onEvent({
-            type: "kill",
-            killer: killerId,
-            victim: victimId,
-            killerName: killer ? killer.name : "?",
-            victimName: p.name
-          });
-          return true;
-        }
-        maintainPickups() {
-          if (this.pickups.size >= PICKUP_MAX || this.now < this.pickupAt) return;
-          this.pickupAt = this.now + PICKUP_INTERVAL;
-          const pk = {
-            type: this.weightedPowerup(),
-            px: 0,
-            py: 0,
-            pz: 0
-          };
-          setP(pk, this.pickPickupPosition());
-          this.pickups.set(`pk${this.pickupSeq++}`, pk);
-        }
-        pickPickupPosition() {
-          let best = vec(0, SPAWN_ALT, 0);
-          for (let i = 0; i < SPAWN_REROLL; i++) {
-            const r = Math.pow(Math.random(), 1.35) * PICKUP_FIELD_RADIUS;
-            const ang = Math.random() * TAU;
-            const pos = vec(Math.cos(ang) * r, rand(PICKUP_ALT_MIN, PICKUP_ALT_MAX), Math.sin(ang) * r);
-            if (this.insideLandmark(pos, PICKUP_RADIUS)) continue;
-            best = pos;
-            break;
-          }
-          return best;
-        }
-        weightedPowerup() {
-          let total = 0;
-          for (const type of POWERUP_TYPES) total += POWERUP_WEIGHTS[type] ?? 1;
-          let roll = Math.random() * total;
-          for (const type of POWERUP_TYPES) {
-            roll -= POWERUP_WEIGHTS[type] ?? 1;
-            if (roll <= 0) return type;
-          }
-          return POWERUP_TYPES[0];
-        }
-        collectPickups() {
-          for (const [key, pk] of this.pickups) {
-            const pkPos = getP(pk);
-            for (const [pid, p] of this.players) {
-              if (!p.alive) continue;
-              if (distance(pkPos, getP(p)) > PICKUP_RADIUS + PLANE_RADIUS) continue;
-              if (pk.type === "repair" && p.hp >= MAX_HP) continue;
-              this.applyPowerup(pid, p, pk.type);
-              this.pickups.delete(key);
-              this.onEvent({ type: "pickup", by: pid, pickupType: pk.type });
-              break;
-            }
-          }
-        }
-        applyPowerup(id, p, type) {
-          if (type === "repair") {
-            p.hp = MAX_HP;
-            return;
-          }
-          if (type === "emp") {
-            for (const [pid, victim] of this.players) {
-              if (pid === id || !victim.alive) continue;
-              if (this.mode === "tdm" && victim.team >= 0 && p.team >= 0 && victim.team === p.team) continue;
-              if (distance(getP(p), getP(victim)) <= EMP_RADIUS) {
-                victim.empLeft = EMP_DURATION;
-              }
-            }
-            return;
-          }
-          const duration = type === "star" ? STAR_DURATION : POWERUP_DURATION;
-          this.shield.delete(id);
-          p.power = type;
-          p.powerLeft = duration;
-          this.powerUntil.set(id, this.now + duration);
-          if (type === "shield") this.shield.set(id, SHIELD_CHARGES);
-        }
-        clearPower(id, p) {
-          this.powerUntil.delete(id);
-          this.shield.delete(id);
-          if (p) {
-            p.power = "";
-            p.powerLeft = 0;
-          }
-        }
-        expirePowers() {
-          for (const [id, until] of this.powerUntil) {
-            const p = this.players.get(id);
-            if (!p) {
-              this.powerUntil.delete(id);
-              continue;
-            }
-            if (this.now >= until) this.clearPower(id, p);
-            else p.powerLeft = Math.max(0, until - this.now);
-          }
-        }
-        /**
-         * Star powerup: each tick, a starred player instantly destroys any enemy
-         * plane within PLANE_RADIUS*STAR_RAM_RADIUS_FACTOR, crediting the kill to
-         * the starred player. Starred-vs-starred and spawn-invuln victims are skipped
-         * (damage() itself gates on star/invuln/TDM-team, so we just route through it).
-         */
-        stepStarRams() {
-          const ramRadius = PLANE_RADIUS * STAR_RAM_RADIUS_FACTOR;
-          for (const [id, p] of this.players) {
-            if (!p.alive || p.power !== "star" || p.powerLeft <= 0) continue;
-            const myPos = getP(p);
-            for (const [vid, victim] of this.players) {
-              if (vid === id || !victim.alive) continue;
-              if (distance(myPos, getP(victim)) > ramRadius) continue;
-              this.damage(victim, vid, id, 999);
-            }
-          }
-        }
-        spawn(id, p) {
-          const pos = this.pickSpawnPoint();
-          const center = normalizeHorizontal({ x: -pos.x, y: 0, z: -pos.z });
-          const yaw = Math.atan2(center.z, center.x) + rand(-0.4, 0.4);
-          const pitch = rand(-0.06, 0.08);
-          const fwd = yawPitchForward(yaw, pitch);
-          setP(p, pos);
-          setF(p, fwd);
-          p.seq = this.inputs.get(id)?.seq ?? 0;
-          p.speed = CRUISE_SPEED;
-          p.turn = 0;
-          p.climb = 0;
-          p.hp = MAX_HP;
-          p.alive = true;
-          p.boosting = false;
-          p.frozenLeft = 0;
-          p.empLeft = 0;
-          this.clearPower(id, p);
-          this.lastShot.delete(id);
-          this.invulnUntil.set(id, this.now + SPAWN_INVULN);
-        }
-        pickSpawnPoint() {
-          let best = vec(0, SPAWN_ALT, 0);
-          let bestScore = -Infinity;
-          for (let i = 0; i < SPAWN_REROLL; i++) {
-            const ang = Math.random() * TAU;
-            const r = rand(MAP_HALF * 0.45, MAP_HALF * 0.8);
-            const pos = vec(Math.cos(ang) * r, rand(SPAWN_ALT - 18, SPAWN_ALT + 42), Math.sin(ang) * r);
-            if (this.insideLandmark(pos, PLANE_RADIUS)) continue;
-            let nearest = Infinity;
-            for (const [, other] of this.players) {
-              if (!other.alive) continue;
-              nearest = Math.min(nearest, distance(pos, getP(other)));
-            }
-            const centerPull = Math.sqrt(pos.x * pos.x + pos.z * pos.z);
-            const score = (nearest === Infinity ? 1200 : nearest) + centerPull * 0.12;
-            if (score > bestScore) {
-              bestScore = score;
-              best = pos;
-            }
-          }
-          return best;
-        }
-        insideLandmark(pos, radius) {
-          for (const landmark of LANDMARKS) {
-            if (!landmark.cover) continue;
-            const rr = landmark.radius + radius;
-            const dx = pos.x - landmark.x;
-            const dz = pos.z - landmark.z;
-            if (dx * dx + dz * dz <= rr * rr && pos.y <= landmark.height + radius) return true;
-          }
-          return false;
-        }
-        startMatch() {
-          this.phase = "playing";
-          this.timeLeft = this.roundLength;
-          this.lobbyElapsed = 0;
-          this.teamScore0 = 0;
-          this.teamScore1 = 0;
-          if (this.mode === "tdm") {
-            let teamIdx = 0;
-            for (const [, p] of this.players) {
-              p.team = teamIdx % TEAM_COUNT;
-              teamIdx++;
-            }
-          }
-          for (const [id, p] of this.players) {
-            p.score = 0;
-            p.ready = false;
-            this.spawn(id, p);
-          }
-        }
-        checkAutoStart() {
-          if (this.phase !== "lobby") return;
-          let humanCount = 0;
-          let readyCount = 0;
-          for (const [, p] of this.players) {
-            if (!p.bot) {
-              humanCount++;
-              if (p.ready) readyCount++;
-            }
-          }
-          if (humanCount >= 2 && readyCount === humanCount) {
-            this.startMatch();
-          }
-        }
-        maintainBots() {
-          const shouldMaintain = this.isPublic ? this.botsEnabled : this.botsEnabled && this.botsInRoom;
-          if (!shouldMaintain) {
-            for (const id of [...this.bots.keys()]) this.removePlayer(id);
-            return;
-          }
-          let humans = 0;
-          for (const [, p] of this.players) if (!p.bot) humans++;
-          const target = Math.max(BOT_FILL_TARGET, humans);
-          while (this.players.size > target && this.bots.size > 0) {
-            const firstBot = this.bots.keys().next().value;
-            if (!firstBot) break;
-            this.removePlayer(firstBot);
-          }
-          if (this.players.size < BOT_FILL_TARGET) {
-            this.addBot();
-          }
-        }
-        addBot() {
-          const id = `bot_${this.botSeq++}`;
-          const p = {
-            name: BOT_NAMES[Math.floor(Math.random() * BOT_NAMES.length)],
-            px: 0,
-            py: 0,
-            pz: 0,
-            fx: 1,
-            fy: 0,
-            fz: 0,
-            seq: 0,
-            speed: 0,
-            turn: 0,
-            climb: 0,
-            hp: MAX_HP,
-            score: 0,
-            skin: Math.floor(Math.random() * SKIN_COUNT),
-            alive: true,
-            bot: true,
-            boosting: false,
-            power: "",
-            powerLeft: 0,
-            ready: false,
-            bodyShape: Math.floor(Math.random() * 2),
-            // capped [0,1] to protect mobile draw calls
-            accent: Math.floor(Math.random() * ACCENT_COUNT),
-            trail: Math.floor(Math.random() * TRAIL_COUNT),
-            livery: Math.floor(Math.random() * LIVERY_COUNT),
-            team: -1,
-            frozenLeft: 0,
-            empLeft: 0
-          };
-          if (this.mode === "tdm" && this.phase === "playing") {
-            let t0 = 0;
-            let t1 = 0;
-            for (const [, pl] of this.players) {
-              if (pl.team === 0) t0++;
-              else if (pl.team === 1) t1++;
-            }
-            p.team = t0 <= t1 ? 0 : 1;
-          }
-          this.spawn(id, p);
-          this.players.set(id, p);
-          this.inputs.set(id, { ...ZERO_INPUT });
-          const brain = {
-            targetId: null,
-            retargetAt: 0,
-            wanderYaw: rand(-1, 1),
-            aimErr: 0,
-            fireCone: 0.15,
-            leadFactor: 1,
-            reactMin: 0.6,
-            reactMax: 1.2,
-            aimJitter: 0
-          };
-          this._applyDifficulty(brain);
-          brain.aimJitter = rand(-brain.aimErr, brain.aimErr);
-          this.bots.set(id, brain);
-        }
-        thinkBot(id, brain) {
-          const me = this.players.get(id);
-          const input = this.inputs.get(id);
-          if (!me || !input) return;
-          if (!me.alive) {
-            input.turn = 0;
-            input.climb = 0;
-            input.boost = false;
-            input.fire = false;
-            return;
-          }
-          if (this.now >= brain.retargetAt) {
-            brain.targetId = this.pickBotTarget(id, getP(me));
-            brain.retargetAt = this.now + rand(brain.reactMin, brain.reactMax);
-            brain.aimJitter = rand(-brain.aimErr, brain.aimErr);
-          }
-          const myPos = getP(me);
-          const myFwd = getF(me);
-          const target = brain.targetId ? this.players.get(brain.targetId) : void 0;
-          let desired = normalize({ x: Math.cos(brain.wanderYaw), y: 0, z: Math.sin(brain.wanderYaw) });
-          let fire = false;
-          let boost = false;
-          const pickup = this.bestPickupForBot(me);
-          if (pickup && (!target || me.hp < 45 || me.power === "")) {
-            desired = normalize(sub(pickup, myPos));
-          }
-          if (target && target.alive) {
-            const targetPos = getP(target);
-            const leadTime = distance(myPos, targetPos) / Math.max(BULLET_SPEED, 1) * 0.8 * brain.leadFactor;
-            const leadPos = add(targetPos, scale(getF(target), target.speed * leadTime));
-            desired = normalize(sub(leadPos, myPos));
-            desired = turn(myPos, desired, brain.aimJitter);
-            if (me.hp < 35 && distance(myPos, targetPos) < 340) {
-              desired = normalize(add(sub(myPos, targetPos), scale(normalizeHorizontal({ x: -myPos.x, y: 0, z: -myPos.z }), 0.6)));
-              boost = true;
-            }
-            const aim = Math.abs(signedYaw(myFwd, desired));
-            const altDelta = targetPos.y - myPos.y;
-            fire = aim < brain.fireCone && Math.abs(altDelta) < 70 && distance(myPos, targetPos) < 560;
-            boost = boost || distance(myPos, targetPos) > 520;
-          } else {
-            brain.wanderYaw += rand(-0.25, 0.25);
-            desired = normalize({ x: Math.cos(brain.wanderYaw), y: signWithDeadzone(SPAWN_ALT - myPos.y, 18) * 0.18, z: Math.sin(brain.wanderYaw) });
-          }
-          const edge = Math.max(Math.abs(myPos.x), Math.abs(myPos.z));
-          if (edge > MAP_HALF - MAP_EDGE_SOFT * 1.1) {
-            desired = normalize(add(desired, scale(normalizeHorizontal({ x: -myPos.x, y: 0, z: -myPos.z }), 0.8)));
-            boost = true;
-          }
-          input.turn = signWithDeadzone(signedYaw(myFwd, desired), 0.06);
-          input.climb = signWithDeadzone(desired.y, 0.08);
-          input.boost = boost;
-          input.fire = fire;
-          input.seq += 1;
-        }
-        pickBotTarget(selfId, myPos) {
-          let bestId = null;
-          let bestScore = -Infinity;
-          for (const [pid, p] of this.players) {
-            if (pid === selfId || !p.alive) continue;
-            const pos = getP(p);
-            const dist = distance(myPos, pos);
-            const centerBias = 1 - Math.min(1, Math.sqrt(pos.x * pos.x + pos.z * pos.z) / MAP_HALF);
-            let score = 1 / Math.max(1, dist);
-            score += centerBias * 4e-3;
-            score += (MAX_HP - p.hp) * 8e-4;
-            if (score > bestScore) {
-              bestScore = score;
-              bestId = pid;
-            }
-          }
-          return bestId;
-        }
-        bestPickupForBot(me) {
-          let best = null;
-          let bestScore = -Infinity;
-          for (const [, pickup] of this.pickups) {
-            if (pickup.type === "repair" && me.hp >= MAX_HP) continue;
-            if (pickup.type === me.power) continue;
-            const pos = getP(pickup);
-            const dist = distance(getP(me), pos);
-            if (dist > 500) continue;
-            const weight = pickup.type === "shield" && me.hp < 50 ? 4 : pickup.type === "afterburner" ? 2.6 : 1.8;
-            const score = weight / Math.max(1, dist);
-            if (score > bestScore) {
-              bestScore = score;
-              best = pos;
-            }
-          }
-          return best;
-        }
-        closestTarget(owner, pos) {
-          let best = null;
-          let bestDist = Infinity;
-          for (const [id, p] of this.players) {
-            if (id === owner || !p.alive) continue;
-            const dist = distance(pos, getP(p));
-            if (dist < bestDist) {
-              bestDist = dist;
-              best = { id, player: p };
-            }
-          }
-          return best;
-        }
-      };
+  // src/client/net-ws.ts
+  var INPUT_HZ = 25;
+  var SNAP_BUFFER_MS = 1400;
+  var MAX_EXTRAP_MS = 120;
+  var SNAP_DISTANCE = 140;
+  var WELCOME_TIMEOUT_MS = 1e4;
+  var INPUT_INTERVAL_MS = 1e3 / INPUT_HZ;
+  var StableMap = class {
+    constructor() {
+      this._m = /* @__PURE__ */ new Map();
     }
-  });
-
-  // src/client/net-p2p.ts
-  function makePeerConnection(iceServers) {
-    return new RTCPeerConnection({ iceServers });
-  }
-  async function compressB64(text) {
-    try {
-      const enc = new TextEncoder().encode(text);
-      const cs = new window.CompressionStream("deflate-raw");
-      const w = cs.writable.getWriter();
-      const r = cs.readable.getReader();
-      w.write(enc);
-      w.close();
-      const chunks = [];
-      while (true) {
-        const { done, value } = await r.read();
-        if (done) break;
-        chunks.push(value);
-      }
-      const buf = new Uint8Array(chunks.reduce((acc, c) => acc + c.length, 0));
-      let offset = 0;
-      for (const c of chunks) {
-        buf.set(c, offset);
-        offset += c.length;
-      }
-      let b64 = btoa(String.fromCharCode(...buf));
-      b64 = b64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
-      return b64;
-    } catch {
-      let b64 = btoa(unescape(encodeURIComponent(text)));
-      b64 = b64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
-      return b64;
+    get size() {
+      return this._m.size;
     }
-  }
-  async function decompressB64(b64url) {
-    try {
-      let b64 = b64url.replace(/-/g, "+").replace(/_/g, "/");
-      while (b64.length % 4) b64 += "=";
-      const bin = atob(b64);
-      const buf = new Uint8Array(bin.length);
-      for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
-      try {
-        const ds = new window.DecompressionStream("deflate-raw");
-        const w = ds.writable.getWriter();
-        const r = ds.readable.getReader();
-        w.write(buf);
-        w.close();
-        const chunks = [];
-        while (true) {
-          const { done, value } = await r.read();
-          if (done) break;
-          chunks.push(value);
-        }
-        const total = new Uint8Array(chunks.reduce((acc, c) => acc + c.length, 0));
-        let offset = 0;
-        for (const c of chunks) {
-          total.set(c, offset);
-          offset += c.length;
-        }
-        return new TextDecoder().decode(total);
-      } catch {
-        return decodeURIComponent(escape(atob(b64)));
-      }
-    } catch {
-      return b64url;
+    get(k) {
+      return this._m.get(k);
     }
-  }
-  function filterSdpToLocal(sdp) {
-    return sdp.split("\n").filter((line) => {
-      if (!line.startsWith("a=candidate:")) return true;
-      if (/\b10\.\d+\.\d+\.\d+\b/.test(line)) return true;
-      if (/\b172\.(1[6-9]|2\d|3[01])\.\d+\.\d+\b/.test(line)) return true;
-      if (/\b192\.168\.\d+\.\d+\b/.test(line)) return true;
-      if (/\bfe80::/i.test(line)) return true;
-      if (/\b127\.0\.0\.1\b/.test(line)) return true;
-      return false;
-    }).join("\n");
-  }
-  var DT_MAX, STATE_HZ, INPUT_HZ, SNAP_BUFFER_MS, MAX_EXTRAP_MS, SNAP_DISTANCE, MAX_GUESTS, ICE_SERVER, STUN_ICE, StableMap, GuestTransportState, HostTransportState, SignalSocket, WebRtcTransport;
-  var init_net_p2p = __esm({
-    "src/client/net-p2p.ts"() {
-      "use strict";
-      init_GameSim();
-      DT_MAX = 0.05;
-      STATE_HZ = 30;
-      INPUT_HZ = 25;
-      SNAP_BUFFER_MS = 1400;
-      MAX_EXTRAP_MS = 120;
-      SNAP_DISTANCE = 140;
-      MAX_GUESTS = 19;
-      ICE_SERVER = "stun:stun.l.google.com:19302";
-      STUN_ICE = [{ urls: ICE_SERVER }];
-      StableMap = class {
-        constructor() {
-          this._m = /* @__PURE__ */ new Map();
+    forEach(cb) {
+      this._m.forEach(cb);
+    }
+    /** Merge an array of [key, value] entries into this map in-place. */
+    mergeFrom(entries) {
+      const seen = /* @__PURE__ */ new Set();
+      for (const [k, v] of entries) {
+        seen.add(k);
+        const existing = this._m.get(k);
+        if (existing) {
+          Object.assign(existing, v);
+        } else {
+          this._m.set(k, Object.assign({}, v));
         }
-        get size() {
-          return this._m.size;
-        }
-        get(k) {
-          return this._m.get(k);
-        }
-        forEach(cb) {
-          this._m.forEach(cb);
-        }
-        /** Merge an array of [key, value] entries into this map in-place. */
-        mergeFrom(entries) {
-          const seen = /* @__PURE__ */ new Set();
-          for (const [k, v] of entries) {
-            seen.add(k);
-            const existing = this._m.get(k);
-            if (existing) {
-              Object.assign(existing, v);
-            } else {
-              this._m.set(k, Object.assign({}, v));
-            }
-          }
-          for (const k of this._m.keys()) {
-            if (!seen.has(k)) this._m.delete(k);
-          }
-        }
+      }
+      for (const k of this._m.keys()) {
+        if (!seen.has(k)) this._m.delete(k);
+      }
+    }
+  };
+  var WsTransportState = class {
+    constructor() {
+      this.players = new StableMap();
+      this.bullets = new StableMap();
+      this.pickups = new StableMap();
+      this.phase = "lobby";
+      this.timeLeft = 0;
+      this.hostId = "";
+      this.roomName = "";
+      this.roundLength = 150;
+      this.botsInRoom = false;
+      this.mode = "ffa";
+      this.teamScore0 = 0;
+      this.teamScore1 = 0;
+      this.botDifficulty = "medium";
+    }
+  };
+  var WsTransport = class {
+    constructor() {
+      this.sessionId = null;
+      this.localPose = {
+        active: false,
+        p: { x: 0, y: 0, z: 0 },
+        f: { x: 1, y: 0, z: 0 },
+        speed: 0,
+        seq: 0,
+        turn: 0,
+        climb: 0,
+        boost: false,
+        fire: false,
+        alive: false,
+        ackSeq: 0
       };
-      GuestTransportState = class {
-        constructor() {
-          this.players = new StableMap();
-          this.bullets = new StableMap();
-          this.pickups = new StableMap();
-          this.phase = "lobby";
-          this.timeLeft = 0;
-          this.hostId = "";
-          this.roomName = "";
-          this.roundLength = 150;
-          this.botsInRoom = false;
-          this.mode = "ffa";
-          this.teamScore0 = 0;
-          this.teamScore1 = 0;
-          this.botDifficulty = "medium";
-          // Carried from the host's snapshot so a migration-elected new host can
-          // reconstruct its GameSim with the same botsEnabled/isPublic semantics.
-          this.botsEnabled = false;
-          this.isPublic = false;
+      this.onKill = null;
+      this.onPickup = null;
+      this.onDisconnect = null;
+      this.onStateChange = null;
+      // Internal
+      this._ws = null;
+      this._st = null;
+      this._snaps = [];
+      this._lastSent = { seq: 0, turn: 0, climb: 0, boost: false, fire: false };
+      this._lastSentAt = 0;
+      this._leaderId = "";
+      this._leaving = false;
+      // Saved join args for tryReconnect (single immediate attempt — LAN latency ~ms)
+      this._savedName = "";
+      this._savedCode = "";
+      this._savedCosmetics = { color: 0, bodyShape: 0, accent: 0, trail: 0, livery: 0 };
+      this._savedServerOrigin = null;
+      // Pending connect() settlement
+      this._welcomeWait = null;
+    }
+    // ── ITransport ──────────────────────────────────────────────────────────────
+    get state() {
+      return this._st;
+    }
+    async connect(name, code, cosmetics, serverOrigin) {
+      this._savedName = name;
+      this._savedCode = code;
+      this._savedCosmetics = { ...cosmetics };
+      this._savedServerOrigin = serverOrigin ?? null;
+      this._leaving = false;
+      this._st = new WsTransportState();
+      this.sessionId = null;
+      this.snaps_clear();
+      this.localPose.active = false;
+      this._lastSent = { seq: 0, turn: 0, climb: 0, boost: false, fire: false };
+      this._lastSentAt = 0;
+      if (this._ws) {
+        try {
+          this._ws.close();
+        } catch {
         }
-      };
-      HostTransportState = class {
-        constructor(sim) {
-          this.sim = sim;
-        }
-        get players() {
-          return this.sim.players;
-        }
-        get bullets() {
-          return this.sim.bullets;
-        }
-        get pickups() {
-          return this.sim.pickups;
-        }
-        get phase() {
-          return this.sim.phase;
-        }
-        get timeLeft() {
-          return this.sim.timeLeft;
-        }
-        get hostId() {
-          return this.sim.hostId;
-        }
-        get roomName() {
-          return this.sim.roomName;
-        }
-        get roundLength() {
-          return this.sim.roundLength;
-        }
-        get botsInRoom() {
-          return this.sim.botsInRoom;
-        }
-        get mode() {
-          return this.sim.mode;
-        }
-        get teamScore0() {
-          return this.sim.teamScore0;
-        }
-        get teamScore1() {
-          return this.sim.teamScore1;
-        }
-        get botDifficulty() {
-          return this.sim.botDifficulty;
-        }
-      };
-      SignalSocket = class {
-        constructor() {
-          this.ws = null;
-          this.queue = [];
-          this.keepaliveTimer = null;
-          this.onMessage = null;
-          this.onClose = null;
-        }
-        open(room, role, peerId) {
-          this._stopKeepalive();
-          if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+        this._ws = null;
+      }
+      const proto = location.protocol === "https:" ? "wss" : "ws";
+      const origin = serverOrigin || location.host;
+      const ws = new WebSocket(`${proto}://${origin}/ws`);
+      this._ws = ws;
+      const welcome = new Promise((resolve, reject) => {
+        const waiter = { resolve, reject };
+        this._welcomeWait = waiter;
+        setTimeout(() => {
+          if (this._welcomeWait === waiter) {
+            this._welcomeWait = null;
+            reject(new Error("Join timed out"));
             try {
-              this.ws.close();
+              ws.close();
             } catch {
             }
           }
-          return new Promise((resolve, reject) => {
-            const proto = location.protocol === "https:" ? "wss" : "ws";
-            const url = `${proto}://${location.host}/signal`;
-            const ws = new WebSocket(url);
-            this.ws = ws;
-            ws.onopen = () => {
-              if (role === "host") {
-                const hostMsg = { type: "host", room };
-                if (this.hostRoomName !== void 0) hostMsg.name = this.hostRoomName;
-                if (this.hostCallSign !== void 0) hostMsg.hostName = this.hostCallSign;
-                this.send(hostMsg);
-                this._startKeepalive(room);
-              } else {
-                this.send({ type: "join", room, peerId });
-              }
-              for (const m of this.queue) this._rawSend(m);
-              this.queue = [];
-              resolve();
-            };
-            ws.onmessage = (ev) => {
-              try {
-                const msg = JSON.parse(ev.data);
-                if (this.onMessage) this.onMessage(msg);
-              } catch {
-              }
-            };
-            ws.onerror = () => reject(new Error("Signal WS error"));
-            ws.onclose = () => {
-              this._stopKeepalive();
-              if (this.onClose) this.onClose();
-            };
-          });
-        }
-        send(msg) {
-          if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
-            this.queue.push(msg);
-            return;
-          }
-          this._rawSend(msg);
-        }
-        _rawSend(msg) {
-          if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-            this.ws.send(JSON.stringify(msg));
-          }
-        }
-        close() {
-          this._stopKeepalive();
-          if (this.ws) {
-            try {
-              this.ws.close();
-            } catch {
-            }
-            this.ws = null;
-          }
-        }
-        _startKeepalive(room) {
-          this._stopKeepalive();
-          this.keepaliveTimer = setInterval(() => {
-            this._rawSend({ type: "ping", room });
-          }, 12e3);
-        }
-        _stopKeepalive() {
-          if (this.keepaliveTimer !== null) {
-            clearInterval(this.keepaliveTimer);
-            this.keepaliveTimer = null;
-          }
-        }
-      };
-      WebRtcTransport = class {
-        constructor() {
-          // ITransport fields
-          this.sessionId = null;
-          this.localPose = {
-            active: false,
-            p: { x: 0, y: 0, z: 0 },
-            f: { x: 1, y: 0, z: 0 },
-            speed: 0,
-            seq: 0,
-            turn: 0,
-            climb: 0,
-            boost: false,
-            fire: false,
-            alive: false,
-            ackSeq: 0
-          };
-          this.onKill = null;
-          this.onPickup = null;
-          this.onDisconnect = null;
-          this.onStateChange = null;
-          // Internal
-          this._isHost = false;
-          this._room = "";
-          this._signal = null;
-          // HOST-only
-          this._sim = null;
-          this._hostState = null;
-          // Room settings this peer started as host with — carried across host migration
-          // so a re-elected host preserves the original bots/continuous semantics.
-          this._botsEnabled = false;
-          this._continuous = false;
-          this._peers = /* @__PURE__ */ new Map();
-          this._rafId = null;
-          this._lastTick = 0;
-          this._stateAccum = 0;
-          this._lastSent = { seq: 0, turn: 0, climb: 0, boost: false, fire: false };
-          // GUEST-only
-          this._guestState = null;
-          this._guestPc = null;
-          this._guestInputCh = null;
-          this._guestEventCh = null;
-          this._snaps = [];
-          this._lastSentAt = 0;
-          // Migration state (guest and elected-new-host paths)
-          this._peerId = "";
-          this._savedName = "";
-          this._savedCosmetics = { color: 0, bodyShape: 0, accent: 0, trail: 0, livery: 0 };
-          this._migrationState = "none";
-          this._migrationTimeout = null;
-          // When true, the next guest state message should fire migration-complete
-          this._awaitingPostMigrationState = false;
-          // Offline QR flag — migration is no-op for offline sessions (no broker socket)
-          this._isOfflineQr = false;
-        }
-        // ── Shared ─────────────────────────────────────────────────────────────────
-        get state() {
-          if (this._isHost) return this._hostState;
-          return this._guestState;
-        }
-        getPhase() {
-          return this.state?.phase ?? null;
-        }
-        getHostId() {
-          return this.state?.hostId ?? null;
-        }
-        getRosterSnapshot() {
-          const s = this.state;
-          if (!s) return [];
-          const out = [];
-          s.players.forEach((p, id) => {
-            out.push({
-              id,
-              name: p.name || "Pilot",
-              ready: !!p.ready,
-              bot: !!p.bot,
-              score: p.score || 0,
-              color: p.skin || 0
-            });
-          });
-          return out;
-        }
-        leave() {
-          this._stopHostLoop();
-          this._teardownPeers();
-          if (this._signal) {
-            this._signal.close();
-            this._signal = null;
-          }
-          if (this._guestPc) {
-            try {
-              this._guestPc.close();
-            } catch {
-            }
-            this._guestPc = null;
-          }
-          this._sim = null;
-          this._hostState = null;
-          this._guestState = null;
-          this._snaps = [];
-          this.localPose.active = false;
-          this.sessionId = null;
-        }
-        tryReconnect() {
-          return Promise.resolve(false);
-        }
-        // ── HOST MODE ──────────────────────────────────────────────────────────────
-        /**
-         * Start as P2P host.
-         * `name` = player call sign, `code` = P- room code (with prefix),
-         * `cosmetics` = selected cosmetics.
-         * `opts.roomName` = room display name shown in the LAN browser (defaults to `code`).
-         * `opts.continuous` = when true, starts as a live FFA match immediately (no lobby).
-         * Backward-compat: existing callers omit opts and get the original lobby behaviour.
-         */
-        async startHost(name, code, cosmetics, opts) {
-          this._isHost = true;
-          this._room = code;
-          this.sessionId = "host";
-          const continuous = opts?.continuous ?? false;
-          const roomName = opts?.roomName ?? code;
-          const botsEnabled = !!opts?.bots;
-          this._botsEnabled = botsEnabled;
-          this._continuous = continuous;
-          const sim = new GameSim({
-            botsEnabled,
-            // Continuous local rooms start in playing/ffa state immediately (same as isPublic).
-            isPublic: continuous,
-            onEvent: (e) => this._onSimEvent(e)
-          });
-          this._sim = sim;
-          this._hostState = new HostTransportState(sim);
-          sim.addPlayer("host", {
-            name,
+        }, WELCOME_TIMEOUT_MS);
+      });
+      ws.onopen = () => {
+        this._send({
+          type: "join",
+          name,
+          cosmetics: {
             skin: cosmetics.color,
             bodyShape: cosmetics.bodyShape,
             accent: cosmetics.accent,
             trail: cosmetics.trail,
             livery: cosmetics.livery
-          });
-          const sig = new SignalSocket();
-          sig.hostRoomName = roomName;
-          sig.hostCallSign = name;
-          this._signal = sig;
-          sig.onMessage = (msg) => this._onSignalHost(msg);
-          sig.onClose = () => {
-          };
+          }
+        });
+      };
+      ws.onmessage = (ev) => {
+        this._onMessage(ev.data);
+      };
+      ws.onclose = () => {
+        this._onSocketClose();
+      };
+      ws.onerror = () => {
+      };
+      return welcome;
+    }
+    leave() {
+      this._leaving = true;
+      if (this._welcomeWait) {
+        this._welcomeWait = null;
+      }
+      if (this._ws) {
+        try {
+          this._ws.close();
+        } catch {
+        }
+        this._ws = null;
+      }
+      this._st = null;
+      this.snaps_clear();
+      this.localPose.active = false;
+      this.sessionId = null;
+    }
+    async tryReconnect() {
+      if (!this._savedName) return false;
+      try {
+        await this.connect(this._savedName, this._savedCode, this._savedCosmetics, this._savedServerOrigin);
+        return true;
+      } catch {
+        return false;
+      }
+    }
+    // ── LOBBY CONTROL ───────────────────────────────────────────────────────────
+    sendReady() {
+      this._send({ type: "ready" });
+    }
+    sendHostStart() {
+      this._send({ type: "host-start" });
+    }
+    sendHostKick(targetId) {
+      this._send({ type: "host-kick", targetId });
+    }
+    sendHostSettings(s) {
+      const wire = {};
+      if (typeof s.roundLength === "number") wire.roundLength = s.roundLength;
+      if (typeof s.roomName === "string") wire.roomName = s.roomName;
+      if (typeof s.botsInRoom === "boolean") wire.botsInRoom = s.botsInRoom;
+      if (typeof s.botDifficulty === "string") wire.botDifficulty = s.botDifficulty;
+      this._send({ type: "host-settings", settings: wire });
+    }
+    getPhase() {
+      return this._st ? this._st.phase || null : null;
+    }
+    getHostId() {
+      return this._st ? this._st.hostId || this._leaderId || null : null;
+    }
+    /**
+     * Roster rows for lobby rendering — same field shape consumers use today
+     * (renderLobbyRoster reads id/name/ready/bot/score/color).
+     */
+    getRosterSnapshot() {
+      const st = this._st;
+      if (!st) return [];
+      const out = [];
+      st.players.forEach((p, id) => {
+        out.push({
+          id,
+          name: p.name || "Pilot",
+          ready: !!p.ready,
+          bot: !!p.bot,
+          score: p.score || 0,
+          color: p.skin || 0
+        });
+      });
+      return out;
+    }
+    // ── INPUT ───────────────────────────────────────────────────────────────────
+    sendInput(turn, climb, boost, fire) {
+      if (!this._ws || this._ws.readyState !== WebSocket.OPEN) return;
+      const now = performance.now();
+      if (now - this._lastSentAt < INPUT_INTERVAL_MS) return;
+      const seq = this._lastSent.seq + 1;
+      this._lastSent = { seq, turn, climb, boost, fire };
+      this._lastSentAt = now;
+      this._send({ type: "input", input: { seq, turn, climb, boost, fire } });
+    }
+    // ── SOCKET PLUMBING ─────────────────────────────────────────────────────────
+    _send(msg) {
+      if (!this._ws || this._ws.readyState !== WebSocket.OPEN) return;
+      try {
+        this._ws.send(JSON.stringify(msg));
+      } catch {
+      }
+    }
+    _onMessage(data) {
+      let msg;
+      try {
+        const text = typeof data === "string" ? data : new TextDecoder().decode(data);
+        msg = JSON.parse(text);
+      } catch {
+        return;
+      }
+      if (msg.type === "welcome") {
+        const st = this._st;
+        if (!st) return;
+        this.sessionId = msg.sessionId;
+        this._leaderId = msg.leaderId;
+        st.hostId = msg.leaderId;
+        st.roomName = msg.room?.name ?? "";
+        st.roundLength = msg.room?.roundLength ?? 150;
+        st.botsInRoom = msg.room?.botsInRoom ?? false;
+        st.botDifficulty = msg.room?.botDifficulty ?? "medium";
+        const waiter = this._welcomeWait;
+        this._welcomeWait = null;
+        if (waiter) waiter.resolve(msg);
+        if (this.onStateChange) this.onStateChange();
+        return;
+      }
+      if (msg.type === "state") {
+        this._applySnapshot(msg.snap);
+        return;
+      }
+      if (msg.type === "event") {
+        this._onEvent(msg.event);
+        return;
+      }
+      if (msg.type === "error") {
+        const waiter = this._welcomeWait;
+        if (waiter) {
+          this._welcomeWait = null;
+          waiter.reject(new Error(msg.message || msg.code));
+          return;
+        }
+        if (!this._leaving && this.onDisconnect) {
+          this.onDisconnect({ type: "error", code: msg.code, message: msg.message });
+        }
+        return;
+      }
+    }
+    _onEvent(evt) {
+      if (evt.type === "kill") {
+        if (this.onKill) this.onKill(evt);
+      } else if (evt.type === "pickup") {
+        if (this.onPickup) this.onPickup({ by: evt.by, type: evt.pickupType });
+      } else if (evt.type === "roster-change") {
+        if (this.onStateChange) this.onStateChange();
+      } else if (evt.type === "kicked") {
+        if (this.onDisconnect) this.onDisconnect({ type: "kicked", reason: "kicked" });
+        this._leaving = true;
+        if (this._ws) {
           try {
-            await sig.open(code, "host");
+            this._ws.close();
           } catch {
           }
-          this._startHostLoop();
-          if (this.onStateChange) this.onStateChange();
+          this._ws = null;
         }
-        /**
-         * List rooms visible from this client's network by querying the broker's
-         * `{type:"list"}` message. Returns an empty array on any error or timeout.
-         * This is a static method so callers can use `WebRtcTransport.listRooms()`
-         * without needing an instance.
-         */
-        static listRooms() {
-          return new Promise((resolve) => {
-            let settled = false;
-            const done = (rooms) => {
-              if (settled) return;
-              settled = true;
-              try {
-                ws.close();
-              } catch {
-              }
-              resolve(rooms);
-            };
-            const proto = location.protocol === "https:" ? "wss" : "ws";
-            const ws = new WebSocket(`${proto}://${location.host}/signal`);
-            const timer = setTimeout(() => done([]), 6e3);
-            ws.onopen = () => {
-              try {
-                ws.send(JSON.stringify({ type: "list" }));
-              } catch {
-                done([]);
-              }
-            };
-            ws.onmessage = (ev) => {
-              try {
-                const msg = JSON.parse(ev.data);
-                if (msg.type === "rooms") {
-                  clearTimeout(timer);
-                  done(Array.isArray(msg.rooms) ? msg.rooms : []);
-                }
-              } catch {
-              }
-            };
-            ws.onerror = () => {
-              clearTimeout(timer);
-              done([]);
-            };
-            ws.onclose = () => {
-              clearTimeout(timer);
-              done([]);
-            };
-          });
-        }
-        _onSimEvent(e) {
-          if (e.type === "kill") {
-            if (this.onKill) this.onKill({ killer: e.killer, victim: e.victim, killerName: e.killerName, victimName: e.victimName });
-            this._broadcastEvent({ type: "kill", killer: e.killer, victim: e.victim, killerName: e.killerName, victimName: e.victimName });
-          } else if (e.type === "pickup") {
-            if (this.onPickup) this.onPickup({ by: e.by, type: e.pickupType });
-            this._broadcastEvent({ type: "pickup", by: e.by, pickupType: e.pickupType });
-          } else if (e.type === "roundEnd") {
-            this._broadcastEvent({ type: "roundEnd", scores: e.scores });
-          }
-          if (this.onStateChange) this.onStateChange();
-        }
-        _startHostLoop() {
-          this._lastTick = performance.now();
-          this._stateAccum = 0;
-          const interval = 1e3 / STATE_HZ;
-          const tick = (now) => {
-            this._rafId = requestAnimationFrame(tick);
-            if (document.hidden) return;
-            let dtMs = now - this._lastTick;
-            this._lastTick = now;
-            if (dtMs <= 0 || !isFinite(dtMs)) dtMs = 16;
-            let dt = dtMs / 1e3;
-            while (dt > 0) {
-              const step = Math.min(dt, DT_MAX);
-              this._sim.tick(step);
-              dt -= step;
-            }
-            this._stateAccum += dtMs;
-            if (this._stateAccum >= interval) {
-              this._stateAccum -= interval;
-              this._broadcastState();
-              if (this.onStateChange) this.onStateChange();
-            }
-          };
-          this._rafId = requestAnimationFrame(tick);
-        }
-        _stopHostLoop() {
-          if (this._rafId !== null) {
-            cancelAnimationFrame(this._rafId);
-            this._rafId = null;
-          }
-        }
-        _broadcastState() {
-          if (!this._sim || !this._peers.size) return;
-          const snap = this._sim.snapshot();
-          const payload = JSON.stringify({ type: "state", snap });
-          for (const [, peer] of this._peers) {
-            if (peer.state && peer.state.readyState === "open") {
-              try {
-                peer.state.send(payload);
-              } catch {
-              }
-            }
-          }
-        }
-        _broadcastEvent(evt) {
-          const payload = JSON.stringify({ type: "event", event: evt });
-          for (const [, peer] of this._peers) {
-            if (peer.events && peer.events.readyState === "open") {
-              try {
-                peer.events.send(payload);
-              } catch {
-              }
-            }
-          }
-        }
-        async _onSignalHost(msg) {
-          if (!this._sim) return;
-          const sig = this._signal;
-          if (msg.type === "peer-joined") {
-            const peerId = msg.peerId;
-            if (this._peers.size >= MAX_GUESTS) return;
-            const pc = makePeerConnection(STUN_ICE);
-            const stateCh = pc.createDataChannel("state", { ordered: true, maxRetransmits: 0 });
-            const inputsCh = pc.createDataChannel("inputs", { ordered: false, maxRetransmits: 0 });
-            const eventsCh = pc.createDataChannel("events", { ordered: true });
-            stateCh.binaryType = "arraybuffer";
-            inputsCh.binaryType = "arraybuffer";
-            eventsCh.binaryType = "arraybuffer";
-            const channels = { pc, state: stateCh, inputs: inputsCh, events: eventsCh };
-            this._peers.set(peerId, channels);
-            inputsCh.onmessage = (ev) => this._onGuestInput(peerId, ev.data);
-            eventsCh.onmessage = (ev) => this._onGuestControl(peerId, ev.data);
-            pc.onicecandidate = (ev) => {
-              if (ev.candidate) sig.send({ type: "ice", room: this._room, to: peerId, candidate: ev.candidate.toJSON() });
-            };
-            pc.onconnectionstatechange = () => {
-              if (pc.connectionState === "failed" || pc.connectionState === "disconnected" || pc.connectionState === "closed") {
-                this._removePeer(peerId);
-              }
-            };
-            const offer = await pc.createOffer();
-            await pc.setLocalDescription(offer);
-            sig.send({ type: "offer", room: this._room, to: peerId, sdp: pc.localDescription.toJSON() });
-          }
-          if (msg.type === "answer" && msg.to === "host") {
-            const peer = this._peers.get(msg.from || msg.peerId);
-            for (const [, p] of this._peers) {
-              if (p.pc.signalingState === "have-local-offer") {
-                await p.pc.setRemoteDescription(new RTCSessionDescription(msg.sdp));
-                break;
-              }
-            }
-          }
-          if (msg.type === "ice" && msg.to === "host") {
-            for (const [, p] of this._peers) {
-              try {
-                await p.pc.addIceCandidate(new RTCIceCandidate(msg.candidate));
-              } catch {
-              }
-            }
-          }
-        }
-        _onGuestInput(peerId, data) {
-          if (!this._sim) return;
-          try {
-            const text = typeof data === "string" ? data : new TextDecoder().decode(data);
-            const msg = JSON.parse(text);
-            if (msg.type === "input") {
-              this._sim.applyInput(peerId, msg.input);
-            }
-          } catch {
-          }
-        }
-        _onGuestControl(peerId, data) {
-          if (!this._sim) return;
-          try {
-            const text = typeof data === "string" ? data : new TextDecoder().decode(data);
-            const msg = JSON.parse(text);
-            if (msg.type === "join") {
-              const peer = this._peers.get(peerId);
-              if (this._sim.players.has(peerId)) {
-                if (peer?.events?.readyState === "open") {
-                  peer.events.send(JSON.stringify({ type: "session", sessionId: peerId }));
-                }
-              } else {
-                this._sim.addPlayer(peerId, {
-                  name: msg.name || "Pilot",
-                  skin: msg.skin || 0,
-                  bodyShape: msg.bodyShape || 0,
-                  accent: msg.accent || 0,
-                  trail: msg.trail || 0,
-                  livery: msg.livery || 0
-                });
-                if (peer?.events?.readyState === "open") {
-                  peer.events.send(JSON.stringify({ type: "session", sessionId: peerId }));
-                }
-                if (this.onStateChange) this.onStateChange();
-              }
-            } else if (msg.type === "ready") {
-              this._sim.setReady(peerId);
-              if (this.onStateChange) this.onStateChange();
-            } else if (msg.type === "hostStart") {
-              this._sim.hostStart(peerId);
-              if (this.onStateChange) this.onStateChange();
-            } else if (msg.type === "hostKick") {
-              this._sim.hostKick(peerId, msg.targetId);
-              this._broadcastEvent({ type: "kicked", targetId: msg.targetId });
-              if (this.onStateChange) this.onStateChange();
-            } else if (msg.type === "hostSettings") {
-              this._sim.setHostSettings(peerId, {
-                roundLength: typeof msg.roundLength === "number" ? msg.roundLength : void 0,
-                roomName: typeof msg.roomName === "string" ? msg.roomName : void 0,
-                botsInRoom: typeof msg.botsInRoom === "boolean" ? msg.botsInRoom : void 0,
-                mode: typeof msg.mode === "string" ? msg.mode : void 0,
-                botDifficulty: typeof msg.botDifficulty === "string" ? msg.botDifficulty : void 0
-              });
-              if (this.onStateChange) this.onStateChange();
-            }
-          } catch {
-          }
-        }
-        _removePeer(peerId) {
-          const peer = this._peers.get(peerId);
-          if (!peer) return;
-          try {
-            peer.pc.close();
-          } catch {
-          }
-          this._peers.delete(peerId);
-          if (this._sim) this._sim.removePlayer(peerId);
-          this._broadcastEvent({ type: "roster-change" });
-          if (this.onStateChange) this.onStateChange();
-        }
-        _teardownPeers() {
-          try {
-            this._broadcastEvent({ type: "host-left" });
-          } catch {
-          }
-          for (const [, peer] of this._peers) {
-            try {
-              peer.pc.close();
-            } catch {
-            }
-          }
-          this._peers.clear();
-        }
-        // ── GUEST MODE ─────────────────────────────────────────────────────────────
-        async connect(name, code, cosmetics, _serverOrigin) {
-          this._isHost = false;
-          this._room = code;
-          this._guestState = new GuestTransportState();
-          this.sessionId = null;
-          const peerId = "g-" + Math.random().toString(36).slice(2, 10);
-          this._peerId = peerId;
-          this._savedName = name;
-          this._savedCosmetics = { ...cosmetics };
-          const sig = new SignalSocket();
-          this._signal = sig;
-          const pc = makePeerConnection(STUN_ICE);
-          this._guestPc = pc;
-          this._wireGuestPc(pc, peerId, code, sig);
-          sig.onMessage = async (msg) => {
-            await this._onSignalGuest(msg, peerId, code, sig, pc);
-          };
-          await sig.open(code, "join", peerId);
-          await this._waitForGuestChannels();
-          this._sendGuestJoin();
-        }
-        /** Wire the standard guest-side PC event handlers. */
-        _wireGuestPc(pc, peerId, code, sig) {
-          pc.onicecandidate = (ev) => {
-            if (ev.candidate) sig.send({ type: "ice", room: code, to: "host", candidate: ev.candidate.toJSON() });
-          };
-          pc.ondatachannel = (ev) => {
-            const ch = ev.channel;
-            ch.binaryType = "arraybuffer";
-            if (ch.label === "state") {
-              ch.onmessage = (e) => this._onGuestStateMsg(e.data);
-            } else if (ch.label === "events") {
-              this._guestEventCh = ch;
-              ch.onmessage = (e) => this._onGuestEventMsg(e.data);
-            } else if (ch.label === "inputs") {
-              this._guestInputCh = ch;
-            } else if (ch.label === "inputs-fallback") {
-              this._guestInputCh = ch;
-            }
-          };
-          pc.onconnectionstatechange = () => {
-            if (pc.connectionState === "failed" || pc.connectionState === "disconnected" || pc.connectionState === "closed") {
-              if (this._migrationState !== "none") return;
-              setTimeout(() => {
-                if (this._migrationState !== "none") return;
-                if (this.onDisconnect) this.onDisconnect({ type: "leave", code: 1001 });
-              }, 400);
-            }
-          };
-        }
-        /** Route guest-side signaling messages, including migration control messages. */
-        async _onSignalGuest(msg, peerId, code, sig, pc) {
-          if (msg.type === "offer" && msg.to === peerId) {
-            await pc.setRemoteDescription(new RTCSessionDescription(msg.sdp));
-            const answer = await pc.createAnswer();
-            await pc.setLocalDescription(answer);
-            sig.send({ type: "answer", room: code, to: "host", sdp: pc.localDescription.toJSON() });
-          } else if (msg.type === "ice" && msg.to === peerId) {
-            try {
-              await pc.addIceCandidate(new RTCIceCandidate(msg.candidate));
-            } catch {
-            }
-          } else if (msg.type === "host-migrating") {
-            if (this._isOfflineQr) return;
-            const migMsg = msg;
-            if (migMsg.nextHost === this._peerId) {
-              this._startMigrationAsElected();
-            } else {
-              this._startMigrationAsGuest();
-            }
-          } else if (msg.type === "host-arrived") {
-            if (this._migrationState === "guest-wait") {
-              this._reconnectGuestToNewHost();
-            }
-          } else if (msg.type === "host-left") {
-            if (this._migrationState !== "none") {
-              if (this._migrationTimeout !== null) {
-                clearTimeout(this._migrationTimeout);
-                this._migrationTimeout = null;
-              }
-            }
-            if (this.onDisconnect) this.onDisconnect({ type: "host-left" });
-          }
-        }
-        /** Wait for both guest data channels to open (up to 15 s). */
-        _waitForGuestChannels() {
-          return new Promise((resolve, reject) => {
-            const timeout = setTimeout(() => reject(new Error("P2P connection timeout")), 15e3);
-            const check = () => {
-              if (this._guestInputCh?.readyState === "open" && this._guestEventCh?.readyState === "open") {
-                clearTimeout(timeout);
-                resolve();
-              }
-            };
-            const poll = setInterval(() => {
-              if (this._guestInputCh && this._guestEventCh) {
-                this._guestInputCh.onopen = check;
-                this._guestEventCh.onopen = check;
-                clearInterval(poll);
-                check();
-              }
-            }, 100);
-          });
-        }
-        /** Send the initial join announcement to the host over the events channel. */
-        _sendGuestJoin() {
-          if (this._guestEventCh?.readyState === "open") {
-            this._guestEventCh.send(JSON.stringify({
-              type: "join",
-              name: this._savedName,
-              skin: this._savedCosmetics.color,
-              bodyShape: this._savedCosmetics.bodyShape,
-              accent: this._savedCosmetics.accent,
-              trail: this._savedCosmetics.trail,
-              livery: this._savedCosmetics.livery
-            }));
-          }
-        }
-        // ── MIGRATION STATE MACHINE ───────────────────────────────────────────────────
-        /**
-         * Build a SimStateSnapshot from the current guest state (used as the seed
-         * for the new host's GameSim when this guest is elected as the new host).
-         */
-        _buildMigrationSnapshot() {
-          const gs = this._guestState;
-          const players = [];
-          gs.players.forEach((v, k) => players.push([k, { ...v }]));
-          const bullets = [];
-          gs.bullets.forEach((v, k) => bullets.push([k, { ...v }]));
-          const pickups = [];
-          gs.pickups.forEach((v, k) => pickups.push([k, { ...v }]));
-          return {
-            players,
-            bullets,
-            pickups,
-            phase: gs.phase,
-            timeLeft: gs.timeLeft,
-            hostId: this._peerId,
-            // this guest becomes the new host
-            roundLength: gs.roundLength,
-            roomName: gs.roomName,
-            botsInRoom: gs.botsInRoom,
-            mode: gs.mode,
-            teamScore0: gs.teamScore0,
-            teamScore1: gs.teamScore1,
-            botDifficulty: gs.botDifficulty,
-            botsEnabled: gs.botsEnabled,
-            isPublic: gs.isPublic
-          };
-        }
-        /**
-         * Called when this guest has been elected as the new host.
-         * Tears down the guest WebRTC path, claims the host slot on the broker,
-         * and starts a new GameSim seeded from the last known state.
-         */
-        _startMigrationAsElected() {
-          if (this._migrationState !== "none") return;
-          this._migrationState = "electing";
-          const snap = this._buildMigrationSnapshot();
-          if (this._guestPc) {
-            try {
-              this._guestPc.close();
-            } catch {
-            }
-            this._guestPc = null;
-            this._guestInputCh = null;
-            this._guestEventCh = null;
-          }
-          const room = this._room;
-          const peerId = this._peerId;
-          const sig = this._signal ?? new SignalSocket();
-          this._signal = sig;
-          if (snap.roomName) sig.hostRoomName = snap.roomName;
-          if (this._savedName) sig.hostCallSign = this._savedName;
-          sig.open(room, "host").then(() => {
-            const origOnMessage = sig.onMessage;
-            sig.onMessage = (msg) => {
-              if (msg.type === "hosted") {
-                sig.onMessage = origOnMessage;
-                this._onElectedHosted(msg, snap, peerId);
-              } else if (msg.type === "peer-joined") {
-                if (origOnMessage) origOnMessage(msg);
-              }
-            };
-          }).catch(() => {
-            this._migrationState = "none";
-            if (this.onDisconnect) this.onDisconnect({ type: "host-left" });
-          });
-        }
-        /** After broker confirms hosted, set up the new GameSim and host loop. */
-        _onElectedHosted(hostedMsg, snap, peerId) {
-          const sim = new GameSim({
-            botsEnabled: snap.botsEnabled ?? false,
-            isPublic: snap.isPublic ?? false,
-            onEvent: (e) => this._onSimEvent(e),
-            initialState: snap
-          });
-          sim.hostId = peerId;
-          this._isHost = true;
-          this._sim = sim;
-          this._hostState = new HostTransportState(sim);
-          this.sessionId = peerId;
-          const sig = this._signal;
-          sig.onMessage = (msg) => this._onSignalHost(msg);
-          this._startHostLoop();
-          const existingPeers = hostedMsg.peers ?? [];
-          for (const gPeerId of existingPeers) {
-            if (gPeerId !== peerId) {
-              this._onSignalHost({ type: "peer-joined", peerId: gPeerId });
-            }
-          }
-          this._migrationState = "none";
-          if (this.onStateChange) this.onStateChange();
-          if (this.onDisconnect) this.onDisconnect({ type: "migration-complete" });
-        }
-        /**
-         * Called when another guest was elected host. Show the "reconnecting" overlay
-         * and wait for 'host-arrived' from the broker, then re-establish WebRTC.
-         */
-        _startMigrationAsGuest() {
-          if (this._migrationState !== "none") return;
-          this._migrationState = "guest-wait";
-          if (this.onDisconnect) this.onDisconnect({ type: "host-migrating" });
-          if (this._guestPc) {
-            try {
-              this._guestPc.close();
-            } catch {
-            }
-            this._guestPc = null;
-            this._guestInputCh = null;
-            this._guestEventCh = null;
-          }
-          this._migrationTimeout = setTimeout(() => {
-            if (this._migrationState !== "guest-wait") return;
-            this._migrationState = "none";
-            if (this.onDisconnect) this.onDisconnect({ type: "host-left" });
-          }, 5e3);
-        }
-        /**
-         * Guest reconnect: called when broker sends 'host-arrived'.
-         * Creates a fresh WebRTC peer connection to the new host.
-         */
-        _reconnectGuestToNewHost() {
-          if (this._migrationTimeout !== null) {
-            clearTimeout(this._migrationTimeout);
-            this._migrationTimeout = null;
-          }
-          const room = this._room;
-          const peerId = this._peerId;
-          const sig = this._signal;
-          const pc = makePeerConnection(STUN_ICE);
-          this._guestPc = pc;
-          this._guestInputCh = null;
-          this._guestEventCh = null;
-          this._wireGuestPc(pc, peerId, room, sig);
-          sig.onMessage = async (msg) => {
-            if (msg.type === "offer" && msg.to === peerId) {
-              await pc.setRemoteDescription(new RTCSessionDescription(msg.sdp));
-              const answer = await pc.createAnswer();
-              await pc.setLocalDescription(answer);
-              sig.send({ type: "answer", room, to: "host", sdp: pc.localDescription.toJSON() });
-            } else if (msg.type === "ice" && msg.to === peerId) {
-              try {
-                await pc.addIceCandidate(new RTCIceCandidate(msg.candidate));
-              } catch {
-              }
-            } else if (msg.type === "host-migrating") {
-              if (this._isOfflineQr) return;
-              const migMsg = msg;
-              this._migrationState = "none";
-              this._awaitingPostMigrationState = false;
-              if (migMsg.nextHost === this._peerId) {
-                this._startMigrationAsElected();
-              } else {
-                this._startMigrationAsGuest();
-              }
-            } else if (msg.type === "host-left") {
-              this._migrationState = "none";
-              this._awaitingPostMigrationState = false;
-              if (this.onDisconnect) this.onDisconnect({ type: "host-left" });
-            }
-          };
-          sig.send({ type: "join", room, peerId });
-          this._awaitingPostMigrationState = true;
-          this._waitForGuestChannels().then(() => {
-            this._sendGuestJoin();
-          }).catch(() => {
-            this._migrationState = "none";
-            this._awaitingPostMigrationState = false;
-            if (this.onDisconnect) this.onDisconnect({ type: "host-left" });
-          });
-        }
-        _onGuestStateMsg(data) {
-          try {
-            const text = typeof data === "string" ? data : new TextDecoder().decode(data);
-            const parsed = JSON.parse(text);
-            if (parsed.type !== "state") return;
-            const snap = parsed.snap;
-            const gs = this._guestState;
-            gs.phase = snap.phase;
-            gs.timeLeft = snap.timeLeft;
-            gs.hostId = snap.hostId;
-            gs.roomName = snap.roomName ?? "";
-            gs.roundLength = snap.roundLength ?? 150;
-            gs.botsInRoom = snap.botsInRoom ?? false;
-            gs.mode = snap.mode ?? "ffa";
-            gs.botDifficulty = snap.botDifficulty ?? "medium";
-            gs.teamScore0 = snap.teamScore0 ?? 0;
-            gs.teamScore1 = snap.teamScore1 ?? 0;
-            gs.botsEnabled = snap.botsEnabled ?? false;
-            gs.isPublic = snap.isPublic ?? false;
-            gs.players.mergeFrom(snap.players);
-            gs.bullets.mergeFrom(snap.bullets);
-            gs.pickups.mergeFrom(snap.pickups);
-            if (this._awaitingPostMigrationState) {
-              this._awaitingPostMigrationState = false;
-              this._migrationState = "none";
-              if (this.onDisconnect) this.onDisconnect({ type: "migration-complete" });
-            }
-            this._snapFromState(gs);
-            if (this.onStateChange) this.onStateChange();
-          } catch {
-          }
-        }
-        _onGuestEventMsg(data) {
-          try {
-            const text = typeof data === "string" ? data : new TextDecoder().decode(data);
-            const parsed = JSON.parse(text);
-            if (parsed.type !== "event") {
-              if (parsed.type === "session") {
-                this.sessionId = parsed.sessionId;
-              }
-              return;
-            }
-            const evt = parsed.event;
-            if (evt.type === "kill" && this.onKill) this.onKill(evt);
-            if (evt.type === "pickup" && this.onPickup) this.onPickup({ by: evt.by, type: evt.pickupType });
-            if (evt.type === "host-left") {
-              if (this.onDisconnect) this.onDisconnect({ type: "host-left" });
-            }
-            if (evt.type === "kicked" && evt.targetId === this.sessionId) {
-              if (this.onDisconnect) this.onDisconnect({ type: "kicked" });
-            }
-          } catch {
-          }
-        }
-        // ── INPUT ──────────────────────────────────────────────────────────────────
-        sendInput(turn2, climb, boost, fire) {
-          if (this._isHost) {
-            if (!this._sim) return;
-            const last = this._lastSent;
-            const changed = Math.abs(turn2 - last.turn) >= 0.03 || Math.abs(climb - last.climb) >= 0.03 || boost !== last.boost || fire !== last.fire;
-            const now = performance.now();
-            if (!changed && now - this._lastSentAt < 1e3 / INPUT_HZ) return;
-            const seq = last.seq + 1;
-            this._lastSent = { seq, turn: turn2, climb, boost, fire };
-            this._lastSentAt = now;
-            this._sim.applyInput("host", { seq, turn: turn2, climb, boost, fire });
-          } else {
-            if (!this._guestInputCh || this._guestInputCh.readyState !== "open") return;
-            const now = performance.now();
-            const last = this._lastSent;
-            const changed = Math.abs(turn2 - last.turn) >= 0.03 || Math.abs(climb - last.climb) >= 0.03 || boost !== last.boost || fire !== last.fire;
-            if (!changed && now - this._lastSentAt < 1e3 / INPUT_HZ) return;
-            const seq = last.seq + 1;
-            this._lastSent = { seq, turn: turn2, climb, boost, fire };
-            this._lastSentAt = now;
-            try {
-              this._guestInputCh.send(JSON.stringify({ type: "input", input: { seq, turn: turn2, climb, boost, fire } }));
-            } catch {
-            }
-          }
-        }
-        // ── LOBBY CONTROL ──────────────────────────────────────────────────────────
-        sendReady() {
-          if (this._isHost) {
-            if (this._sim) {
-              this._sim.setReady("host");
-              if (this.onStateChange) this.onStateChange();
-            }
-          } else {
-            this._sendControl({ type: "ready" });
-          }
-        }
-        sendHostStart() {
-          if (this._isHost) {
-            if (this._sim) {
-              this._sim.hostStart("host");
-              if (this.onStateChange) this.onStateChange();
-            }
-          } else {
-            this._sendControl({ type: "hostStart" });
-          }
-        }
-        sendHostKick(targetId) {
-          if (this._isHost) {
-            if (this._sim) {
-              this._sim.hostKick("host", targetId);
-              if (this.onStateChange) this.onStateChange();
-            }
-          } else {
-            this._sendControl({ type: "hostKick", targetId });
-          }
-        }
-        sendHostSettings(s) {
-          if (this._isHost) {
-            if (this._sim) {
-              this._sim.setHostSettings("host", s);
-              if (this.onStateChange) this.onStateChange();
-            }
-          } else {
-            this._sendControl({ type: "hostSettings", ...s });
-          }
-        }
-        _sendControl(msg) {
-          if (!this._guestEventCh || this._guestEventCh.readyState !== "open") return;
-          try {
-            this._guestEventCh.send(JSON.stringify(msg));
-          } catch {
-          }
-        }
-        // ── PREDICTION (verbatim from net.ts, adapted for P2P) ──────────────────
-        _authoritativeSelf() {
-          const s = this.state;
-          if (!s || !this.sessionId) return null;
-          return s.players.get(this.sessionId) || null;
-        }
-        _setLocalFromAuth(me) {
-          this.localPose.active = true;
-          this.localPose.p = { x: me.px, y: me.py, z: me.pz };
-          this.localPose.f = { x: me.fx, y: me.fy, z: me.fz };
-          this.localPose.speed = me.speed || window.GAME.CRUISE_SPEED;
-          this.localPose.seq = me.seq || 0;
-          this.localPose.turn = me.turn || 0;
-          this.localPose.climb = me.climb || 0;
-          this.localPose.boost = !!me.boosting;
-          this.localPose.fire = false;
-          this.localPose.alive = !!me.alive;
-          this.localPose.ackSeq = me.seq || 0;
-        }
-        _snapFromState(ts) {
-          const players = {};
-          ts.players.forEach((p, id) => {
-            players[id] = {
-              p: { x: p.px, y: p.py, z: p.pz },
-              f: { x: p.fx, y: p.fy, z: p.fz },
-              alive: !!p.alive,
-              speed: p.speed || 0,
-              turn: p.turn || 0,
-              climb: p.climb || 0,
-              seq: p.seq || 0
-            };
-          });
-          const t = performance.now();
-          this._snaps.push({ t, players });
-          this._snaps.sort((a, b) => a.t - b.t);
-          const cut = t - SNAP_BUFFER_MS;
-          while (this._snaps.length > 2 && this._snaps[0].t < cut) this._snaps.shift();
-          const me = this._authoritativeSelf();
-          if (!me) return;
-          if (!this.localPose.active || !me.alive) {
-            this._setLocalFromAuth(me);
-            return;
-          }
-          const Sp = window.Sphere;
-          const auth = { x: me.px, y: me.py, z: me.pz };
-          const authF = { x: me.fx, y: me.fy, z: me.fz };
-          const err = Sp.distance(this.localPose.p, auth);
-          if (err > SNAP_DISTANCE) {
-            this._setLocalFromAuth(me);
-            return;
-          }
-          this.localPose.p = Sp.lerpVec(this.localPose.p, auth, 0.22);
-          this.localPose.f = Sp.normalize(Sp.lerpVec(this.localPose.f, authF, 0.28));
-          this.localPose.speed = me.speed || this.localPose.speed;
-          this.localPose.seq = Math.max(this.localPose.seq, me.seq || 0);
-          this.localPose.ackSeq = me.seq || this.localPose.ackSeq;
-          this.localPose.alive = !!me.alive;
-        }
-        stepLocal(dt) {
-          if (this._isHost) {
-            const me2 = this._sim?.players.get("host");
-            if (!me2) return;
-            this.localPose.active = true;
-            this.localPose.p = { x: me2.px, y: me2.py, z: me2.pz };
-            this.localPose.f = { x: me2.fx, y: me2.fy, z: me2.fz };
-            this.localPose.speed = me2.speed;
-            this.localPose.alive = me2.alive;
-            return;
-          }
-          const me = this._authoritativeSelf();
-          if (!me) return;
-          if (!this.localPose.active) {
-            this._setLocalFromAuth(me);
-          }
-          if (!this.localPose.alive || !me.alive) {
-            this._setLocalFromAuth(me);
-            return;
-          }
-          const Sp = window.Sphere;
-          const G = window.GAME;
-          const inp = this._lastSent;
-          const angles = Sp.yawPitchFromForward(this.localPose.f);
-          const yaw = angles.yaw + inp.turn * G.TURN_RATE * dt;
-          const pitch = Sp.clamp(angles.pitch + inp.climb * G.PITCH_RATE * dt, -G.PITCH_MAX, G.PITCH_MAX);
-          let fwd = Sp.yawPitchForward(yaw, pitch);
-          let targetSpeed = inp.boost ? G.BOOST_SPEED : G.CRUISE_SPEED;
-          if (me.power === "afterburner") targetSpeed *= G.AFTERBURNER_FACTOR;
-          const delta = targetSpeed - this.localPose.speed;
-          const step = Math.sign(delta) * G.ACCEL * dt;
-          this.localPose.speed = Math.abs(step) >= Math.abs(delta) ? targetSpeed : this.localPose.speed + step;
-          const pos = this.localPose.p;
-          const edge = Math.max(Math.abs(pos.x), Math.abs(pos.z));
-          if (edge > G.MAP_HALF - G.MAP_EDGE_SOFT) {
-            const edgeT = Sp.clamp((edge - (G.MAP_HALF - G.MAP_EDGE_SOFT)) / G.MAP_EDGE_SOFT, 0, 1);
-            const home = Sp.normalize({ x: -pos.x || 1, y: 0, z: -pos.z });
-            fwd = Sp.normalize({
-              x: Sp.lerp(fwd.x, home.x, edgeT * 0.25),
-              y: fwd.y * (1 - edgeT * 0.2),
-              z: Sp.lerp(fwd.z, home.z, edgeT * 0.25)
-            });
-          }
-          let next = Sp.advance(pos, fwd, this.localPose.speed * dt).p;
-          next.x = Sp.clamp(next.x, -G.MAP_HALF, G.MAP_HALF);
-          next.z = Sp.clamp(next.z, -G.MAP_HALF, G.MAP_HALF);
-          next.y = Sp.clamp(next.y, G.MIN_ALT, G.MAX_ALT);
-          if (next.y <= G.MIN_ALT + 0.01 && fwd.y < 0) fwd = Sp.withPitch(fwd, 0.02);
-          if (next.y >= G.MAX_ALT - 0.01 && fwd.y > 0) fwd = Sp.withPitch(fwd, -0.02);
-          const auth = { x: me.px, y: me.py, z: me.pz };
-          const authF = { x: me.fx, y: me.fy, z: me.fz };
-          const err = Sp.distance(next, auth);
-          if (err > SNAP_DISTANCE) {
-            next = auth;
-            fwd = authF;
-            this.localPose.speed = me.speed || this.localPose.speed;
-          } else {
-            next = Sp.lerpVec(next, auth, Math.min(0.12, dt * 3.5));
-            fwd = Sp.normalize(Sp.lerpVec(fwd, authF, Math.min(0.18, dt * 4.5)));
-          }
-          this.localPose.p = next;
-          this.localPose.f = fwd;
-          this.localPose.turn = inp.turn;
-          this.localPose.climb = inp.climb;
-          this.localPose.boost = inp.boost;
-          this.localPose.fire = inp.fire;
-          this.localPose.seq = inp.seq;
-        }
-        sample(renderTime) {
-          const Sp = window.Sphere;
-          const snaps = this._snaps;
-          const out = {};
-          if (!snaps.length) return out;
-          const clone = (p) => ({
-            p: { ...p.p },
-            f: { ...p.f },
-            alive: p.alive,
-            speed: p.speed,
-            turn: p.turn,
-            climb: p.climb,
-            seq: p.seq
-          });
-          const blend = (a2, b2, t2) => ({
-            p: Sp.lerpVec(a2.p, b2.p, t2),
-            f: Sp.normalize(Sp.lerpVec(a2.f, b2.f, t2)),
-            alive: b2.alive,
-            speed: Sp.lerp(a2.speed, b2.speed, t2),
-            turn: Sp.lerp(a2.turn, b2.turn, t2),
-            climb: Sp.lerp(a2.climb, b2.climb, t2),
-            seq: b2.seq
-          });
-          const latest = snaps[snaps.length - 1];
-          if (renderTime >= latest.t) {
-            if (snaps.length < 2) {
-              for (const id in latest.players) out[id] = clone(latest.players[id]);
-              return out;
-            }
-            const prev = snaps[snaps.length - 2];
-            const span = latest.t - prev.t || 1;
-            const k = Math.min(renderTime - latest.t, MAX_EXTRAP_MS) / span;
-            for (const id in latest.players) {
-              const b2 = latest.players[id];
-              const a2 = prev.players[id] || b2;
-              const blended = blend(a2, b2, 1 + k);
-              blended.p = Sp.add(b2.p, Sp.scale(Sp.sub(b2.p, a2.p), k));
-              blended.f = Sp.normalize(Sp.lerpVec(a2.f, b2.f, 1 + k));
-              out[id] = blended;
-            }
-            return out;
-          }
-          let idx = 0;
-          while (idx < snaps.length && snaps[idx].t < renderTime) idx++;
-          if (idx === 0) {
-            for (const id in snaps[0].players) out[id] = clone(snaps[0].players[id]);
-            return out;
-          }
-          const a = snaps[idx - 1];
-          const b = snaps[idx];
-          const t = (renderTime - a.t) / (b.t - a.t || 1);
-          for (const id in b.players) {
-            out[id] = blend(a.players[id] || b.players[id], b.players[id], t);
-          }
+      }
+    }
+    _onSocketClose() {
+      this._ws = null;
+      if (this._leaving) return;
+      const waiter = this._welcomeWait;
+      if (waiter) {
+        this._welcomeWait = null;
+        waiter.reject(new Error("Connection closed before welcome"));
+        return;
+      }
+      if (this.onDisconnect) this.onDisconnect({ type: "closed", reason: "closed" });
+    }
+    snaps_clear() {
+      this._snaps = [];
+    }
+    // ── SNAPSHOT HANDLING ───────────────────────────────────────────────────────
+    _applySnapshot(snap) {
+      const st = this._st;
+      if (!st) return;
+      st.phase = snap.phase;
+      st.timeLeft = snap.timeLeft;
+      st.hostId = snap.hostId;
+      if (snap.hostId && snap.hostId !== this._leaderId) this._leaderId = snap.hostId;
+      st.roomName = snap.roomName ?? "";
+      st.roundLength = snap.roundLength ?? 150;
+      st.botsInRoom = snap.botsInRoom ?? false;
+      st.mode = snap.mode ?? "ffa";
+      st.teamScore0 = snap.teamScore0 ?? 0;
+      st.teamScore1 = snap.teamScore1 ?? 0;
+      st.botDifficulty = snap.botDifficulty ?? "medium";
+      st.players.mergeFrom(snap.players);
+      st.bullets.mergeFrom(snap.bullets);
+      st.pickups.mergeFrom(snap.pickups);
+      this._snapFromSnapshot(snap);
+      if (this.onStateChange) this.onStateChange();
+    }
+    _authoritativeSelf() {
+      const st = this._st;
+      if (!st || !this.sessionId) return null;
+      return st.players.get(this.sessionId) || null;
+    }
+    _setLocalFromAuth(me) {
+      this.localPose.active = true;
+      this.localPose.p = { x: me.px, y: me.py, z: me.pz };
+      this.localPose.f = { x: me.fx, y: me.fy, z: me.fz };
+      this.localPose.speed = me.speed || window.GAME.CRUISE_SPEED;
+      this.localPose.seq = me.seq || 0;
+      this.localPose.turn = me.turn || 0;
+      this.localPose.climb = me.climb || 0;
+      this.localPose.boost = !!me.boosting;
+      this.localPose.fire = false;
+      this.localPose.alive = !!me.alive;
+      this.localPose.ackSeq = me.seq || 0;
+    }
+    /** Push a wire snapshot into the interpolation buffer, then reconcile prediction. */
+    _snapFromSnapshot(snap) {
+      const players = {};
+      let me = null;
+      for (const [id, p] of snap.players) {
+        players[id] = {
+          p: { x: p.px, y: p.py, z: p.pz },
+          f: { x: p.fx, y: p.fy, z: p.fz },
+          alive: !!p.alive,
+          speed: p.speed || 0,
+          turn: p.turn || 0,
+          climb: p.climb || 0,
+          seq: p.seq || 0
+        };
+        if (id === this.sessionId) me = p;
+      }
+      const t = performance.now();
+      this._snaps.push({ t, players });
+      this._snaps.sort((a, b) => a.t - b.t);
+      const cut = t - SNAP_BUFFER_MS;
+      while (this._snaps.length > 2 && this._snaps[0].t < cut) this._snaps.shift();
+      if (!me) return;
+      if (!this.localPose.active || !me.alive) {
+        this._setLocalFromAuth(me);
+        return;
+      }
+      const Sp = window.Sphere;
+      const authPos = { x: me.px, y: me.py, z: me.pz };
+      const authFwd = { x: me.fx, y: me.fy, z: me.fz };
+      const err = Sp.distance(this.localPose.p, authPos);
+      if (err > SNAP_DISTANCE) {
+        this._setLocalFromAuth(me);
+        return;
+      }
+      this.localPose.p = Sp.lerpVec(this.localPose.p, authPos, 0.22);
+      this.localPose.f = Sp.normalize(Sp.lerpVec(this.localPose.f, authFwd, 0.28));
+      this.localPose.speed = me.speed || this.localPose.speed;
+      this.localPose.seq = Math.max(this.localPose.seq, me.seq || 0);
+      this.localPose.ackSeq = me.seq || this.localPose.ackSeq;
+      this.localPose.alive = !!me.alive;
+    }
+    // ── PREDICTION (ported from net.ts — includes landmark collisions) ──────────
+    stepLocal(dt) {
+      const me = this._authoritativeSelf();
+      if (!me) return;
+      if (!this.localPose.active) this._setLocalFromAuth(me);
+      if (!this.localPose.alive || !me.alive) {
+        this._setLocalFromAuth(me);
+        return;
+      }
+      const Sp = window.Sphere;
+      const G2 = window.GAME;
+      const input = this._lastSent;
+      const angles = Sp.yawPitchFromForward(this.localPose.f);
+      const yaw = angles.yaw + input.turn * G2.TURN_RATE * dt;
+      const pitch = Sp.clamp(angles.pitch + input.climb * G2.PITCH_RATE * dt, -G2.PITCH_MAX, G2.PITCH_MAX);
+      let fwd = Sp.yawPitchForward(yaw, pitch);
+      let targetSpeed = input.boost ? G2.BOOST_SPEED : G2.CRUISE_SPEED;
+      if (me.power === "afterburner") targetSpeed *= G2.AFTERBURNER_FACTOR;
+      const delta = targetSpeed - this.localPose.speed;
+      const step = Math.sign(delta) * G2.ACCEL * dt;
+      this.localPose.speed = Math.abs(step) >= Math.abs(delta) ? targetSpeed : this.localPose.speed + step;
+      const pos = this.localPose.p;
+      const edge = Math.max(Math.abs(pos.x), Math.abs(pos.z));
+      if (edge > G2.MAP_HALF - G2.MAP_EDGE_SOFT) {
+        const edgeT = Sp.clamp((edge - (G2.MAP_HALF - G2.MAP_EDGE_SOFT)) / G2.MAP_EDGE_SOFT, 0, 1);
+        const home = Sp.normalize({ x: -pos.x || 1, y: 0, z: -pos.z });
+        fwd = Sp.normalize({
+          x: Sp.lerp(fwd.x, home.x, edgeT * 0.25),
+          y: fwd.y * (1 - edgeT * 0.2),
+          z: Sp.lerp(fwd.z, home.z, edgeT * 0.25)
+        });
+      }
+      let next = Sp.advance(pos, fwd, this.localPose.speed * dt).p;
+      const collision = resolveLandmarkCollisions(next, fwd, G2.LANDMARKS, G2.PLANE_RADIUS);
+      next = collision.pos;
+      fwd = collision.fwd;
+      next.x = Sp.clamp(next.x, -G2.MAP_HALF, G2.MAP_HALF);
+      next.z = Sp.clamp(next.z, -G2.MAP_HALF, G2.MAP_HALF);
+      next.y = Sp.clamp(next.y, G2.MIN_ALT, G2.MAX_ALT);
+      if (next.y <= G2.MIN_ALT + 0.01 && fwd.y < 0) fwd = Sp.withPitch(fwd, 0.02);
+      if (next.y >= G2.MAX_ALT - 0.01 && fwd.y > 0) fwd = Sp.withPitch(fwd, -0.02);
+      const authPos = { x: me.px, y: me.py, z: me.pz };
+      const authFwd = { x: me.fx, y: me.fy, z: me.fz };
+      const err = Sp.distance(next, authPos);
+      if (err > SNAP_DISTANCE) {
+        next = authPos;
+        fwd = authFwd;
+        this.localPose.speed = me.speed || this.localPose.speed;
+      } else {
+        next = Sp.lerpVec(next, authPos, Math.min(0.12, dt * 3.5));
+        fwd = Sp.normalize(Sp.lerpVec(fwd, authFwd, Math.min(0.18, dt * 4.5)));
+      }
+      this.localPose.p = next;
+      this.localPose.f = fwd;
+      this.localPose.turn = input.turn;
+      this.localPose.climb = input.climb;
+      this.localPose.boost = input.boost;
+      this.localPose.fire = input.fire;
+      this.localPose.seq = input.seq;
+    }
+    // ── INTERPOLATION (verbatim from the proven guest path) ─────────────────────
+    sample(renderTime) {
+      const Sp = window.Sphere;
+      const snaps = this._snaps;
+      const out = {};
+      if (!snaps.length) return out;
+      const clone = (p) => ({
+        p: { ...p.p },
+        f: { ...p.f },
+        alive: p.alive,
+        speed: p.speed,
+        turn: p.turn,
+        climb: p.climb,
+        seq: p.seq
+      });
+      const blend = (a2, b2, t2) => ({
+        p: Sp.lerpVec(a2.p, b2.p, t2),
+        f: Sp.normalize(Sp.lerpVec(a2.f, b2.f, t2)),
+        alive: b2.alive,
+        speed: Sp.lerp(a2.speed, b2.speed, t2),
+        turn: Sp.lerp(a2.turn, b2.turn, t2),
+        climb: Sp.lerp(a2.climb, b2.climb, t2),
+        seq: b2.seq
+      });
+      const latest = snaps[snaps.length - 1];
+      if (renderTime >= latest.t) {
+        if (snaps.length < 2) {
+          for (const id in latest.players) out[id] = clone(latest.players[id]);
           return out;
         }
-        // ── OFFLINE QR HOST SIDE ──────────────────────────────────────────────────
-        /**
-         * Build an offline offer: create PC with no ICE servers, gather local-only
-         * candidates, encode to base64url.  Call after the ICE gathering is complete.
-         * Renders the result to `canvas` using window.QR.
-         *
-         * Returned promise resolves with the encoded payload string (for debugging).
-         */
-        async startOfflineQrOffer(canvas) {
-          this._isOfflineQr = true;
-          const pc = makePeerConnection([]);
-          this._guestPc = pc;
-          const stateCh = pc.createDataChannel("state", { ordered: true, maxRetransmits: 0 });
-          const inputsCh = pc.createDataChannel("inputs", { ordered: false, maxRetransmits: 0 });
-          const eventsCh = pc.createDataChannel("events", { ordered: true });
-          stateCh.binaryType = "arraybuffer";
-          inputsCh.binaryType = "arraybuffer";
-          eventsCh.binaryType = "arraybuffer";
-          inputsCh.onmessage = (ev) => this._onGuestInput("offline-guest", ev.data);
-          eventsCh.onmessage = (ev) => this._onGuestControl("offline-guest", ev.data);
-          const channels = { pc, state: stateCh, inputs: inputsCh, events: eventsCh };
-          this._peers.set("offline-guest", channels);
-          const offer = await pc.createOffer();
-          await pc.setLocalDescription(offer);
-          await new Promise((resolve) => {
-            if (pc.iceGatheringState === "complete") {
-              resolve();
-              return;
-            }
-            pc.onicegatheringstatechange = () => {
-              if (pc.iceGatheringState === "complete") resolve();
-            };
-            setTimeout(resolve, 5e3);
-          });
-          const sdpLocal = filterSdpToLocal(pc.localDescription.sdp);
-          const payload = JSON.stringify({ type: "offer", sdp: { type: "offer", sdp: sdpLocal } });
-          const encoded = await compressB64(payload);
-          if (encoded.length > 2400) {
-            throw new Error("too many network interfaces \u2014 use code instead");
-          }
-          const joinUrl = `${location.origin}${location.pathname}?offline-answer=${encoded}`;
-          window.QR.render(canvas, joinUrl, {
-            size: window.Input.isTouchDevice() ? 220 : 256,
-            errorCorrectionLevel: "M"
-          });
-          return encoded;
+        const prev = snaps[snaps.length - 2];
+        const span2 = latest.t - prev.t || 1;
+        const extraMs = Math.min(renderTime - latest.t, MAX_EXTRAP_MS);
+        const k = extraMs / span2;
+        for (const id in latest.players) {
+          const b2 = latest.players[id];
+          const a2 = prev.players[id] || b2;
+          const blended = blend(a2, b2, 1 + k);
+          blended.p = Sp.add(b2.p, Sp.scale(Sp.sub(b2.p, a2.p), k));
+          blended.f = Sp.normalize(Sp.lerpVec(a2.f, b2.f, 1 + k));
+          out[id] = blended;
         }
-        /**
-         * Guest: decode offer QR payload, create answer, encode answer, render QR.
-         */
-        async startOfflineQrAnswer(encoded, answerCanvas) {
-          this._isOfflineQr = true;
-          const payload = await decompressB64(encoded);
-          const { sdp: offerSdp } = JSON.parse(payload);
-          const pc = makePeerConnection([]);
-          this._guestPc = pc;
-          pc.ondatachannel = (ev) => {
-            const ch = ev.channel;
-            ch.binaryType = "arraybuffer";
-            if (ch.label === "state") ch.onmessage = (e) => this._onGuestStateMsg(e.data);
-            if (ch.label === "events") {
-              this._guestEventCh = ch;
-              ch.onmessage = (e) => this._onGuestEventMsg(e.data);
-            }
-            if (ch.label === "inputs" || ch.label === "inputs-fallback") this._guestInputCh = ch;
-          };
-          await pc.setRemoteDescription(new RTCSessionDescription(offerSdp));
-          const answer = await pc.createAnswer();
-          await pc.setLocalDescription(answer);
-          await new Promise((resolve) => {
-            if (pc.iceGatheringState === "complete") {
-              resolve();
-              return;
-            }
-            pc.onicegatheringstatechange = () => {
-              if (pc.iceGatheringState === "complete") resolve();
-            };
-            setTimeout(resolve, 5e3);
-          });
-          const sdpLocal = filterSdpToLocal(pc.localDescription.sdp);
-          const answerPayload = JSON.stringify({ type: "answer", sdp: { type: "answer", sdp: sdpLocal } });
-          const answerEncoded = await compressB64(answerPayload);
-          if (answerEncoded.length > 2400) throw new Error("too many network interfaces \u2014 use code instead");
-          window.QR.render(answerCanvas, answerEncoded, {
-            size: window.Input.isTouchDevice() ? 220 : 256,
-            errorCorrectionLevel: "M"
-          });
-        }
-        /**
-         * Host: accept offline QR answer (pasted/scanned base64url string).
-         */
-        async finishOfflineQrOffer(answerEncoded) {
-          const payload = await decompressB64(answerEncoded);
-          const { sdp: answerSdp } = JSON.parse(payload);
-          const peer = this._peers.get("offline-guest");
-          if (!peer) throw new Error("No pending offline offer");
-          await peer.pc.setRemoteDescription(new RTCSessionDescription(answerSdp));
-        }
-      };
+        return out;
+      }
+      let idx = 0;
+      while (idx < snaps.length && snaps[idx].t < renderTime) idx++;
+      if (idx === 0) {
+        for (const id in snaps[0].players) out[id] = clone(snaps[0].players[id]);
+        return out;
+      }
+      const a = snaps[idx - 1];
+      const b = snaps[idx];
+      const span = b.t - a.t || 1;
+      const t = (renderTime - a.t) / span;
+      for (const id in b.players) {
+        const bp = b.players[id];
+        const ap = a.players[id] || bp;
+        out[id] = blend(ap, bp, t);
+      }
+      return out;
     }
-  });
+  };
 
-  // src/client/host-sim.ts
-  var init_host_sim = __esm({
-    "src/client/host-sim.ts"() {
-      "use strict";
-      init_net_p2p();
-    }
-  });
-
-  // src/client/arcadeMenu.ts
-  function arcadeScreenId(screen2) {
-    return `arcade-screen-${screen2}`;
+  // src/client/appshell.ts
+  var deferredInstallPrompt = null;
+  if (typeof window !== "undefined") {
+    window.addEventListener("beforeinstallprompt", (e) => {
+      e.preventDefault();
+      deferredInstallPrompt = e;
+    });
   }
-  function mountArcadeMenu() {
-    const host = document.getElementById(ARCADE_MENU_HOST_ID);
-    if (!(host instanceof HTMLElement)) return null;
-    if (!host.dataset.mounted) {
-      host.innerHTML = getArcadeMenuMarkup();
-      host.dataset.mounted = "1";
+  function requestAppFullscreen() {
+    let ok = false;
+    try {
+      const el = document.documentElement;
+      if (el.requestFullscreen) {
+        el.requestFullscreen().catch(() => {
+        });
+        ok = true;
+      }
+    } catch {
     }
-    host.classList.remove("hidden");
-    document.body.classList.add("arcade-menu-enabled");
-    return host;
-  }
-  function getArcadeMenuMarkup() {
-    return `
-    <div class="arcade-menu-shell">
-      <div class="arcade-menu-router">
-        <section class="${ARCADE_MENU_SCREEN_CLASS} active" id="${arcadeScreenId("home")}">
-          <div class="arcade-home-corner">
-            <button type="button" id="arcade-menu-settings-btn" class="arcade-corner-btn" aria-label="Settings">\u2699</button>
-            <button type="button" class="arcade-corner-btn arcade-corner-btn--secondary" data-arcade-nav="leaders" aria-label="Leaderboard">\u{1F3C6}</button>
-          </div>
-
-          <div class="arcade-home-center">
-            <div class="arcade-title-block">
-              <h1>SMASHCART</h1>
-              <p class="arcade-tagline">Local Wi-Fi dogfights. No servers, no waiting.</p>
-            </div>
-
-            <label class="arcade-field arcade-home-namefield">
-              <span class="arcade-field-label">Call Sign</span>
-              <input id="arcade-name-input" class="arcade-input" maxlength="14" placeholder="Pilot name" aria-label="Call sign" />
-            </label>
-
-            <div class="arcade-home-buttons">
-              <button type="button" class="arcade-home-btn arcade-home-btn--primary" data-arcade-nav="create">
-                <span class="arcade-home-btn-icon">\u{1F3AE}</span>
-                <span class="arcade-home-btn-label">Create Room</span>
-              </button>
-              <button type="button" class="arcade-home-btn" data-arcade-nav="join">
-                <span class="arcade-home-btn-icon">\u{1F511}</span>
-                <span class="arcade-home-btn-label">Join Room</span>
-              </button>
-              <button type="button" class="arcade-home-btn" data-arcade-nav="customize">
-                <span class="arcade-home-btn-icon">\u2708</span>
-                <span class="arcade-home-btn-label">Customize Plane</span>
-              </button>
-            </div>
-          </div>
-        </section>
-
-        <section class="${ARCADE_MENU_SCREEN_CLASS}" id="${arcadeScreenId("create")}">
-          <header class="arcade-hangar-header">
-            <button type="button" class="arcade-back-btn arcade-back-btn--compact" data-arcade-back>Back</button>
-            <h2 class="arcade-hangar-title">Create Room</h2>
-            <span class="arcade-header-spacer" aria-hidden="true"></span>
-          </header>
-
-          <section class="arcade-panel arcade-create-panel">
-            <label class="arcade-field">
-              <span class="arcade-field-label">Room name</span>
-              <input id="arcade-local-room-name" class="arcade-input" maxlength="20" placeholder="Room name" aria-label="Room name" />
-            </label>
-            <label class="arcade-switch" for="arcade-local-bots-check">
-              <input type="checkbox" id="arcade-local-bots-check" checked />
-              <span>Fill with bots</span>
-            </label>
-            <p class="muted arcade-hint">Friends on your Wi-Fi join with the room code. Bot difficulty: \u2699 Settings.</p>
-            <button type="button" id="arcade-local-create-btn" class="arcade-panel-action arcade-panel-action--wide arcade-panel-action--major">\u2705 Create Room</button>
-          </section>
-        </section>
-
-        <section class="${ARCADE_MENU_SCREEN_CLASS}" id="${arcadeScreenId("join")}">
-          <header class="arcade-hangar-header">
-            <button type="button" class="arcade-back-btn arcade-back-btn--compact" data-arcade-back>Back</button>
-            <h2 class="arcade-hangar-title">Join Room</h2>
-            <span class="arcade-header-spacer" aria-hidden="true"></span>
-          </header>
-
-          <section class="arcade-panel arcade-join-scan-panel">
-            <div class="arcade-panel-header">
-              <div>
-                <h3 class="arcade-panel-title">Nearby Rooms</h3>
-              </div>
-              <button type="button" id="arcade-local-scan-btn" class="arcade-panel-action arcade-panel-action--secondary">\u21BB Re-scan</button>
-            </div>
-            <div id="arcade-local-room-list" class="local-room-list arcade-local-room-list">
-              <p class="muted local-empty">Scanning for rooms\u2026</p>
-            </div>
-          </section>
-
-          <div class="arcade-divider arcade-divider--label" data-label="or enter a code"></div>
-
-          <section class="arcade-panel arcade-join-code-panel">
-            <input id="arcade-join-code-input" class="arcade-input arcade-input--code" maxlength="200" placeholder="ABCDEF" autocomplete="off" spellcheck="false" aria-label="Room code or invite link" />
-            <div class="arcade-join-code-actions">
-              <button type="button" id="arcade-join-code-submit" class="arcade-panel-action arcade-panel-action--wide arcade-panel-action--major">Join</button>
-              <button type="button" id="arcade-scan-open-btn" class="arcade-panel-action arcade-panel-action--secondary">\u{1F4F7} Scan QR</button>
-            </div>
-          </section>
-        </section>
-
-        <section class="${ARCADE_MENU_SCREEN_CLASS}" id="${arcadeScreenId("leaders")}">
-          <header class="arcade-hangar-header">
-            <button type="button" class="arcade-back-btn arcade-back-btn--compact" data-arcade-back>Back</button>
-            <h2 class="arcade-hangar-title">Leaderboard</h2>
-            <span class="arcade-header-spacer" aria-hidden="true"></span>
-          </header>
-
-          <section class="arcade-panel arcade-leaderboard-panel">
-            <div class="arcade-panel-header">
-              <div>
-                <h3 class="arcade-panel-title">Top Pilots</h3>
-              </div>
-              <span class="arcade-panel-badge arcade-panel-badge--subtle">Top 10</span>
-            </div>
-            <div id="arcade-menu-leaderboard">
-              <div class="lb-row muted">Loading...</div>
-            </div>
-          </section>
-        </section>
-
-        <section class="${ARCADE_MENU_SCREEN_CLASS} arcade-hangar-screen" id="${arcadeScreenId("customize")}">
-          <header class="arcade-hangar-header">
-            <button type="button" class="arcade-back-btn arcade-back-btn--compact" data-arcade-back>Back</button>
-            <h2 class="arcade-hangar-title">Hangar</h2>
-            <div class="arcade-hangar-header-actions">
-              <button type="button" id="arcade-customize-randomize" class="arcade-icon-btn" aria-label="Randomize loadout" title="Randomize">\u{1F3B2}</button>
-              <button type="button" id="arcade-customize-done" class="arcade-panel-action arcade-panel-action--compact" data-arcade-back>Done</button>
-            </div>
-          </header>
-
-          <div class="arcade-hangar-stage" aria-hidden="true"></div>
-
-          <p class="arcade-hangar-summary">
-            <span id="arcade-customize-summary-name">Viper Fighter</span>
-            <span id="arcade-customize-summary-text" class="arcade-hangar-summary-text">Scarlet paint, Midnight accent, Clean livery, White Smoke trail</span>
-          </p>
-
-          <div class="arcade-hangar-sheet">
-            <div class="arcade-hangar-tabs" role="tablist">
-              <button type="button" class="arcade-hangar-tab is-active" data-hangar-tab="airframe" role="tab" aria-selected="true">\u2708 Frame</button>
-              <button type="button" class="arcade-hangar-tab" data-hangar-tab="paint" role="tab" aria-selected="false">\u{1F3A8} Paint</button>
-              <button type="button" class="arcade-hangar-tab" data-hangar-tab="accent" role="tab" aria-selected="false">\u25C6 Accent</button>
-              <button type="button" class="arcade-hangar-tab" data-hangar-tab="livery" role="tab" aria-selected="false">\u25A8 Livery</button>
-              <button type="button" class="arcade-hangar-tab" data-hangar-tab="trail" role="tab" aria-selected="false">\u2726 Trail</button>
-              <button type="button" class="arcade-hangar-tab" data-hangar-tab="presets" role="tab" aria-selected="false">\u2B50 Presets</button>
-            </div>
-
-            <div class="arcade-hangar-sheet-body">
-              <div id="arcade-customize-airframe" class="arcade-hangar-panel-content option-row option-row--cards is-active" data-hangar-panel="airframe"></div>
-              <div id="arcade-customize-paint" class="arcade-hangar-panel-content option-row option-row--swatches" data-hangar-panel="paint"></div>
-              <div id="arcade-customize-accent" class="arcade-hangar-panel-content option-row option-row--swatches" data-hangar-panel="accent"></div>
-              <div id="arcade-customize-livery" class="arcade-hangar-panel-content option-row option-row--cards" data-hangar-panel="livery"></div>
-              <div id="arcade-customize-trail" class="arcade-hangar-panel-content option-row option-row--swatches" data-hangar-panel="trail"></div>
-              <div class="arcade-hangar-panel-content arcade-hangar-presets-panel" data-hangar-panel="presets">
-                <div id="arcade-preset-grid" class="preset-grid preset-grid--row"></div>
-                <button type="button" id="arcade-customize-reset" class="arcade-hangar-reset-btn">Reset to default</button>
-              </div>
-            </div>
-
-            <p id="arcade-customize-feedback" class="arcade-hangar-feedback">Cosmetics are visual only. No effect on flight or damage.</p>
-          </div>
-        </section>
-
-        <div class="arcade-menu-footer">
-          <p id="arcade-orientation-note" class="muted">Landscape is recommended on touch devices.</p>
-          <p id="arcade-friends-note" class="muted"></p>
-          <p id="arcade-status" class="muted arcade-status-line" aria-live="polite"></p>
-        </div>
-      </div>
-    </div>
-  `;
-  }
-  var ARCADE_MENU_HOST_ID, ARCADE_MENU_SCREEN_CLASS;
-  var init_arcadeMenu = __esm({
-    "src/client/arcadeMenu.ts"() {
-      "use strict";
-      ARCADE_MENU_HOST_ID = "arcade-start-screen";
-      ARCADE_MENU_SCREEN_CLASS = "arcade-menu-screen";
+    try {
+      const so = screen.orientation;
+      if (so && so.lock) {
+        so.lock("landscape").catch(() => {
+        });
+        ok = true;
+      }
+    } catch {
     }
-  });
+    return ok;
+  }
+  function exitAppFullscreen() {
+    try {
+      const so = screen.orientation;
+      if (so && so.unlock) so.unlock();
+    } catch {
+    }
+    try {
+      if (document.fullscreenElement) document.exitFullscreen().catch(() => {
+      });
+    } catch {
+    }
+  }
+  var wakeLockSentinel = null;
+  var wakeLockWanted = false;
+  async function acquireWakeLock() {
+    try {
+      const wl = navigator.wakeLock;
+      if (!wl) return;
+      wakeLockSentinel = await wl.request("screen");
+      wakeLockSentinel.addEventListener?.("release", () => {
+        wakeLockSentinel = null;
+      });
+    } catch {
+      wakeLockSentinel = null;
+    }
+  }
+  function keepAwake() {
+    wakeLockWanted = true;
+    void acquireWakeLock();
+  }
+  function releaseAwake() {
+    wakeLockWanted = false;
+    try {
+      wakeLockSentinel?.release?.();
+    } catch {
+    }
+    wakeLockSentinel = null;
+  }
+  if (typeof document !== "undefined") {
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "visible" && wakeLockWanted && !wakeLockSentinel) {
+        void acquireWakeLock();
+      }
+    });
+  }
+  async function registerServiceWorker() {
+    try {
+      if (!("serviceWorker" in navigator)) return null;
+      if (!window.isSecureContext && location.hostname !== "localhost" && location.hostname !== "127.0.0.1") {
+        return null;
+      }
+      return await navigator.serviceWorker.register("/sw.js");
+    } catch {
+      return null;
+    }
+  }
 
   // src/shared/loadout.ts
+  var LOADOUT_STORAGE_KEY = "smashcart.loadout.v1";
+  var PRESET_SLOT_COUNT = 4;
+  var DEFAULT_LOADOUT = {
+    color: 0,
+    bodyShape: 0,
+    accent: 0,
+    trail: 0,
+    livery: 0
+  };
+  var LEGACY_LOADOUT_KEYS = {
+    skin: "smashcart.skin",
+    color: "smashcart.color",
+    bodyShape: "smashcart.bodyShape",
+    accent: "smashcart.accent",
+    trail: "smashcart.trail",
+    livery: "smashcart.livery"
+  };
+  var AIRFRAME_OPTIONS = [
+    { value: 0, label: "Fighter", callsign: "Viper", note: "Balanced silhouette with a steady mid-wing stance." },
+    { value: 1, label: "Interceptor", callsign: "Razor", note: "Slim nose and swept wings for a fast strike profile." },
+    { value: 2, label: "Bomber", callsign: "Mammoth", note: "Broad wings and a heavy center mass with twin nacelles." },
+    { value: 3, label: "Biplane", callsign: "Stork", note: "Stacked wings and struts for a vintage dogfight look." }
+  ];
+  var PAINT_OPTIONS = [
+    { value: 0, label: "Scarlet", note: "Classic red launch paint.", swatch: "#ff6b6b" },
+    { value: 1, label: "Cobalt", note: "Cold blue squadron finish.", swatch: "#49c0ff" },
+    { value: 2, label: "Olive", note: "Field-ready tactical green.", swatch: "#8be34a" },
+    { value: 3, label: "Sunburst", note: "High-visibility yellow sweep.", swatch: "#ffd24a" },
+    { value: 4, label: "Violet", note: "Arcade purple glow tone.", swatch: "#c07bff" },
+    { value: 5, label: "Ember", note: "Hot orange carrier deck flare.", swatch: "#ff9f43" },
+    { value: 6, label: "Teal", note: "Sea-glass cyan finish.", swatch: "#00d2d3" },
+    { value: 7, label: "Cream", note: "Warm ivory patrol coat.", swatch: "#ffeaa7" },
+    { value: 8, label: "Ghost", note: "Pale alloy shell.", swatch: "#dfe6e9" },
+    { value: 9, label: "Stealth", note: "Low-light blacked-out finish.", swatch: "#2d3436" },
+    { value: 10, label: "Rust", note: "Weathered copper strike paint.", swatch: "#e17055" },
+    { value: 11, label: "Mint", note: "Bright coastal mint.", swatch: "#55efc4" }
+  ];
+  var ACCENT_OPTIONS = [
+    { value: 0, label: "Midnight", note: "Dark utility trim.", swatch: "#273244" },
+    { value: 1, label: "Signal White", note: "Clean instrument-white contrast.", swatch: "#ffffff" },
+    { value: 2, label: "Iron Black", note: "Deep matte shadow line.", swatch: "#000000" },
+    { value: 3, label: "Gold", note: "Showcase deck stripe highlight.", swatch: "#ffd24a" },
+    { value: 4, label: "Crimson", note: "Red warning-band accent.", swatch: "#ff6b6b" },
+    { value: 5, label: "Ice Blue", note: "Cold neon wing edge.", swatch: "#49c0ff" },
+    { value: 6, label: "Vector Green", note: "Radar-green trim.", swatch: "#8be34a" }
+  ];
+  var LIVERY_OPTIONS = [
+    { value: 0, label: "Clean", note: "Primary body with crisp wing contrast." },
+    { value: 1, label: "Stripe", note: "Single bold centerline stripe." },
+    { value: 2, label: "Two-Tone", note: "Split-color wing and tail treatment." },
+    { value: 3, label: "Camo", note: "Patchwork accent markers across the shell." }
+  ];
+  var TRAIL_OPTIONS = [
+    { value: 0, label: "White Smoke", note: "Neutral engine exhaust.", swatch: "#ffffff" },
+    { value: 1, label: "Afterburner Orange", note: "Hot thrust flare.", swatch: "#ff9f43" },
+    { value: 2, label: "Cryo Blue", note: "Cold plasma stream.", swatch: "#49c0ff" },
+    { value: 3, label: "Plasma Violet", note: "Electric purple trail.", swatch: "#c07bff" },
+    { value: 4, label: "Toxic Green", note: "Acid-green vapor wake.", swatch: "#8be34a" }
+  ];
   function toInt(value) {
     if (typeof value === "number" && Number.isFinite(value)) return Math.trunc(value);
     if (typeof value === "string" && value.trim()) {
@@ -3027,300 +775,45 @@
       livery: clampIndex(source.livery, LIVERY_OPTIONS.length, DEFAULT_LOADOUT.livery)
     };
   }
-  function randomizeLoadout(random = Math.random) {
-    const pick = (count) => Math.max(0, Math.min(count - 1, Math.floor(random() * count)));
-    return {
-      color: pick(PAINT_OPTIONS.length),
-      bodyShape: pick(AIRFRAME_OPTIONS.length),
-      accent: pick(ACCENT_OPTIONS.length),
-      trail: pick(TRAIL_OPTIONS.length),
-      livery: pick(LIVERY_OPTIONS.length)
-    };
-  }
-  function getLoadoutSummary(loadout) {
-    const airframe = AIRFRAME_OPTIONS[loadout.bodyShape] || AIRFRAME_OPTIONS[0];
-    const paint = PAINT_OPTIONS[loadout.color] || PAINT_OPTIONS[0];
-    const accent = ACCENT_OPTIONS[loadout.accent] || ACCENT_OPTIONS[0];
-    const livery = LIVERY_OPTIONS[loadout.livery] || LIVERY_OPTIONS[0];
-    const trail = TRAIL_OPTIONS[loadout.trail] || TRAIL_OPTIONS[0];
-    return {
-      title: `${airframe.callsign} ${airframe.label}`,
-      subtitle: `${paint.label} paint \xB7 ${accent.label} accent \xB7 ${livery.label} livery \xB7 ${trail.label} trail`
-    };
-  }
-  function getLoadoutDetailRows(loadout) {
-    return [
-      { label: "Airframe", value: (AIRFRAME_OPTIONS[loadout.bodyShape] || AIRFRAME_OPTIONS[0]).label },
-      { label: "Paint", value: (PAINT_OPTIONS[loadout.color] || PAINT_OPTIONS[0]).label },
-      { label: "Accent", value: (ACCENT_OPTIONS[loadout.accent] || ACCENT_OPTIONS[0]).label },
-      { label: "Livery", value: (LIVERY_OPTIONS[loadout.livery] || LIVERY_OPTIONS[0]).label },
-      { label: "Trail", value: (TRAIL_OPTIONS[loadout.trail] || TRAIL_OPTIONS[0]).label }
-    ];
-  }
-  var LOADOUT_STORAGE_KEY, PRESET_SLOT_COUNT, DEFAULT_LOADOUT, LEGACY_LOADOUT_KEYS, AIRFRAME_OPTIONS, PAINT_OPTIONS, ACCENT_OPTIONS, LIVERY_OPTIONS, TRAIL_OPTIONS, PRESET_SLOTS;
-  var init_loadout = __esm({
-    "src/shared/loadout.ts"() {
-      "use strict";
-      LOADOUT_STORAGE_KEY = "smashcart.loadout.v1";
-      PRESET_SLOT_COUNT = 4;
-      DEFAULT_LOADOUT = {
-        color: 0,
-        bodyShape: 0,
-        accent: 0,
-        trail: 0,
-        livery: 0
-      };
-      LEGACY_LOADOUT_KEYS = {
-        skin: "smashcart.skin",
-        color: "smashcart.color",
-        bodyShape: "smashcart.bodyShape",
-        accent: "smashcart.accent",
-        trail: "smashcart.trail",
-        livery: "smashcart.livery"
-      };
-      AIRFRAME_OPTIONS = [
-        { value: 0, label: "Fighter", callsign: "Viper", note: "Balanced silhouette with a steady mid-wing stance." },
-        { value: 1, label: "Interceptor", callsign: "Razor", note: "Slim nose and swept wings for a fast strike profile." },
-        { value: 2, label: "Bomber", callsign: "Mammoth", note: "Broad wings and a heavy center mass with twin nacelles." },
-        { value: 3, label: "Biplane", callsign: "Stork", note: "Stacked wings and struts for a vintage dogfight look." }
-      ];
-      PAINT_OPTIONS = [
-        { value: 0, label: "Scarlet", note: "Classic red launch paint.", swatch: "#ff6b6b" },
-        { value: 1, label: "Cobalt", note: "Cold blue squadron finish.", swatch: "#49c0ff" },
-        { value: 2, label: "Olive", note: "Field-ready tactical green.", swatch: "#8be34a" },
-        { value: 3, label: "Sunburst", note: "High-visibility yellow sweep.", swatch: "#ffd24a" },
-        { value: 4, label: "Violet", note: "Arcade purple glow tone.", swatch: "#c07bff" },
-        { value: 5, label: "Ember", note: "Hot orange carrier deck flare.", swatch: "#ff9f43" },
-        { value: 6, label: "Teal", note: "Sea-glass cyan finish.", swatch: "#00d2d3" },
-        { value: 7, label: "Cream", note: "Warm ivory patrol coat.", swatch: "#ffeaa7" },
-        { value: 8, label: "Ghost", note: "Pale alloy shell.", swatch: "#dfe6e9" },
-        { value: 9, label: "Stealth", note: "Low-light blacked-out finish.", swatch: "#2d3436" },
-        { value: 10, label: "Rust", note: "Weathered copper strike paint.", swatch: "#e17055" },
-        { value: 11, label: "Mint", note: "Bright coastal mint.", swatch: "#55efc4" }
-      ];
-      ACCENT_OPTIONS = [
-        { value: 0, label: "Midnight", note: "Dark utility trim.", swatch: "#273244" },
-        { value: 1, label: "Signal White", note: "Clean instrument-white contrast.", swatch: "#ffffff" },
-        { value: 2, label: "Iron Black", note: "Deep matte shadow line.", swatch: "#000000" },
-        { value: 3, label: "Gold", note: "Showcase deck stripe highlight.", swatch: "#ffd24a" },
-        { value: 4, label: "Crimson", note: "Red warning-band accent.", swatch: "#ff6b6b" },
-        { value: 5, label: "Ice Blue", note: "Cold neon wing edge.", swatch: "#49c0ff" },
-        { value: 6, label: "Vector Green", note: "Radar-green trim.", swatch: "#8be34a" }
-      ];
-      LIVERY_OPTIONS = [
-        { value: 0, label: "Clean", note: "Primary body with crisp wing contrast." },
-        { value: 1, label: "Stripe", note: "Single bold centerline stripe." },
-        { value: 2, label: "Two-Tone", note: "Split-color wing and tail treatment." },
-        { value: 3, label: "Camo", note: "Patchwork accent markers across the shell." }
-      ];
-      TRAIL_OPTIONS = [
-        { value: 0, label: "White Smoke", note: "Neutral engine exhaust.", swatch: "#ffffff" },
-        { value: 1, label: "Afterburner Orange", note: "Hot thrust flare.", swatch: "#ff9f43" },
-        { value: 2, label: "Cryo Blue", note: "Cold plasma stream.", swatch: "#49c0ff" },
-        { value: 3, label: "Plasma Violet", note: "Electric purple trail.", swatch: "#c07bff" },
-        { value: 4, label: "Toxic Green", note: "Acid-green vapor wake.", swatch: "#8be34a" }
-      ];
-      PRESET_SLOTS = [
-        { index: 0, label: "Deck 1" },
-        { index: 1, label: "Deck 2" },
-        { index: 2, label: "Deck 3" },
-        { index: 3, label: "Deck 4" }
-      ];
-    }
-  });
 
-  // src/client/main.ts
-  var require_main = __commonJS({
-    "src/client/main.ts"() {
-      init_host_sim();
-      init_arcadeMenu();
-      init_loadout();
-      var dollar = (id) => document.getElementById(id);
-      var menuRoot = mountArcadeMenu();
-      var useArcadeMenu = menuRoot.id === ARCADE_MENU_HOST_ID;
-      var menuDollar = (...ids) => {
-        for (const id of ids) {
-          const el = document.getElementById(id);
-          if (el) return el;
-        }
-        throw new Error(`Missing DOM element: ${ids.join(", ")}`);
-      };
-      var menuScreenSelector = useArcadeMenu ? `.${ARCADE_MENU_SCREEN_CLASS}` : ".menu-screen";
-      var menuNavSelector = useArcadeMenu ? "[data-arcade-nav]" : "[data-nav]";
-      var menuBackSelector = useArcadeMenu ? "[data-arcade-back]" : "[data-back]";
-      var menuScreenElementId = (id) => useArcadeMenu ? arcadeScreenId(id) : `screen-${id}`;
-      var G = window.GAME;
-      var buzz = (ms) => {
-        try {
-          if (navigator.vibrate) navigator.vibrate(ms);
-        } catch {
-        }
-      };
-      var els = {
-        canvas: dollar("game"),
-        hud: dollar("hud"),
-        score: dollar("hud-score"),
-        time: dollar("hud-time"),
-        alt: dollar("hud-alt"),
-        speed: dollar("hud-speed"),
-        boostFill: dollar("boost-fill"),
-        crosshair: dollar("crosshair"),
-        oobWarning: dollar("oob-warning"),
-        leaderboard: dollar("leaderboard"),
-        health: dollar("healthbar"),
-        healthfill: dollar("healthfill"),
-        respawn: dollar("respawn"),
-        start: menuRoot,
-        name: menuDollar("arcade-name-input", "name-input"),
-        orientationNote: menuDollar("arcade-orientation-note", "orientation-note"),
-        friendsNote: menuDollar("arcade-friends-note", "friends-note"),
-        status: menuDollar("arcade-status", "status"),
-        mute: dollar("mute-btn"),
-        pause: dollar("pause-screen"),
-        resume: dollar("resume-btn"),
-        pauseMenu: dollar("pause-menu-btn"),
-        pauseSettings: dollar("pause-settings-btn"),
-        share: dollar("share-bar"),
-        shareLink: dollar("share-link"),
-        shareCodeBar: dollar("share-qr-code-bar"),
-        qrBtn: dollar("qr-btn"),
-        copy: dollar("copy-btn"),
-        shareQrOverlay: dollar("share-qr-overlay"),
-        shareQrCanvas: dollar("share-qr-canvas"),
-        shareQrRoom: dollar("share-qr-room"),
-        shareQrCode: dollar("share-qr-code"),
-        shareQrNote: dollar("share-qr-note"),
-        shareQrLink: dollar("share-qr-link"),
-        shareQrCopy: dollar("share-qr-copy"),
-        shareQrClose: dollar("share-qr-close"),
-        scanOverlay: dollar("scan-overlay"),
-        scanVideo: dollar("scan-video"),
-        scanCanvas: dollar("scan-canvas"),
-        scanStatus: dollar("scan-status"),
-        scanCloseBtn: dollar("scan-close-btn"),
-        scanOpenBtn: menuDollar("arcade-scan-open-btn", "scan-open-btn"),
-        inter: dollar("intermission"),
-        finalBoard: dollar("final-board"),
-        interTime: dollar("inter-time"),
-        winnerLine: dollar("winner-line"),
-        yourPlace: dollar("your-place"),
-        killfeed: dollar("killfeed"),
-        callout: dollar("callout"),
-        vignette: dollar("vignette"),
-        powerChip: dollar("power-chip"),
-        touch: dollar("touch-controls"),
-        left: dollar("left-btn"),
-        right: dollar("right-btn"),
-        climb: dollar("climb-btn"),
-        dive: dollar("dive-btn"),
-        boost: dollar("boost-btn"),
-        fire: dollar("fire-btn"),
-        rotate: dollar("rotate-overlay"),
-        connLost: dollar("conn-lost"),
-        connMsg: dollar("conn-msg"),
-        connRetry: dollar("conn-retry"),
-        connMenu: dollar("conn-menu"),
-        localBots: menuDollar("arcade-local-bots-check", "arcade-local-bots-check"),
-        countdown: dollar("countdown"),
-        interLeave: dollar("intermission-leave"),
-        hostLeftOverlay: dollar("host-left-overlay"),
-        hostLeftMenuBtn: dollar("host-left-menu-btn"),
-        p2pMigratingOverlay: dollar("p2p-migrating-overlay"),
-        bootOverlay: dollar("boot-overlay"),
-        fatalOverlay: dollar("fatal-overlay"),
-        fatalMsg: dollar("fatal-msg"),
-        lobbyScreen: dollar("lobby-screen"),
-        lobbyTitle: dollar("lobby-title"),
-        lobbySettings: dollar("lobby-settings"),
-        lobbyRoomName: dollar("lobby-room-name"),
-        lobbyRoundLength: dollar("lobby-round-length"),
-        lobbyBotsCheck: dollar("lobby-bots-check"),
-        lobbyMode: dollar("lobby-mode"),
-        hudTeamScore: dollar("hud-team-score"),
-        hudTeamBlue: dollar("hud-team-blue"),
-        hudTeamRed: dollar("hud-team-red"),
-        hudTScore0: dollar("hud-tscore0"),
-        hudTScore1: dollar("hud-tscore1"),
-        lobbyRoster: dollar("lobby-roster"),
-        lobbyReadyBtn: dollar("lobby-ready-btn"),
-        lobbyStartBtn: dollar("lobby-start-btn"),
-        lobbyLeaveBtn: dollar("lobby-leave-btn"),
-        settingsScreen: dollar("settings-screen"),
-        settingsCloseBtn: dollar("settings-close-btn"),
-        settingsCloseBtn2: dollar("settings-close-btn2"),
-        menuSettingsBtn: menuDollar("arcade-menu-settings-btn", "menu-settings-btn"),
-        joinCodeInput: menuDollar("arcade-join-code-input", "join-code-input"),
-        joinCodeSubmit: menuDollar("arcade-join-code-submit", "join-code-submit"),
-        menuLeaderboard: menuDollar("arcade-menu-leaderboard", "menu-leaderboard"),
-        lobbyRoomChip: dollar("lobby-room-chip"),
-        lobbyModeChip: dollar("lobby-mode-chip"),
-        lobbyPlaneSummary: dollar("lobby-plane-summary"),
-        customizeSummaryName: menuDollar("arcade-customize-summary-name", "customize-summary-name"),
-        customizeSummaryText: menuDollar("arcade-customize-summary-text", "customize-summary-text"),
-        customizeFeedback: menuDollar("arcade-customize-feedback", "customize-feedback"),
-        presetGrid: menuDollar("arcade-preset-grid", "preset-grid"),
-        customizeAirframe: menuDollar("arcade-customize-airframe", "customize-airframe"),
-        customizePaint: menuDollar("arcade-customize-paint", "customize-paint"),
-        customizeAccent: menuDollar("arcade-customize-accent", "customize-accent"),
-        customizeLivery: menuDollar("arcade-customize-livery", "customize-livery"),
-        customizeTrail: menuDollar("arcade-customize-trail", "customize-trail"),
-        customizeRandomize: menuDollar("arcade-customize-randomize", "customize-randomize"),
-        customizeReset: menuDollar("arcade-customize-reset", "customize-reset"),
-        customizeDone: menuDollar("arcade-customize-done", "customize-done"),
-        ingameMenuBtn: dollar("ingame-menu-btn"),
-        pauseInviteBtn: dollar("pause-invite-btn"),
-        hudRoomChip: dollar("hud-room-chip"),
-        localRoomName: menuDollar("arcade-local-room-name", "local-room-name"),
-        localCreateBtn: menuDollar("arcade-local-create-btn", "local-create-btn"),
-        localScanBtn: menuDollar("arcade-local-scan-btn", "local-scan-btn"),
-        localRoomList: menuDollar("arcade-local-room-list", "local-room-list"),
-        toast: dollar("toast"),
-        respawnBy: dollar("respawn-by"),
-        respawnCount: dollar("respawn-count")
-      };
-      var mode = "menu";
-      var sceneMode = "preflight";
-      var settingsOpen = false;
-      var last = 0;
-      var prevPhase = "playing";
-      var prevHp = G.MAX_HP;
-      var lastFireSnd = 0;
-      var wasEmpd = false;
-      var wasFrozen = false;
-      var smashTrack = /* @__PURE__ */ new Map();
-      function getTrack(id) {
-        let t = smashTrack.get(id);
-        if (!t) {
-          t = { streak: 0, last: 0, rapid: 0 };
-          smashTrack.set(id, t);
-        }
-        return t;
+  // src/client/menu.ts
+  var MENU_HOST_ID = "arcade-start-screen";
+  var svg = (inner, viewBox = "0 0 24 24") => `<svg viewBox="${viewBox}" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${inner}</g></svg>`;
+  var ICON = {
+    play: '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5.14v13.72c0 .83.92 1.33 1.62.89l10.8-6.86a1.05 1.05 0 0 0 0-1.78L9.62 4.25A1.05 1.05 0 0 0 8 5.14z"/></svg>',
+    join: svg('<path d="M10 13a5 5 0 0 0 7.07 0l2.83-2.83a5 5 0 0 0-7.07-7.07L11.5 4.4"/><path d="M14 11a5 5 0 0 0-7.07 0L4.1 13.83a5 5 0 0 0 7.07 7.07l1.3-1.3"/>'),
+    plane: svg('<path d="M17.8 19.2 16 11l3.5-3.5a2.12 2.12 0 0 0-3-3L13 8 4.8 6.2a.5.5 0 0 0-.5.81L8 10l-2.5 2.5-2.4-.5a.5.5 0 0 0-.55.77L4.5 15l2.23 2.95c.22.29.66.24.77-.09l.5-2.4L10.5 13l3 3.7a.5.5 0 0 0 .8-.06z"/>'),
+    gear: svg('<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>'),
+    back: svg('<path d="M15 18l-6-6 6-6"/>'),
+    check: svg('<path d="M20 6 9 17l-5-5"/>'),
+    close: svg('<path d="M18 6 6 18M6 6l12 12"/>'),
+    exit: svg('<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/>'),
+    wifi: svg('<path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><circle cx="12" cy="20" r="1" fill="currentColor" stroke="none"/>'),
+    refresh: svg('<path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/>'),
+    pause: svg('<path d="M8 5v14M16 5v14"/>'),
+    flag: svg('<path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><path d="M4 22v-7"/>'),
+    bolt: '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M13 2 3 14h7l-1 8 11-13h-7l1-7z"/></svg>'
+  };
+  var PROFILE_KEY = "smashcart-profile";
+  var NAME_KEY = "smashcart.name";
+  function clampIdx(v, count, fallback) {
+    const n = typeof v === "number" ? Math.trunc(v) : NaN;
+    return Number.isFinite(n) && n >= 0 && n < count ? n : fallback;
+  }
+  function sanitizeProfile(raw) {
+    let cosmetics = cloneLoadout(DEFAULT_LOADOUT);
+    let sawLegacy = false;
+    try {
+      const saved = parseLoadoutStore(localStorage.getItem(LOADOUT_STORAGE_KEY));
+      if (saved) {
+        cosmetics = cloneLoadout(saved.active);
+        sawLegacy = true;
       }
-      var lastKiller = "";
-      var prevLeader = "";
-      var engineStarted = false;
-      var botsEnabled = true;
-      var botDifficulty = "medium";
-      var inviteRoom = null;
-      var activeShareUrl = null;
-      var deathTime = -1;
-      var wasAlive = true;
-      var oobShownUntil = 0;
-      var boostLevel = 0;
-      var countdownActive = false;
-      var currentLobbyCode = null;
-      var currentLobbyServer = null;
-      var currentRoomFriendlyName = null;
-      var _settingsDebounce = null;
-      var _colyseusNet = null;
-      var _isP2PSession = false;
-      var scannerOpen = false;
-      var scanRafId = null;
-      var _localScanInterval = null;
-      var presetFeedbackTimeout = null;
-      var COLORS_HEX = PAINT_OPTIONS.map((option) => option.swatch || "#ffffff");
-      function readLegacyLoadout() {
-        return loadoutFromLegacy({
+    } catch {
+    }
+    if (!sawLegacy) {
+      try {
+        cosmetics = loadoutFromLegacy({
           skin: localStorage.getItem(LEGACY_LOADOUT_KEYS.skin),
           color: localStorage.getItem(LEGACY_LOADOUT_KEYS.color),
           bodyShape: localStorage.getItem(LEGACY_LOADOUT_KEYS.bodyShape),
@@ -3328,1802 +821,1777 @@
           trail: localStorage.getItem(LEGACY_LOADOUT_KEYS.trail),
           livery: localStorage.getItem(LEGACY_LOADOUT_KEYS.livery)
         });
-      }
-      function loadPersistedLoadoutStore() {
-        try {
-          const saved = parseLoadoutStore(localStorage.getItem(LOADOUT_STORAGE_KEY));
-          if (saved) return saved;
-        } catch {
-        }
-        const store = createDefaultLoadoutStore();
-        try {
-          store.active = readLegacyLoadout();
-        } catch {
-          store.active = cloneLoadout(DEFAULT_LOADOUT);
-        }
-        return store;
-      }
-      var loadoutStore = loadPersistedLoadoutStore();
-      var selectedCosmetics = cloneLoadout(loadoutStore.active);
-      loadoutStore.active = selectedCosmetics;
-      function persistLoadoutStore() {
-        try {
-          localStorage.setItem(LOADOUT_STORAGE_KEY, JSON.stringify(loadoutStore));
-          localStorage.setItem(LEGACY_LOADOUT_KEYS.color, String(selectedCosmetics.color));
-          localStorage.setItem(LEGACY_LOADOUT_KEYS.bodyShape, String(selectedCosmetics.bodyShape));
-          localStorage.setItem(LEGACY_LOADOUT_KEYS.accent, String(selectedCosmetics.accent));
-          localStorage.setItem(LEGACY_LOADOUT_KEYS.trail, String(selectedCosmetics.trail));
-          localStorage.setItem(LEGACY_LOADOUT_KEYS.livery, String(selectedCosmetics.livery));
-        } catch {
-        }
-      }
-      try {
-        botsEnabled = localStorage.getItem("smashcart.bots") !== "0";
       } catch {
       }
+    }
+    const c = raw?.cosmetics;
+    if (c) {
+      cosmetics.color = clampIdx(c.skin, PAINT_OPTIONS.length, cosmetics.color);
+      cosmetics.bodyShape = clampIdx(c.bodyShape, AIRFRAME_OPTIONS.length, cosmetics.bodyShape);
+      cosmetics.accent = clampIdx(c.accent, ACCENT_OPTIONS.length, cosmetics.accent);
+      cosmetics.trail = clampIdx(c.trail, TRAIL_OPTIONS.length, cosmetics.trail);
+      cosmetics.livery = clampIdx(c.livery, LIVERY_OPTIONS.length, cosmetics.livery);
+    }
+    let name = "";
+    try {
+      name = String(raw?.name ?? "").slice(0, 14);
+    } catch {
+    }
+    if (!name) {
       try {
-        const savedDiff = localStorage.getItem("smashcart.difficulty");
-        if (savedDiff === "easy" || savedDiff === "medium" || savedDiff === "high") {
-          botDifficulty = savedDiff;
-        }
+        name = localStorage.getItem(NAME_KEY)?.slice(0, 14) ?? "";
       } catch {
       }
-      function loadInputPrefs() {
-        try {
-          window.Input.invertPitch = localStorage.getItem("smashcart.invertPitch") === "1";
-        } catch {
-        }
-        try {
-          window.Input.invertSteer = localStorage.getItem("smashcart.invertSteer") === "1";
-        } catch {
-        }
-      }
-      function escapeHtml(s) {
-        return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
-      }
-      function ordinal(n) {
-        const s = ["th", "st", "nd", "rd"];
-        const v = n % 100;
-        return n + (s[(v - 20) % 10] || s[v] || s[0]);
-      }
-      function formatClock(totalSeconds) {
-        const safe = Math.max(0, Math.ceil(totalSeconds || 0));
-        const minutes = Math.floor(safe / 60);
-        const seconds = safe % 60;
-        return `${minutes}:${String(seconds).padStart(2, "0")}`;
-      }
-      function genCode() {
-        const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-        let out = "";
-        for (let i = 0; i < 6; i++) out += chars[Math.floor(Math.random() * chars.length)];
-        return out;
-      }
-      function readInviteFromUrl() {
-        const params = new URLSearchParams(location.search);
-        const p2pParam = params.get("p2p");
-        if (p2pParam) {
-          const p2pCode = p2pParam.trim().toUpperCase().slice(0, 8);
-          if (p2pCode.startsWith("P-")) {
-            inviteRoom = p2pCode;
-          }
-        }
-      }
-      function hideShareQr() {
-        els.shareQrOverlay.classList.add("hidden");
-      }
-      function roomCodeCore(code) {
-        return code.startsWith("P-") ? code.slice(2) : code;
-      }
-      async function copyShareCode() {
-        const value = els.shareQrCode.textContent || (currentLobbyCode ? roomCodeCore(currentLobbyCode) : "");
-        if (!value) return false;
-        try {
-          if (navigator.clipboard) await navigator.clipboard.writeText(value);
-          else {
-            els.shareQrLink.value = value;
-            els.shareQrLink.select();
-            document.execCommand("copy");
-            els.shareQrLink.value = activeShareUrl || "";
-          }
-          return true;
-        } catch {
-          return false;
-        }
-      }
-      function clearShareInvite() {
-        activeShareUrl = null;
-        els.shareLink.value = "";
-        els.shareQrLink.value = "";
-        els.shareCodeBar.textContent = "";
-        els.shareQrRoom.textContent = "Room";
-        els.shareQrCode.textContent = "";
-        els.shareQrNote.textContent = "Scan to join this room.";
-        els.shareQrCanvas.width = 0;
-        els.shareQrCanvas.height = 0;
-        els.copy.disabled = true;
-        els.shareQrCopy.disabled = true;
-        els.qrBtn.disabled = true;
-        els.copy.textContent = "Copy code";
-        els.shareQrCopy.textContent = "Copy code";
-        hideShareQr();
-      }
-      function showShareQr() {
-        if (!activeShareUrl || els.qrBtn.disabled) return;
-        els.shareQrOverlay.classList.remove("hidden");
-      }
-      function hideRoomChip() {
-        els.hudRoomChip.classList.add("hidden");
-        els.hudRoomChip.textContent = "";
-      }
-      function updateRoomChip() {
-        if (!_isP2PSession || !currentLobbyCode) {
-          hideRoomChip();
-          return;
-        }
-        const core = roomCodeCore(currentLobbyCode);
-        els.hudRoomChip.textContent = currentRoomFriendlyName ? `\u{1F4F6} ${currentRoomFriendlyName} \xB7 ${core}` : `\u{1F4F6} ${core}`;
-        els.hudRoomChip.classList.remove("hidden");
-      }
-      function updateLobbyMeta() {
-        const state = window.Net.state;
-        const modeLabel = state?.mode === "tdm" ? "Team Deathmatch" : "Free-for-all";
-        const roundLength = typeof state?.roundLength === "number" ? state.roundLength : 150;
-        const roomLabel = currentLobbyCode ? `Code ${roomCodeCore(currentLobbyCode)}` : _isP2PSession ? "Wi-Fi live" : "Private room";
-        els.lobbyRoomChip.textContent = roomLabel;
-        els.lobbyModeChip.textContent = `${modeLabel} \xB7 ${formatClock(roundLength)}`;
-      }
-      function renderLobbyRoster() {
-        const myId = window.Net.sessionId;
-        const hostId = window.Net.getHostId();
-        const roster = window.Net.getRosterSnapshot();
-        const iAmHost = myId === hostId;
-        const stateName = window.Net.state?.roomName;
-        if (stateName) {
-          els.lobbyTitle.textContent = stateName;
-        } else if (currentLobbyCode) {
-          els.lobbyTitle.textContent = `Room ${roomCodeCore(currentLobbyCode)}`;
-        }
-        updateLobbyMeta();
-        if (iAmHost) {
-          els.lobbySettings.classList.remove("hidden");
-          const serverRoomName = window.Net.state?.roomName ?? "";
-          const serverRoundLength = String(window.Net.state?.roundLength ?? 150);
-          if (document.activeElement !== els.lobbyRoomName) {
-            els.lobbyRoomName.value = serverRoomName;
-          }
-          if (document.activeElement !== els.lobbyRoundLength) {
-            els.lobbyRoundLength.value = serverRoundLength;
-          }
-          const serverBotsInRoom = window.Net.state?.botsInRoom ?? false;
-          els.lobbyBotsCheck.checked = serverBotsInRoom;
-          const serverMode = window.Net.state?.mode ?? "ffa";
-          els.lobbyMode.value = serverMode;
-        } else {
-          els.lobbySettings.classList.add("hidden");
-        }
-        if (!roster.length) {
-          els.lobbyRoster.innerHTML = '<p class="muted">Waiting for players\u2026</p>';
-          return;
-        }
-        els.lobbyRoster.innerHTML = roster.map((p) => {
-          const isMe = p.id === myId;
-          const isHost = p.id === hostId;
-          const isLocalHost = myId === hostId;
-          const hostBadge = isHost ? '<span class="lobby-badge lobby-badge--host">HOST</span>' : "";
-          const botBadge = p.bot ? '<span class="lobby-badge lobby-badge--bot">BOT</span>' : "";
-          const readyMark = !p.bot ? `<span class="lobby-ready-mark ${p.ready ? "is-ready" : ""}">${p.ready ? "\u2713" : "\u25CB"}</span>` : "";
-          const kickBtn = isLocalHost && !isMe && !p.bot ? `<button class="lobby-kick-btn secondary" data-target="${escapeHtml(p.id)}" title="Kick">\u2715</button>` : "";
-          const colorHex = COLORS_HEX[typeof p.color === "number" && p.color >= 0 && p.color < COLORS_HEX.length ? p.color : 0];
-          const colorDot = `<span class="lobby-color-dot" style="background:${colorHex}"></span>`;
-          return `<div class="lobby-row${isMe ? " lobby-row--me" : ""}">
-  <span class="lobby-row-name">${colorDot}${hostBadge}${botBadge}${escapeHtml(p.name)}</span>
-  <span class="lobby-row-right">${readyMark}${kickBtn}</span>
-</div>`;
-        }).join("");
-        els.lobbyRoster.querySelectorAll(".lobby-kick-btn").forEach((btn) => {
-          btn.addEventListener("click", () => {
-            const targetId = btn.dataset.target;
-            if (targetId) {
-              window.SFX.uiClick();
-              window.Net.sendHostKick(targetId);
-            }
-          });
-        });
-        const me = roster.find((p) => p.id === myId);
-        if (me) {
-          els.lobbyReadyBtn.textContent = me.ready ? "Unready" : "Ready";
-          els.lobbyReadyBtn.classList.toggle("active", me.ready);
-        }
-        els.lobbyStartBtn.classList.toggle("hidden", !iAmHost);
-      }
-      function enterPlayingFromLobby() {
-        prevPhase = "playing";
-        prevHp = G.MAX_HP;
-        wasAlive = true;
-        deathTime = -1;
-        wasEmpd = false;
-        wasFrozen = false;
-        applyMode("playing");
-        els.respawn.classList.add("hidden");
-        els.inter.classList.add("hidden");
-        if (window.Input.isTouchDevice()) {
-          els.touch.classList.remove("hidden");
-          applyControlSchemeUI(window.Input.controlScheme);
-        }
-        if (!engineStarted) {
-          window.SFX.startEngine();
-          engineStarted = true;
-        }
-        if (window.SFX.stopMenuAmbient) window.SFX.stopMenuAmbient();
-        window.SFX.startMusic();
-        runCountdown();
-      }
-      function setStatus(text = "") {
-        els.status.textContent = text;
-      }
-      function setBusy(busy) {
-        [els.localCreateBtn, els.localScanBtn, els.joinCodeSubmit].forEach((button) => {
-          button.disabled = busy;
-        });
-      }
-      function updateMenuMeta(preserveStatus = true) {
-        const portrait = !!(window.matchMedia && window.matchMedia("(orientation: portrait)").matches);
-        if (!window.Input.isTouchDevice()) {
-          els.orientationNote.textContent = "Keyboard flight: A/D steer, W/S climb, Shift boost, Space fire.";
-        } else if (portrait) {
-          els.orientationNote.textContent = "Portrait is fine for setup. Rotate to landscape before you launch.";
-        } else {
-          els.orientationNote.textContent = "Landscape ready. Touch controls appear after launch.";
-        }
-        if (inviteRoom) {
-          if (els.friendsNote) els.friendsNote.textContent = `Invite ready for room ${roomCodeCore(inviteRoom)}. Joining\u2026`;
-          if (!preserveStatus || !els.status.textContent) setStatus(`Invite ready: room ${roomCodeCore(inviteRoom)}`);
-        } else {
-          if (els.friendsNote) els.friendsNote.textContent = "";
-          if (!preserveStatus) setStatus("");
-        }
-      }
-      var MENU_SCREENS = ["home", "create", "join", "leaders", "customize"];
-      var navStack = ["home"];
-      function currentMenuScreen() {
-        return navStack[navStack.length - 1] || "home";
-      }
-      function deriveSceneMode(state = window.Net?.state) {
-        if (mode === "menu") return currentMenuScreen() === "customize" ? "customize" : "preflight";
-        if (mode === "lobby") return "lobby";
-        if (mode === "paused") return "paused";
-        if (mode === "playing") return state && state.phase === "intermission" ? "results" : "playing";
-        return "preflight";
-      }
-      function syncSceneMode(state = window.Net?.state) {
-        const next = deriveSceneMode(state);
-        if (sceneMode === next && document.body.dataset.sceneMode === next) return;
-        sceneMode = next;
-        document.body.dataset.sceneMode = next;
-        if (window.Renderer && window.Renderer.setSceneMode) window.Renderer.setSceneMode(next);
-      }
-      function navShow(id) {
-        document.body.dataset.menuScreen = id;
-        menuRoot.querySelectorAll(menuScreenSelector).forEach((screen2) => screen2.classList.toggle("active", screen2.id === menuScreenElementId(id)));
-        menuRoot.scrollTop = 0;
-        const menuShell = menuRoot.firstElementChild;
-        if (menuShell instanceof HTMLElement) menuShell.scrollTop = 0;
-        if (id === "join") startLocalScanWithAutoRefresh();
-        else stopLocalScanInterval();
-        syncSceneMode(window.Net?.state);
-      }
-      function navGo(id) {
-        if (navStack[navStack.length - 1] === id) return;
-        navStack.push(id);
-        navShow(id);
-      }
-      function navBack() {
-        if (navStack.length > 1) {
-          navStack.pop();
-          navShow(navStack[navStack.length - 1]);
-        }
-      }
-      function navReset() {
-        navStack = ["home"];
-        navShow("home");
-      }
-      function applyMode(nextMode) {
-        mode = nextMode;
-        const isMenu = mode === "menu";
-        const isLobby = mode === "lobby";
-        const isPlaying = mode === "playing" || mode === "paused";
-        const isLost = mode === "lost";
-        const isError = mode === "error";
-        els.bootOverlay.classList.add("hidden");
-        els.start.classList.toggle("hidden", !isMenu);
-        els.lobbyScreen.classList.toggle("hidden", !isLobby);
-        els.hud.classList.toggle("hidden", !isPlaying);
-        els.health.classList.toggle("hidden", !isPlaying);
-        els.pause.classList.toggle("hidden", mode !== "paused");
-        els.connLost.classList.toggle("hidden", !isLost);
-        els.fatalOverlay.classList.toggle("hidden", !isError);
-        els.crosshair.classList.toggle("hidden", mode !== "playing");
-        if (mode !== "playing") els.oobWarning.classList.add("hidden");
-        els.hostLeftOverlay.classList.add("hidden");
-        els.p2pMigratingOverlay.classList.add("hidden");
-        if (mode !== "lobby") els.share.classList.add("hidden");
-        if (!isMenu) stopLocalScanInterval();
-        if (mode === "playing") updateRoomChip();
-        else if (isMenu) hideRoomChip();
-        syncSceneMode(window.Net?.state);
-      }
-      function showHostLeftOverlay() {
-        els.hostLeftOverlay.classList.remove("hidden");
-      }
-      function showFatal(msg) {
-        els.fatalMsg.textContent = msg;
-        applyMode("error");
-      }
-      function populateSettingsUI() {
-        const vols = window.SFX.vols();
-        const volMasterEl = document.getElementById("set-vol-master");
-        const volSfxEl = document.getElementById("set-vol-sfx");
-        const volMusicEl = document.getElementById("set-vol-music");
-        if (volMasterEl) volMasterEl.value = String(vols.master);
-        if (volSfxEl) volSfxEl.value = String(vols.sfx);
-        if (volMusicEl) volMusicEl.value = String(vols.music);
-        const qualityTier = window.Quality._auto ? "auto" : window.Quality.current;
-        const qualitySelect = document.getElementById("set-quality");
-        if (qualitySelect && qualitySelect.tagName === "SELECT") {
-          qualitySelect.value = qualityTier;
-        } else {
-          const radios = document.querySelectorAll('input[name="set-quality"]');
-          radios.forEach((r) => {
-            r.checked = r.value === qualityTier;
-          });
-        }
-        const invertPitchEl = document.getElementById("set-invert-pitch");
-        const invertSteerEl = document.getElementById("set-invert-steer");
-        if (invertPitchEl) invertPitchEl.checked = window.Input.invertPitch;
-        if (invertSteerEl) invertSteerEl.checked = window.Input.invertSteer;
-        const schemeRadios = document.querySelectorAll('input[name="ctrl-scheme"]');
-        schemeRadios.forEach((r) => {
-          r.checked = r.value === window.Input.controlScheme;
-        });
-        const liveDiff = window.Net?.state?.botDifficulty;
-        const activeDiff = liveDiff === "easy" || liveDiff === "medium" || liveDiff === "high" ? liveDiff : botDifficulty;
-        document.querySelectorAll('input[name="difficulty"]').forEach((r) => {
-          r.checked = r.value === activeDiff;
-        });
-      }
-      function showSettings() {
-        settingsOpen = true;
-        populateSettingsUI();
-        els.settingsScreen.classList.remove("hidden");
-      }
-      function hideSettings() {
-        settingsOpen = false;
-        els.settingsScreen.classList.add("hidden");
-      }
-      function stopScanCamera() {
-        if (scanRafId !== null) {
-          cancelAnimationFrame(scanRafId);
-          scanRafId = null;
-        }
-        const vid = els.scanVideo;
-        const s = vid.srcObject;
-        if (s) {
-          s.getTracks().forEach((t) => t.stop());
-          vid.srcObject = null;
-        }
-      }
-      function normalizeRoomCode(raw) {
-        let s = raw.trim();
-        if (!s) return null;
-        try {
-          const url = new URL(s);
-          s = url.searchParams.get("p2p") || url.searchParams.get("room") || url.searchParams.get("code") || "";
-        } catch {
-        }
-        s = s.trim().toUpperCase();
-        if (s.startsWith("P-")) s = s.slice(2);
-        s = s.replace(/[^A-Z0-9]/g, "");
-        return s.length === 6 ? s : null;
-      }
-      function openScanner() {
-        scannerOpen = true;
-        els.scanOverlay.classList.remove("hidden");
-        els.scanStatus.textContent = "Starting camera\u2026";
-        if (!window.isSecureContext || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-          els.scanStatus.textContent = "Camera needs a secure (HTTPS) connection. On a local Wi-Fi host this isn't available \u2014 type the code instead, or scan the host's QR with your phone's normal camera app.";
-          return;
-        }
-        navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" }, audio: false }).then((stream) => {
-          if (!scannerOpen) {
-            stream.getTracks().forEach((t) => t.stop());
-            return;
-          }
-          els.scanVideo.srcObject = stream;
-          els.scanStatus.textContent = "Point at a SmashCart QR code\u2026";
-          els.scanVideo.play().catch(() => {
-          });
-          function tick() {
-            if (!scannerOpen) return;
-            const vid = els.scanVideo;
-            if (vid.readyState < vid.HAVE_ENOUGH_DATA) {
-              scanRafId = requestAnimationFrame(tick);
-              return;
-            }
-            const w = vid.videoWidth;
-            const h = vid.videoHeight;
-            if (!w || !h) {
-              scanRafId = requestAnimationFrame(tick);
-              return;
-            }
-            const cvs = els.scanCanvas;
-            cvs.width = w;
-            cvs.height = h;
-            const ctx = cvs.getContext("2d");
-            ctx.drawImage(vid, 0, 0, w, h);
-            const img = ctx.getImageData(0, 0, w, h);
-            const result = (typeof jsQR !== "undefined" ? jsQR : window.jsQR)?.(img.data, w, h);
-            if (result && result.data) {
-              const core = normalizeRoomCode(result.data);
-              if (core) {
-                els.scanStatus.textContent = "QR detected \u2014 joining\u2026";
-                stopScanCamera();
-                scannerOpen = false;
-                els.scanOverlay.classList.add("hidden");
-                els.joinCodeInput.value = core;
-                window.SFX.uiClick();
-                joinP2PAsGuest("P-" + core);
-                return;
-              }
-            }
-            scanRafId = requestAnimationFrame(tick);
-          }
-          scanRafId = requestAnimationFrame(tick);
-        }).catch((err) => {
-          let msg = "Camera error. Type the code instead.";
-          if (err.name === "NotAllowedError" || err.name === "PermissionDeniedError") {
-            msg = "Camera permission denied. Allow camera access in your browser settings, or type the code instead.";
-          } else if (err.name === "NotFoundError" || err.name === "DevicesNotFoundError") {
-            msg = "No camera found on this device. Type the code instead.";
-          } else if (err.name === "NotReadableError") {
-            msg = "Camera is in use by another app. Close it and try again, or type the code instead.";
-          }
-          els.scanStatus.textContent = msg;
-        });
-      }
-      function closeScanner() {
-        scannerOpen = false;
-        stopScanCamera();
-        els.scanOverlay.classList.add("hidden");
-      }
-      function fetchLeaderboard() {
-        fetch("/leaderboard?n=10").then((r) => r.ok ? r.json() : []).then((rows) => {
-          if (!Array.isArray(rows) || !rows.length) {
-            els.leaderboard.innerHTML = '<div class="lb-row muted">No scores yet</div>';
-            els.menuLeaderboard.innerHTML = '<div class="lb-row muted">No scores yet</div>';
-            return;
-          }
-          const makeRow = (entry, i) => `<div class="lb-row"><span>${i + 1}. ${escapeHtml(entry.name)}</span><span>${entry.score | 0}</span></div>`;
-          els.leaderboard.innerHTML = rows.slice(0, 5).map(makeRow).join("");
-          els.menuLeaderboard.innerHTML = rows.slice(0, 10).map(makeRow).join("");
-        }).catch(() => {
-          els.leaderboard.innerHTML = '<div class="lb-row muted">Leaderboard unavailable</div>';
-          els.menuLeaderboard.innerHTML = '<div class="lb-row muted">Leaderboard unavailable</div>';
-        });
-      }
-      function setCustomizeFeedback(text, sticky = false) {
-        els.customizeFeedback.textContent = text;
-        if (presetFeedbackTimeout !== null) {
-          clearTimeout(presetFeedbackTimeout);
-          presetFeedbackTimeout = null;
-        }
-        if (!sticky) {
-          presetFeedbackTimeout = setTimeout(() => {
-            presetFeedbackTimeout = null;
-            els.customizeFeedback.textContent = "Cosmetics are visual only. No effect on flight or damage.";
-          }, 2200);
-        }
-      }
-      function findActivePresetIndex() {
-        return loadoutStore.presets.findIndex((preset) => sameLoadout(preset, selectedCosmetics));
-      }
-      function updateSelectedLoadout(next, feedback) {
-        selectedCosmetics = cloneLoadout(next);
-        loadoutStore.active = selectedCosmetics;
-        persistLoadoutStore();
-        renderLoadoutUI();
-        if (window.Renderer && window.Renderer.updateMenuPlane) window.Renderer.updateMenuPlane(selectedCosmetics);
-        if (feedback) setCustomizeFeedback(feedback);
-      }
-      function updateLoadoutField(key, value) {
-        const next = cloneLoadout(selectedCosmetics);
-        next[key] = value;
-        updateSelectedLoadout(next);
-      }
-      function renderPresetGrid() {
-        const activePreset = findActivePresetIndex();
-        els.presetGrid.innerHTML = PRESET_SLOTS.map((slot) => {
-          const preset = loadoutStore.presets[slot.index] || cloneLoadout(DEFAULT_LOADOUT);
-          const summary = getLoadoutSummary(preset);
-          const isActive = activePreset === slot.index;
-          const swatches = [
-            PAINT_OPTIONS[preset.color]?.swatch || "#ffffff",
-            ACCENT_OPTIONS[preset.accent]?.swatch || "#ffffff",
-            TRAIL_OPTIONS[preset.trail]?.swatch || "#ffffff"
-          ];
-          return `
-      <article class="preset-card${isActive ? " is-active" : ""}">
-        <div class="preset-card-head">
-          <div>
-            <p class="preset-label">${escapeHtml(slot.label)}</p>
-            <h4>${escapeHtml(summary.title)}</h4>
-          </div>
-          <span class="preset-state">${isActive ? "Armed" : "Stored"}</span>
-        </div>
-        <p class="preset-copy">${escapeHtml(summary.subtitle)}</p>
-        <div class="preset-swatch-row">${swatches.map((swatch) => `<span class="preset-swatch" style="--swatch:${swatch}"></span>`).join("")}</div>
-        <div class="preset-actions">
-          <button class="preset-apply-btn" data-slot="${slot.index}">APPLY</button>
-          <button class="preset-save-btn secondary" data-slot="${slot.index}">SAVE</button>
-        </div>
-      </article>`;
-        }).join("");
-        els.presetGrid.querySelectorAll(".preset-apply-btn").forEach((button) => {
-          button.addEventListener("click", () => {
-            const slot = Number.parseInt(button.dataset.slot || "", 10);
-            if (!Number.isFinite(slot) || !loadoutStore.presets[slot]) return;
-            window.SFX.uiClick();
-            updateSelectedLoadout(loadoutStore.presets[slot], `${PRESET_SLOTS[slot].label} armed.`);
-          });
-        });
-        els.presetGrid.querySelectorAll(".preset-save-btn").forEach((button) => {
-          button.addEventListener("click", () => {
-            const slot = Number.parseInt(button.dataset.slot || "", 10);
-            if (!Number.isFinite(slot) || !loadoutStore.presets[slot]) return;
-            loadoutStore.presets[slot] = cloneLoadout(selectedCosmetics);
-            persistLoadoutStore();
-            renderLoadoutUI();
-            window.SFX.uiClick();
-            setCustomizeFeedback(`${PRESET_SLOTS[slot].label} saved.`);
-          });
-        });
-      }
-      function renderOptionGroup(target, key, options, variant) {
-        target.innerHTML = options.map((option) => {
-          const selected = selectedCosmetics[key] === option.value;
-          if (variant === "swatches") {
-            return `
-        <button class="option-btn option-btn--swatch${selected ? " is-selected" : ""}" data-key="${key}" data-value="${option.value}" style="--swatch:${option.swatch || "#ffffff"}">
-          <span class="option-swatch"></span>
-          <span class="option-copy">
-            <strong>${escapeHtml(option.label)}</strong>
-            <span>${escapeHtml(option.note)}</span>
-          </span>
-        </button>`;
-          }
-          return `
-      <button class="option-btn option-btn--card${selected ? " is-selected" : ""}" data-key="${key}" data-value="${option.value}">
-        <strong>${escapeHtml(option.label)}</strong>
-        <span>${escapeHtml(option.note)}</span>
-      </button>`;
-        }).join("");
-        target.querySelectorAll(".option-btn").forEach((button) => {
-          button.addEventListener("click", () => {
-            const value = Number.parseInt(button.dataset.value || "", 10);
-            if (!Number.isFinite(value)) return;
-            window.SFX.uiClick();
-            updateLoadoutField(key, value);
-          });
-        });
-      }
-      function renderLoadoutUI() {
-        const summary = getLoadoutSummary(selectedCosmetics);
-        const rows = getLoadoutDetailRows(selectedCosmetics);
-        els.lobbyPlaneSummary.textContent = `${summary.title} \xB7 ${rows.map((row) => row.value).join(" \xB7 ")}`;
-        els.customizeSummaryName.textContent = summary.title;
-        els.customizeSummaryText.textContent = summary.subtitle;
-        renderPresetGrid();
-        renderOptionGroup(els.customizeAirframe, "bodyShape", AIRFRAME_OPTIONS, "cards");
-        renderOptionGroup(els.customizePaint, "color", PAINT_OPTIONS, "swatches");
-        renderOptionGroup(els.customizeAccent, "accent", ACCENT_OPTIONS, "swatches");
-        renderOptionGroup(els.customizeLivery, "livery", LIVERY_OPTIONS, "cards");
-        renderOptionGroup(els.customizeTrail, "trail", TRAIL_OPTIONS, "swatches");
-      }
-      function buildP2PShareUrl(code) {
-        const url = new URL(location.pathname, location.origin);
-        url.searchParams.set("p2p", code);
-        return url.toString();
-      }
-      var LOCAL_ROOM_ADJECTIVES = ["Ace", "Bolt", "Cobalt", "Dusk", "Echo", "Flare", "Ghost", "Hyper", "Iron", "Jade", "Keen", "Laser", "Mach", "Nova", "Orbit", "Pixel", "Quick", "Red", "Solar", "Turbo", "Ultra", "Venom", "Wild", "Xenon", "Zero"];
-      var LOCAL_ROOM_NOUNS = ["Arena", "Base", "Circuit", "Dome", "Engine", "Field", "Grid", "Haven", "Isle", "Junction", "Lair", "Mesa", "Nexus", "Orbit", "Peak", "Range", "Sector", "Tower", "Vault", "Wing", "Zone"];
-      function randomLocalRoomName() {
-        const adj = LOCAL_ROOM_ADJECTIVES[Math.floor(Math.random() * LOCAL_ROOM_ADJECTIVES.length)];
-        const noun = LOCAL_ROOM_NOUNS[Math.floor(Math.random() * LOCAL_ROOM_NOUNS.length)];
-        return `${adj} ${noun}`;
-      }
-      async function startLocalRoom() {
-        window.SFX.unlock();
-        enterImmersive();
-        const name = (els.name.value || "Pilot").slice(0, 14);
-        const code = "P-" + genCode();
-        const roomName = (els.localRoomName.value.trim() || els.localRoomName.placeholder || randomLocalRoomName()).slice(0, 20);
-        if (!_isP2PSession) {
-          _colyseusNet = window.Net;
-        }
-        const transport = new WebRtcTransport();
-        window.Net = transport;
-        _isP2PSession = true;
-        transport.onKill = onKill;
-        transport.onPickup = onPickup;
-        transport.onDisconnect = onP2PDisconnect;
-        setStatus("Starting local room\u2026");
-        setBusy(true);
-        try {
-          await transport.startHost(name, code, selectedCosmetics, { roomName, continuous: true, bots: els.localBots.checked });
-        } catch (e) {
-          setStatus("Could not start local room: " + (e && e.message ? e.message : e));
-          setBusy(false);
-          window.Net = _colyseusNet;
-          _colyseusNet = null;
-          _isP2PSession = false;
-          return;
-        }
-        setStatus("");
-        setBusy(false);
-        currentLobbyCode = code;
-        currentLobbyServer = null;
-        currentRoomFriendlyName = roomName;
-        const p2pUrl = buildP2PShareUrl(code);
-        activeShareUrl = p2pUrl;
-        els.shareLink.value = p2pUrl;
-        els.shareQrLink.value = p2pUrl;
-        els.shareCodeBar.textContent = roomCodeCore(code);
-        els.shareQrRoom.textContent = roomName;
-        els.shareQrCode.textContent = roomCodeCore(code);
-        els.shareQrNote.textContent = `Scan on the same Wi-Fi to join "${roomName}".`;
-        els.copy.disabled = false;
-        els.shareQrCopy.disabled = false;
-        try {
-          window.QR.render(els.shareQrCanvas, p2pUrl, {
-            size: window.Input.isTouchDevice() ? 220 : 256,
-            errorCorrectionLevel: "M"
-          });
-          els.qrBtn.disabled = false;
-        } catch {
-          els.qrBtn.disabled = true;
-          els.shareQrCanvas.width = 0;
-        }
-        els.share.classList.remove("hidden");
-        els.lobbyTitle.textContent = `${roomName} \xB7 ${roomCodeCore(code)}`;
-        transport.onStateChange = onLobbyStateChange;
-        renderLobbyRoster();
-        window.Net?.sendHostSettings?.({ botDifficulty });
-        applyMode("lobby");
-      }
-      function stopLocalScanInterval() {
-        if (_localScanInterval !== null) {
-          clearInterval(_localScanInterval);
-          _localScanInterval = null;
-        }
-      }
-      async function runLocalScan() {
-        els.localRoomList.innerHTML = '<article class="local-state-card"><p class="deck-label">Scanning hotspot</p><h4>Looking for active rooms</h4><p class="muted">Hosts on the same Wi-Fi appear here automatically.</p></article>';
-        let rooms = [];
-        try {
-          rooms = await WebRtcTransport.listRooms();
-        } catch {
-          rooms = [];
-        }
-        if (!rooms.length) {
-          els.localRoomList.innerHTML = '<article class="local-state-card"><p class="deck-label">No rooms found</p><h4>Nothing is broadcasting yet</h4><p class="muted">Ask the host to tap Create Room on the hotspot device, then scan again.</p></article><button class="local-rescan-btn secondary" id="local-rescan-btn">Re-scan</button>';
-          const rescan2 = document.getElementById("local-rescan-btn");
-          if (rescan2) rescan2.addEventListener("click", () => {
-            window.SFX.uiClick();
-            runLocalScan();
-          });
-          return;
-        }
-        els.localRoomList.innerHTML = rooms.map(
-          (r) => `<div class="local-room-row" data-room="${escapeHtml(r.code)}" role="button" tabindex="0" aria-label="Join ${escapeHtml(r.name || r.code)}">
-      <div class="local-room-row-info">
-        <div class="local-room-row-head">
-          <span class="local-room-row-name">${escapeHtml(r.name || r.code)}</span>
-          <span class="local-room-tag">${r.count} pilot${r.count !== 1 ? "s" : ""}</span>
-        </div>
-        <span class="local-room-row-meta">Hosted by ${escapeHtml(r.hostName || "Unknown")} \xB7 Same hotspot</span>
+    }
+    const audio = raw?.audio;
+    return {
+      name,
+      cosmetics,
+      audio: audio ? {
+        master: typeof audio.master === "number" ? audio.master : void 0,
+        music: typeof audio.music === "number" ? audio.music : void 0,
+        sfx: typeof audio.sfx === "number" ? audio.sfx : void 0
+      } : void 0
+    };
+  }
+  var profile = {
+    name: "",
+    cosmetics: cloneLoadout(DEFAULT_LOADOUT)
+  };
+  function readProfile() {
+    let raw = null;
+    try {
+      const text = localStorage.getItem(PROFILE_KEY);
+      if (text) raw = JSON.parse(text);
+    } catch {
+      raw = null;
+    }
+    try {
+      profile = sanitizeProfile(raw);
+    } catch {
+      profile = { name: "", cosmetics: cloneLoadout(DEFAULT_LOADOUT) };
+    }
+  }
+  function saveProfile(next) {
+    if (next?.name !== void 0) profile.name = next.name;
+    if (next?.cosmetics) profile.cosmetics = cloneLoadout(next.cosmetics);
+    if (next?.audio) profile.audio = { ...profile.audio, ...next.audio };
+    try {
+      const out = {
+        v: 2,
+        name: profile.name,
+        cosmetics: {
+          skin: profile.cosmetics.color,
+          bodyShape: profile.cosmetics.bodyShape,
+          accent: profile.cosmetics.accent,
+          trail: profile.cosmetics.trail,
+          livery: profile.cosmetics.livery
+        },
+        audio: profile.audio
+      };
+      localStorage.setItem(PROFILE_KEY, JSON.stringify(out));
+      localStorage.setItem(NAME_KEY, profile.name);
+      localStorage.setItem(LEGACY_LOADOUT_KEYS.color, String(profile.cosmetics.color));
+      localStorage.setItem(LEGACY_LOADOUT_KEYS.bodyShape, String(profile.cosmetics.bodyShape));
+      localStorage.setItem(LEGACY_LOADOUT_KEYS.accent, String(profile.cosmetics.accent));
+      localStorage.setItem(LEGACY_LOADOUT_KEYS.trail, String(profile.cosmetics.trail));
+      localStorage.setItem(LEGACY_LOADOUT_KEYS.livery, String(profile.cosmetics.livery));
+    } catch {
+    }
+  }
+  function getCosmetics() {
+    return hangarDraft ? hangarDraft : profile.cosmetics;
+  }
+  function getPilotName() {
+    if (profile.name) return profile.name;
+    try {
+      return localStorage.getItem(NAME_KEY)?.slice(0, 14) ?? "";
+    } catch {
+      return "";
+    }
+  }
+  var root = null;
+  var router = null;
+  var handlers = null;
+  var stack = ["home"];
+  var screens = /* @__PURE__ */ new Map();
+  var $ = (id) => document.getElementById(id);
+  var busy = false;
+  var hangarDraft = null;
+  var lobbySignature = "";
+  var settingsDebounce = null;
+  var probeToken = 0;
+  var pressTimer = null;
+  var buzz = (ms) => {
+    try {
+      if (navigator.vibrate) navigator.vibrate(ms);
+    } catch {
+    }
+  };
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+  }
+  function topbar(title, opts) {
+    return `
+    <header class="sc-topbar">
+      <button type="button" class="sc-btn sc-btn--ghost sc-back" data-nav-back aria-label="Back">${ICON.back}<span>Back</span></button>
+      <h2 class="sc-topbar-title">${escapeHtml(title)}</h2>
+      <div class="sc-topbar-actions">${opts?.actions ?? ""}</div>
+    </header>`;
+  }
+  function screenShell(id, cls, inner) {
+    return `<section class="sc-screen ${cls}" data-screen="${id}" id="sc-screen-${id}">${inner}</section>`;
+  }
+  function homeMarkup() {
+    return screenShell("home", "sc-screen--home", `
+    <button type="button" class="sc-gear" data-nav-go="settings" aria-label="Settings">${ICON.gear}</button>
+    <div class="sc-home-center">
+      <div class="sc-title-block">
+        <div class="sc-title-jet" aria-hidden="true">${ICON.plane}</div>
+        <h1 class="sc-wordmark"><span>SMASH</span><em>CART</em></h1>
+        <p class="sc-tagline">Local Wi-Fi dogfights - no servers - no waiting</p>
       </div>
-      <button class="local-room-join-btn" data-room="${escapeHtml(r.code)}">Join</button>
-    </div>`
-        ).join("") + '<button class="local-rescan-btn secondary" id="local-rescan-btn">Re-scan</button>';
-        els.localRoomList.querySelectorAll(".local-room-row").forEach((row) => {
-          const joinHandler = () => {
-            const roomCode = row.dataset.room;
-            if (!roomCode) return;
-            const matchedRoom = rooms.find((r) => r.code === roomCode);
-            const friendlyName = matchedRoom ? matchedRoom.name || roomCode : void 0;
-            stopLocalScanInterval();
-            window.SFX.uiClick();
-            joinP2PAsGuest(roomCode, friendlyName);
-          };
-          row.addEventListener("click", joinHandler);
-          row.addEventListener("keydown", (e) => {
-            if (e.key === "Enter" || e.key === " ") {
-              e.preventDefault();
-              joinHandler();
-            }
-          });
-        });
-        els.localRoomList.querySelectorAll(".local-room-join-btn").forEach((btn) => {
-          btn.addEventListener("click", (e) => {
-            e.stopPropagation();
-            const roomCode = btn.dataset.room;
-            if (!roomCode) return;
-            const matchedRoom = rooms.find((r) => r.code === roomCode);
-            const friendlyName = matchedRoom ? matchedRoom.name || roomCode : void 0;
-            stopLocalScanInterval();
-            window.SFX.uiClick();
-            joinP2PAsGuest(roomCode, friendlyName);
-          });
-        });
-        const rescan = document.getElementById("local-rescan-btn");
-        if (rescan) rescan.addEventListener("click", () => {
-          window.SFX.uiClick();
-          runLocalScan();
-        });
-      }
-      function startLocalScanWithAutoRefresh() {
-        runLocalScan();
-        stopLocalScanInterval();
-        _localScanInterval = setInterval(() => {
-          const joinScreen = document.getElementById(menuScreenElementId("join"));
-          if (!joinScreen || !joinScreen.classList.contains("active")) {
-            stopLocalScanInterval();
-            return;
-          }
-          runLocalScan();
-        }, 3e3);
-      }
-      async function joinP2PAsGuest(code, friendlyName) {
-        window.SFX.unlock();
-        enterImmersive();
-        const name = (els.name.value || "Pilot").slice(0, 14);
-        if (!_isP2PSession) {
-          _colyseusNet = window.Net;
-        }
-        const transport = new WebRtcTransport();
-        window.Net = transport;
-        _isP2PSession = true;
-        transport.onKill = onKill;
-        transport.onPickup = onPickup;
-        transport.onDisconnect = onP2PDisconnect;
-        setStatus("Connecting via P2P\u2026");
-        setBusy(true);
-        try {
-          await transport.connect(name, code, selectedCosmetics, null);
-        } catch (e) {
-          setStatus("Could not connect (P2P): " + (e && e.message ? e.message : e));
-          setBusy(false);
-          window.Net = _colyseusNet;
-          _colyseusNet = null;
-          _isP2PSession = false;
+
+      <label class="sc-field sc-home-name">
+        <span class="sc-field-label">Pilot name</span>
+        <input id="sc-home-name-input" class="sc-input" maxlength="14" placeholder="ACE" autocomplete="off" spellcheck="false" aria-label="Pilot name" />
+      </label>
+
+      <div class="sc-home-actions">
+        <button type="button" class="sc-btn sc-btn--primary sc-btn--mega" id="sc-home-play" data-nav-go="__create__">${ICON.play}<span>PLAY</span></button>
+        <div class="sc-home-row">
+          <button type="button" class="sc-btn sc-btn--ghost" data-nav-go="join">${ICON.join}<span>JOIN</span></button>
+          <button type="button" class="sc-btn sc-btn--ghost" data-nav-go="hangar">${ICON.plane}<span>HANGAR</span></button>
+        </div>
+      </div>
+
+      <p id="sc-home-status" class="sc-status" aria-live="polite"></p>
+    </div>
+    <footer class="sc-home-foot">
+      <span>${ICON.wifi}</span><span>Same Wi-Fi as your friends -- one player hosts, everyone else joins.</span>
+    </footer>
+  `);
+  }
+  function joinMarkup() {
+    return screenShell("join", "sc-screen--join", `
+    ${topbar("Join Room")}
+    <div class="sc-body sc-join-body">
+      <section class="sc-panel" id="sc-join-probe">
+        <div class="sc-probe-line">
+          <span class="sc-probe-dot" aria-hidden="true"></span>
+          <p id="sc-join-probe-status" class="sc-probe-status">Scanning network<span class="sc-ellipsis"></span></p>
+        </div>
+        <button type="button" class="sc-btn sc-btn--amber sc-btn--wide sc-hidden" id="sc-join-found">
+          ${ICON.bolt}<span>HOST FOUND -- TAP TO JOIN</span>
+        </button>
+        <button type="button" class="sc-btn sc-btn--ghost sc-btn--slim" id="sc-join-rescan">${ICON.refresh}<span>Search again</span></button>
+      </section>
+
+      <div class="sc-divider" data-label="or enter address"></div>
+
+      <section class="sc-panel">
+        <label class="sc-field">
+          <span class="sc-field-label">Host address</span>
+          <input id="sc-join-address" class="sc-input sc-input--mono" value="" placeholder="http://192.168.1.42:2567" autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="url" aria-label="Host address" />
+        </label>
+        <button type="button" class="sc-btn sc-btn--primary sc-btn--wide" id="sc-join-submit">${ICON.play}<span>JOIN</span></button>
+      </section>
+
+      <p class="sc-note">${ICON.wifi}<span>Ask the host for their lobby QR -- point your phone camera at it, or type the address they see on screen.</span></p>
+      <p id="sc-join-status" class="sc-status" aria-live="polite"></p>
+    </div>
+  `);
+  }
+  function hangarMarkup() {
+    const tabs = [
+      ["paint", "PAINT"],
+      ["frame", "FRAME"],
+      ["accent", "ACCENT"],
+      ["livery", "LIVERY"],
+      ["trail", "TRAIL"]
+    ];
+    return screenShell("hangar", "sc-screen--hangar", `
+    ${topbar("Hangar", { actions: `
+      <button type="button" class="sc-btn sc-btn--primary sc-btn--slim" id="sc-hangar-save">${ICON.check}<span>SAVE</span></button>
+    ` })}
+    <div class="sc-hangar-stage" aria-hidden="true"></div>
+    <nav class="sc-hangar-tabs" role="tablist" aria-label="Customization">
+      ${tabs.map(([id, label], i) => `
+        <button type="button" class="sc-tab${i === 0 ? " is-active" : ""}" role="tab" aria-selected="${i === 0}" data-hangar-tab="${id}">${label}</button>
+      `).join("")}
+    </nav>
+    <div class="sc-hangar-sheet">
+      <div class="sc-hangar-panel is-active" data-hangar-panel="paint">
+        <div class="sc-swatch-grid" id="sc-opt-paint"></div>
+      </div>
+      <div class="sc-hangar-panel" data-hangar-panel="frame">
+        <div class="sc-card-grid" id="sc-opt-frame"></div>
+      </div>
+      <div class="sc-hangar-panel" data-hangar-panel="accent">
+        <div class="sc-swatch-grid" id="sc-opt-accent"></div>
+      </div>
+      <div class="sc-hangar-panel" data-hangar-panel="livery">
+        <div class="sc-card-grid" id="sc-opt-livery"></div>
+      </div>
+      <div class="sc-hangar-panel" data-hangar-panel="trail">
+        <div class="sc-swatch-grid" id="sc-opt-trail"></div>
+      </div>
+    </div>
+  `);
+  }
+  function settingsMarkup() {
+    return screenShell("settings", "sc-screen--settings", `
+    ${topbar("Settings")}
+    <div class="sc-body sc-settings-body">
+      <section class="sc-panel">
+        <h3 class="sc-section-head">Audio</h3>
+        <label class="sc-set-row"><span>Master</span><input type="range" id="sc-vol-master" min="0" max="1" step="0.01" value="1" /></label>
+        <label class="sc-set-row"><span>SFX</span><input type="range" id="sc-vol-sfx" min="0" max="1" step="0.01" value="1" /></label>
+        <label class="sc-set-row"><span>Music</span><input type="range" id="sc-vol-music" min="0" max="1" step="0.01" value="0.5" /></label>
+        <button type="button" class="sc-btn sc-btn--ghost sc-btn--slim" id="sc-mute-toggle"><span>MUTE ALL</span></button>
+      </section>
+
+      <section class="sc-panel">
+        <h3 class="sc-section-head">Graphics</h3>
+        <div class="sc-segmented" role="radiogroup" aria-label="Graphics quality" id="sc-quality-group">
+          <button type="button" data-q="low">LOW</button>
+          <button type="button" data-q="med">MED</button>
+          <button type="button" data-q="high">HIGH</button>
+          <button type="button" data-q="auto" class="is-on">AUTO</button>
+        </div>
+      </section>
+
+      <section class="sc-panel">
+        <h3 class="sc-section-head">Pilot</h3>
+        <label class="sc-field">
+          <span class="sc-field-label">Call sign</span>
+          <input id="sc-set-name" class="sc-input" maxlength="14" placeholder="ACE" autocomplete="off" spellcheck="false" />
+        </label>
+      </section>
+
+      <section class="sc-panel sc-touch-only">
+        <h3 class="sc-section-head">Controls</h3>
+        <div class="sc-segmented" role="radiogroup" aria-label="Touch control scheme" id="sc-scheme-group">
+          <button type="button" data-scheme="dpad">D-PAD</button>
+          <button type="button" data-scheme="joystick">STICK</button>
+          <button type="button" data-scheme="tilt">TILT</button>
+        </div>
+        <label class="sc-set-row sc-check-row"><span>Invert pitch</span><input type="checkbox" id="sc-inv-pitch" /></label>
+        <label class="sc-set-row sc-check-row"><span>Invert steer</span><input type="checkbox" id="sc-inv-steer" /></label>
+      </section>
+    </div>
+  `);
+  }
+  function lobbyMarkup() {
+    return screenShell("lobby", "sc-screen--lobby", `
+    ${topbar("Lobby", { actions: `
+      <button type="button" class="sc-btn sc-btn--danger sc-btn--slim" id="sc-lobby-leave">${ICON.exit}<span>LEAVE</span></button>
+    ` })}
+    <div class="sc-body sc-lobby-body">
+
+      <section class="sc-panel sc-lobby-qr-panel">
+        <p class="sc-field-label">ROOM</p>
+        <h2 id="sc-lobby-room-name-view" class="sc-lobby-roomname">Private Room</h2>
+        <input id="sc-lobby-room-name-edit" class="sc-input" maxlength="20" placeholder="Name this room..." autocomplete="off" aria-label="Room name" />
+        <div class="sc-qr-frame">
+          <canvas id="sc-lobby-qr" width="0" height="0" aria-label="Join QR code"></canvas>
+        </div>
+        <p class="sc-note sc-note--tight">${ICON.wifi}<span>Friends: join the same Wi-Fi, then scan this.</span></p>
+        <p id="sc-lobby-url" class="sc-lobby-url mono"></p>
+      </section>
+
+      <section class="sc-lobby-right">
+        <section class="sc-panel sc-lobby-settings-panel" id="sc-lobby-leader-settings">
+          <h3 class="sc-section-head">Room settings</h3>
+          <label class="sc-set-row">
+            <span>Round</span>
+            <select id="sc-lobby-round" class="sc-select">
+              <option value="60">1:00</option>
+              <option value="90">1:30</option>
+              <option value="120">2:00</option>
+              <option value="150">2:30</option>
+              <option value="180">3:00</option>
+              <option value="240">4:00</option>
+              <option value="300">5:00</option>
+            </select>
+          </label>
+          <label class="sc-set-row sc-check-row">
+            <span>Bots fill seats</span>
+            <input type="checkbox" id="sc-lobby-bots" />
+          </label>
+          <div class="sc-segmented sc-segmented--small" id="sc-lobby-difficulty" role="radiogroup" aria-label="Bot difficulty">
+            <button type="button" data-diff="easy">EASY</button>
+            <button type="button" data-diff="medium">MED</button>
+            <button type="button" data-diff="high">HIGH</button>
+          </div>
+        </section>
+        <section class="sc-panel sc-hidden" id="sc-lobby-settings-view">
+          <p id="sc-lobby-settings-chips" class="sc-chip-row"></p>
+        </section>
+
+        <section class="sc-panel sc-lobby-roster-panel">
+          <h3 class="sc-section-head">Pilots <span id="sc-lobby-count" class="sc-count-chip">1</span></h3>
+          <div id="sc-lobby-roster" class="sc-roster"></div>
+          <p class="sc-hint" id="sc-lobby-kick-hint">Hold a pilot's card to kick them.</p>
+        </section>
+      </section>
+    </div>
+
+    <div class="sc-lobby-actions">
+      <button type="button" class="sc-btn sc-btn--ghost" id="sc-lobby-ready">${ICON.check}<span>READY</span></button>
+      <button type="button" class="sc-btn sc-btn--primary sc-btn--mega" id="sc-lobby-play">${ICON.play}<span>PLAY</span></button>
+    </div>
+    <p class="sc-hint sc-lobby-autohint">Starts automatically when every pilot is ready.</p>
+  `);
+  }
+  function pauseMarkup() {
+    return `
+    <div id="sc-pause" class="sc-pause sc-hidden" role="dialog" aria-modal="true" aria-label="Paused">
+      <div class="sc-pause-card">
+        <div class="sc-pause-icon" aria-hidden="true">${ICON.pause}</div>
+        <h2>PAUSED</h2>
+        <div class="sc-pause-actions">
+          <button type="button" class="sc-btn sc-btn--primary sc-btn--wide" id="sc-pause-resume">${ICON.play}<span>RESUME</span></button>
+          <button type="button" class="sc-btn sc-btn--danger sc-btn--wide" id="sc-pause-leave">${ICON.exit}<span>LEAVE MATCH</span></button>
+        </div>
+        <p class="sc-hint">Leaving keeps the match running for everyone else.</p>
+      </div>
+    </div>`;
+  }
+  function mountScreens(hostEl, h) {
+    root = hostEl;
+    handlers = h;
+    readProfile();
+    root.innerHTML = `
+    <div class="sc-root">
+      <div class="sc-router" id="sc-router">
+        ${homeMarkup()}
+        ${joinMarkup()}
+        ${hangarMarkup()}
+        ${settingsMarkup()}
+        ${lobbyMarkup()}
+      </div>
+      ${pauseMarkup()}
+    </div>`;
+    root.classList.remove("hidden");
+    document.body.classList.add("sc-menu-open");
+    router = $("sc-router");
+    router.querySelectorAll(".sc-screen").forEach((el) => {
+      const id = el.dataset.screen;
+      screens.set(id, el);
+    });
+    wireNav();
+    wireHome();
+    wireJoin();
+    wireHangar();
+    wireSettings();
+    wireLobby();
+    wirePause();
+    showScreen("home");
+    reflectProfileIntoUI();
+    applyStoredAudioPrefs();
+  }
+  function reflectProfileIntoUI() {
+    const nameInput = $("sc-home-name-input");
+    if (nameInput) nameInput.value = profile.name;
+    const setName = $("sc-set-name");
+    if (setName) setName.value = profile.name;
+  }
+  function applyStoredAudioPrefs() {
+    const a = profile.audio;
+    if (!a) return;
+    try {
+      if (typeof a.master === "number") window.SFX.setMaster(a.master);
+      if (typeof a.sfx === "number") window.SFX.setSfx(a.sfx);
+      if (typeof a.music === "number") window.SFX.setMusic(a.music);
+    } catch {
+    }
+  }
+  function currentScreenId() {
+    return stack[stack.length - 1] || "home";
+  }
+  var TRANSITION_MS = 340;
+  function showScreen(id, dir = "forward") {
+    if (!router) return;
+    if (currentScreenId() === id && screens.get(id)?.classList.contains("is-active")) return;
+    stopProbe();
+    const prevId = currentScreenId();
+    const prevEl = screens.get(prevId);
+    const nextEl = screens.get(id);
+    if (!nextEl) return;
+    if (id === "hangar") beginHangarDraft();
+    if (id === "settings") populateSettingsUI();
+    if (id === "join") startProbe();
+    stack.push(id);
+    if (prevEl && prevEl !== nextEl && prevEl.classList.contains("is-active")) {
+      prevEl.classList.add(dir === "back" ? "anim-back-out" : "anim-fwd-out");
+      prevEl.setAttribute("aria-hidden", "true");
+      window.setTimeout(() => {
+        prevEl.classList.remove("is-active", "anim-fwd-out", "anim-back-out");
+      }, TRANSITION_MS);
+    }
+    nextEl.classList.remove("anim-fwd-in", "anim-back-in", "anim-fwd-out", "anim-back-out");
+    void nextEl.offsetWidth;
+    nextEl.classList.add("is-active", dir === "back" ? "anim-back-in" : "anim-fwd-in");
+    nextEl.removeAttribute("aria-hidden");
+    if (stack[stack.length - 1] !== id) stack.push(id);
+    const scroller = nextEl.querySelector(".sc-body");
+    if (scroller) scroller.scrollTop = 0;
+  }
+  function navBack() {
+    if (stack.length <= 1) return;
+    const leaving = currentScreenId();
+    if (leaving === "hangar") cancelHangarDraft();
+    stack.pop();
+    showScreen(stack[stack.length - 1] || "home", "back");
+  }
+  function resetToHome() {
+    cancelHangarDraft();
+    stack = ["home"];
+    for (const [, el] of screens) el.classList.remove("is-active", "anim-fwd-in", "anim-back-in", "anim-fwd-out", "anim-back-out");
+    showScreen("home", "back");
+    hidePause();
+  }
+  function applyInitialHash() {
+    const hash = location.hash.replace(/^#/, "").toLowerCase();
+    const valid = ["join", "hangar", "settings"];
+    if (valid.includes(hash)) {
+      stack = ["home"];
+      showScreen(hash);
+    }
+  }
+  function wireNav() {
+    root.addEventListener("click", (e) => {
+      const target = e.target;
+      const go = target.closest("[data-nav-go]");
+      if (go) {
+        const dest = go.dataset.navGo;
+        uiTap();
+        if (dest === "__create__") {
+          handlers?.onCreate();
           return;
         }
-        setStatus("");
-        setBusy(false);
-        currentLobbyCode = code;
-        currentLobbyServer = null;
-        currentRoomFriendlyName = friendlyName || null;
-        const p2pUrl = buildP2PShareUrl(code);
-        const core = roomCodeCore(code);
-        activeShareUrl = p2pUrl;
-        els.shareLink.value = p2pUrl;
-        els.shareQrLink.value = p2pUrl;
-        els.shareCodeBar.textContent = core;
-        els.shareQrRoom.textContent = friendlyName || `Room ${core}`;
-        els.shareQrCode.textContent = core;
-        els.shareQrNote.textContent = `Scan on the same Wi-Fi to join ${core}.`;
-        els.copy.disabled = false;
-        els.shareQrCopy.disabled = false;
-        try {
-          window.QR.render(els.shareQrCanvas, p2pUrl, {
-            size: window.Input.isTouchDevice() ? 220 : 256,
-            errorCorrectionLevel: "M"
-          });
-          els.qrBtn.disabled = false;
-        } catch {
-          els.qrBtn.disabled = true;
-          els.shareQrCanvas.width = 0;
-        }
-        els.share.classList.remove("hidden");
-        transport.onStateChange = onLobbyStateChange;
-        els.lobbyTitle.textContent = friendlyName ? `${friendlyName} \xB7 ${core}` : `Room ${core}`;
-        renderLobbyRoster();
-        applyMode("lobby");
-        const phase = transport.getPhase();
-        if (phase === "playing") {
-          transport.onStateChange = null;
-          enterPlayingFromLobby();
-        }
+        showScreen(dest);
+        return;
       }
-      function onP2PDisconnect(info) {
-        if (info && info.type === "host-migrating") {
-          if (window.SFX.suspend) window.SFX.suspend();
-          els.p2pMigratingOverlay.classList.remove("hidden");
-          return;
-        }
-        if (info && info.type === "migration-complete") {
-          els.p2pMigratingOverlay.classList.add("hidden");
-          if (window.SFX.resume) window.SFX.resume();
-          return;
-        }
-        if (info && (info.type === "host-left" || info.type === "kicked")) {
-          els.p2pMigratingOverlay.classList.add("hidden");
-          if (window.SFX.suspend) window.SFX.suspend();
-          showHostLeftOverlay();
-          return;
-        }
-        onDisconnect(info);
+      if (target.closest("[data-nav-back]")) {
+        uiTap();
+        navBack();
       }
-      function onLobbyStateChange() {
-        const phase = window.Net.getPhase();
-        if (mode === "lobby") {
-          renderLobbyRoster();
-          if (phase === "playing") {
-            window.Net.onStateChange = null;
-            enterPlayingFromLobby();
-          }
-        } else if (mode === "playing" || mode === "paused") {
-        }
+    });
+  }
+  function uiTap() {
+    buzz(8);
+    try {
+      window.SFX.unlock();
+    } catch {
+    }
+    try {
+      window.SFX.uiClick();
+    } catch {
+    }
+  }
+  function setBusy(b) {
+    busy = b;
+    for (const id of ["sc-home-play", "sc-join-submit", "sc-join-found"]) {
+      const el = $(id);
+      if (el) el.disabled = b;
+    }
+    document.body.classList.toggle("sc-busy", b);
+  }
+  function setStatus(text, screen2 = "home") {
+    const el = $(screen2 === "home" ? "sc-home-status" : "sc-join-status");
+    if (el) el.textContent = text;
+  }
+  function wireHome() {
+    const nameInput = $("sc-home-name-input");
+    const commit = () => {
+      const clean = nameInput.value.trim().slice(0, 14);
+      nameInput.value = clean;
+      saveProfile({ name: clean });
+    };
+    nameInput.addEventListener("change", commit);
+    nameInput.addEventListener("blur", commit);
+    nameInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        commit();
+        nameInput.blur();
       }
-      function loop(ts) {
-        requestAnimationFrame(loop);
-        let dt = (ts - last) / 1e3;
-        last = ts;
-        if (!isFinite(dt) || dt <= 0) return;
-        dt = Math.min(dt, 0.05);
-        const state = window.Net.state;
-        syncSceneMode(state);
-        if (mode === "playing" && state) {
-          const myId = window.Net.sessionId;
-          const input = window.Input.get();
-          window.Net.sendInput(input.turn, input.climb, input.boost, input.fire);
-          window.Net.stepLocal(dt);
-          window.Quality.sample(dt);
-          window.Renderer.sync(state, dt, myId);
-          window.Renderer.draw(state, myId);
-          updateHud(state, myId);
-          const me = state.players.get(myId);
-          if (me && engineStarted) {
-            window.SFX.setEngine(me.boosting ? 1 : 0.5, !!me.boosting);
-            const fireCd = G.FIRE_COOLDOWN * (me.power === "rapid" ? G.RAPID_FACTOR : 1);
-            if (me.alive && input.fire && ts / 1e3 - lastFireSnd > fireCd) {
-              window.SFX.fire();
-              lastFireSnd = ts / 1e3;
-            }
-          }
-        } else if (mode === "lobby" && state) {
-          window.Renderer.draw(state, window.Net.sessionId);
-        } else if (mode === "menu") {
-          window.Renderer.drawMenu(dt, selectedCosmetics);
-        } else if (state) {
-          window.Renderer.draw(state, window.Net.sessionId);
-        }
+    });
+  }
+  var MDNS_HOST = "smashcart.local";
+  var PROBE_TIMEOUT_MS = 3e3;
+  function mdnsOrigin() {
+    const port = location.port || "2567";
+    return `${MDNS_HOST}:${port}`;
+  }
+  function probeReachable(origin, token) {
+    return new Promise((resolve) => {
+      let done = false;
+      const finish = (ok) => {
+        if (done) return;
+        done = true;
+        resolve(ok);
+      };
+      const timer = window.setTimeout(() => finish(false), PROBE_TIMEOUT_MS);
+      const img = new Image();
+      img.onload = () => {
+        window.clearTimeout(timer);
+        finish(true);
+      };
+      img.onerror = () => {
+        window.clearTimeout(timer);
+        finish(false);
+      };
+      img.src = `http://${origin}/icons/icon.svg?t=${Date.now()}-${token}`;
+    });
+  }
+  function startProbe() {
+    const token = ++probeToken;
+    const statusEl = $("sc-join-probe-status");
+    const foundBtn = $("sc-join-found");
+    const rescanBtn = $("sc-join-rescan");
+    const probeLine = document.querySelector("#sc-join-probe .sc-probe-line");
+    if (!statusEl || !foundBtn || !rescanBtn) return;
+    foundBtn.classList.add("sc-hidden");
+    rescanBtn.classList.add("sc-hidden");
+    if (probeLine) probeLine.classList.remove("sc-hidden");
+    statusEl.innerHTML = 'Scanning network<span class="sc-ellipsis"></span>';
+    const origin = mdnsOrigin();
+    probeReachable(origin, token).then((ok) => {
+      if (token !== probeToken) return;
+      if (ok) {
+        if (probeLine) probeLine.classList.add("sc-hidden");
+        foundBtn.classList.remove("sc-hidden");
+        foundBtn.dataset.origin = origin;
+      } else {
+        statusEl.textContent = "No host answered on smashcart.local.";
+        if (probeLine) probeLine.classList.remove("sc-hidden");
+        rescanBtn.classList.remove("sc-hidden");
       }
-      function updateHud(state, myId) {
-        const me = state.players.get(myId);
-        const local = window.Net.localPose;
-        els.score.textContent = String(me ? me.score : 0);
-        els.time.textContent = formatClock(state.timeLeft);
-        const altitude = local && local.active ? local.p.y : me ? me.py : 0;
-        const speed = local && local.active ? local.speed : me ? me.speed : 0;
-        els.alt.textContent = String(Math.round(altitude));
-        els.speed.textContent = String(Math.round(speed));
-        const inputNow = window.Input.get();
-        const isBoosting = inputNow.boost;
-        const boostTarget = isBoosting ? 1 : 0;
-        boostLevel += (boostTarget - boostLevel) * (isBoosting ? 0.18 : 0.08);
-        boostLevel = Math.max(0, Math.min(1, boostLevel));
-        els.boostFill.style.width = (boostLevel * 100).toFixed(1) + "%";
-        const posX = local && local.active ? local.p.x : me ? me.px : 0;
-        const posZ = local && local.active ? local.p.z : me ? me.pz : 0;
-        const isOob = Math.abs(posX) > G.MAP_HALF - G.MAP_EDGE_SOFT || Math.abs(posZ) > G.MAP_HALF - G.MAP_EDGE_SOFT;
-        const nowSec = performance.now() / 1e3;
-        if (isOob && me && me.alive) {
-          if (nowSec >= oobShownUntil) {
-            els.oobWarning.classList.remove("hidden");
-            oobShownUntil = nowSec + 2;
-          }
-        } else {
-          els.oobWarning.classList.add("hidden");
-          oobShownUntil = 0;
-        }
-        const isLowTime = state.phase === "playing" && state.timeLeft <= 10;
-        els.time.classList.toggle("low", isLowTime);
-        if (me) {
-          els.healthfill.style.width = Math.max(0, me.hp / G.MAX_HP * 100) + "%";
-          if (!me.alive) {
-            if (wasAlive) {
-              deathTime = performance.now() / 1e3;
-              wasAlive = false;
-            }
-            const elapsed = performance.now() / 1e3 - deathTime;
-            const remaining = Math.max(0, Math.ceil(G.RESPAWN_DELAY - elapsed));
-            els.respawnBy.textContent = lastKiller ? "by " + lastKiller : "";
-            els.respawnCount.textContent = remaining > 0 ? "Respawning in " + remaining + "\u2026" : "Respawning\u2026";
-            els.respawn.classList.remove("hidden");
-          } else {
-            wasAlive = true;
-            els.respawn.classList.add("hidden");
-          }
-          if (me.alive && me.hp < prevHp) {
-            els.vignette.classList.add("hit");
-            setTimeout(() => els.vignette.classList.remove("hit"), 120);
-            window.SFX.hit();
-          }
-          els.vignette.classList.toggle("low", me.alive && me.hp > 0 && me.hp < 30);
-          prevHp = me.hp;
-          if (me.power && me.power !== "repair") {
-            const info = G.POWERUPS[me.power] || { label: me.power, icon: "\u2605", color: 16777215 };
-            const left = typeof me.powerLeft === "number" ? me.powerLeft : G.POWERUP_DURATION;
-            const pct = Math.max(0, Math.min(100, left / G.POWERUP_DURATION * 100));
-            const hex = "#" + info.color.toString(16).padStart(6, "0");
-            els.powerChip.classList.remove("hidden");
-            els.powerChip.innerHTML = `<span class="pc-label">${escapeHtml(info.icon)} ${escapeHtml(info.label)}</span><span class="pc-bar"><span class="pc-fill" style="width:${pct}%;background:${hex}"></span></span>`;
-          } else {
-            els.powerChip.classList.add("hidden");
-          }
-          const empLeft = me.empLeft || 0;
-          const frozenLeft = me.frozenLeft || 0;
-          if (empLeft > 0 && !wasEmpd) {
-            showCallout("\u{1F300} EMP'D \u2014 guns offline");
-          }
-          wasEmpd = empLeft > 0;
-          if (frozenLeft > 0 && !wasFrozen) {
-            showCallout("\u2744\uFE0F FROZEN");
-          }
-          wasFrozen = frozenLeft > 0;
-        }
-        const isTdm = state.mode === "tdm";
-        if (isTdm) {
-          els.hudTeamScore.classList.remove("hidden");
-          const ts0 = state.teamScore0 ?? 0;
-          const ts1 = state.teamScore1 ?? 0;
-          els.hudTScore0.textContent = String(ts0);
-          els.hudTScore1.textContent = String(ts1);
-          const myTeam = me ? me.team ?? -1 : -1;
-          els.hudTeamBlue.classList.toggle("is-my-team", myTeam === 0);
-          els.hudTeamRed.classList.toggle("is-my-team", myTeam === 1);
-        } else {
-          els.hudTeamScore.classList.add("hidden");
-        }
-        const list = [];
-        state.players.forEach((p, id) => list.push({ id, name: p.name, score: p.score, bot: p.bot, team: p.team ?? -1 }));
-        list.sort((a, b) => b.score - a.score);
-        const top5 = list.slice(0, 5);
-        els.leaderboard.innerHTML = `<div class="lb-header">SMASHES</div>` + top5.map((p, i) => {
-          const teamDot = isTdm && p.team >= 0 ? `<span class="lb-team-dot" style="background:${p.team === 0 ? "#4aa3ff" : "#ff5a5a"}"></span>` : "";
-          return `<div class="lb-row ${p.id === myId ? "me" : ""}"><span>${teamDot}${i + 1}. ${escapeHtml(p.name)}${p.bot ? " \u{1F916}" : ""}</span><span>${p.score}</span></div>`;
-        }).join("");
-        if (list.length >= 2 && list.filter((p) => p.score > 0).length >= 2) {
-          const leaderId = list[0].id;
-          if (prevLeader !== "" && prevLeader !== leaderId) {
-            pushToast(list[0].name + " takes the lead!", "leader");
-          }
-          prevLeader = leaderId;
-        }
-        if (state.phase !== prevPhase) {
-          if (state.phase === "intermission") {
-            window.SFX.explosion();
-          } else if (state.phase === "playing") {
-            runCountdown();
-          } else {
-            window.SFX.go();
-          }
-          prevPhase = state.phase;
-        }
-        if (state.phase === "intermission") {
-          els.inter.classList.remove("hidden");
-          els.interTime.textContent = formatClock(state.timeLeft);
-          if (isTdm) {
-            const ts0 = state.teamScore0 ?? 0;
-            const ts1 = state.teamScore1 ?? 0;
-            const myTeam = me ? me.team ?? -1 : -1;
-            const winTeam = ts0 > ts1 ? 0 : ts1 > ts0 ? 1 : -1;
-            const winTeamName = winTeam === 0 ? "Blue" : winTeam === 1 ? "Red" : null;
-            if (winTeam < 0) {
-              els.winnerLine.textContent = "\u{1F3C6} Draw!";
-            } else if (myTeam === winTeam) {
-              els.winnerLine.textContent = `\u{1F3C6} ${winTeamName} team wins! (You're on it!)`;
-            } else {
-              els.winnerLine.textContent = `\u{1F3C6} ${winTeamName} team wins!`;
-            }
-          } else {
-            const winner = list[0];
-            els.winnerLine.textContent = winner ? winner.id === myId ? "\u{1F3C6} You win!" : `\u{1F3C6} ${winner.name} wins!` : "";
-          }
-          els.finalBoard.innerHTML = list.slice(0, 6).map((p, i) => {
-            const teamDot = isTdm && p.team >= 0 ? `<span class="lb-team-dot" style="background:${p.team === 0 ? "#4aa3ff" : "#ff5a5a"}"></span>` : "";
-            return `<li class="${p.id === myId ? "me" : ""}${i === 0 ? " win" : ""}"><span>${teamDot}${i + 1}. ${escapeHtml(p.name)}${p.bot ? " \u{1F916}" : ""}</span><span>${p.score}</span></li>`;
-          }).join("");
-          const myRank = list.findIndex((p) => p.id === myId);
-          els.yourPlace.textContent = myRank >= 0 ? `You placed ${ordinal(myRank + 1)} of ${list.length}` : "";
-        } else {
-          els.inter.classList.add("hidden");
-        }
+    });
+  }
+  function stopProbe() {
+    probeToken++;
+  }
+  function parseAddress(raw) {
+    let s = raw.trim();
+    if (!s) return null;
+    if (!/^https?:\/\//i.test(s)) s = "http://" + s;
+    try {
+      const url = new URL(s);
+      if (!url.hostname) return null;
+      return url.port ? `${url.hostname}:${url.port}` : url.hostname;
+    } catch {
+      return null;
+    }
+  }
+  function wireJoin() {
+    const addressInput = $("sc-join-address");
+    addressInput.value = "http://192.168.";
+    addressInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        submitJoin();
       }
-      function pushToast(text, kind) {
-        while (els.toast.children.length >= 3) {
-          els.toast.firstChild?.remove();
-        }
-        const item = document.createElement("div");
-        item.className = `toast-item toast--${kind}`;
-        item.textContent = text;
-        els.toast.appendChild(item);
-        void item.offsetWidth;
-        item.classList.add("show");
-        setTimeout(() => {
-          item.classList.remove("show");
-          setTimeout(() => item.remove(), 200);
-        }, 2600);
+    });
+    const submitBtn = $("sc-join-submit");
+    submitBtn?.addEventListener("click", submitJoin);
+    const foundBtn = $("sc-join-found");
+    foundBtn?.addEventListener("click", () => {
+      uiTap();
+      const origin = foundBtn.dataset.origin;
+      if (origin && handlers) handlers.onJoinHost(origin);
+    });
+    $("sc-join-rescan")?.addEventListener("click", () => {
+      uiTap();
+      startProbe();
+    });
+    function submitJoin() {
+      if (busy) return;
+      const host = parseAddress(addressInput.value);
+      if (!host) {
+        setStatus("That doesn't look like an address -- try http://192.168.x.x:2567", "join");
+        return;
       }
-      function showCallout(text) {
-        els.callout.textContent = text;
-        els.callout.classList.remove("show");
-        void els.callout.offsetWidth;
-        els.callout.classList.add("show");
+      uiTap();
+      setStatus(`Joining ${host}...`, "join");
+      handlers?.onJoinHost(host);
+    }
+  }
+  function beginHangarDraft() {
+    hangarDraft = cloneLoadout(profile.cosmetics);
+    renderHangarOptions();
+  }
+  function cancelHangarDraft() {
+    if (hangarDraft && !sameLoadout(hangarDraft, profile.cosmetics)) {
+      try {
+        if (window.Renderer && window.Renderer.updateMenuPlane) {
+          window.Renderer.updateMenuPlane(profile.cosmetics);
+        }
+      } catch {
       }
-      function runCountdown() {
-        if (countdownActive) return;
-        countdownActive = true;
-        const steps = ["3", "2", "1", "GO!"];
-        let i = 0;
-        function showStep() {
-          if (i >= steps.length) {
-            countdownActive = false;
-            els.countdown.classList.remove("pop", "go");
-            els.countdown.textContent = "";
-            return;
-          }
-          const label = steps[i];
-          const isGo = label === "GO!";
-          els.countdown.textContent = label;
-          els.countdown.classList.toggle("go", isGo);
-          els.countdown.classList.remove("pop");
-          void els.countdown.offsetWidth;
-          els.countdown.classList.add("pop");
-          if (isGo) {
-            try {
-              window.SFX.go();
-            } catch {
-            }
-          } else {
-            try {
-              window.SFX.uiClick && window.SFX.uiClick();
-            } catch {
-            }
-          }
-          i++;
-          setTimeout(showStep, isGo ? 900 : 850);
-        }
-        showStep();
-      }
-      function onKill(msg) {
-        const myId = window.Net.sessionId;
-        const mine = msg.killer === myId;
-        const victimIsMe = msg.victim === myId;
-        const row = document.createElement("div");
-        row.className = "kill-msg" + (mine ? " mine" : "");
-        row.innerHTML = `${escapeHtml(mine ? "You" : msg.killerName)} <span class="kf-verb">smashed</span> <span class="vic">${escapeHtml(victimIsMe ? "You" : msg.victimName)}</span>`;
-        els.killfeed.appendChild(row);
-        setTimeout(() => row.remove(), 3600);
-        while (els.killfeed.children.length > 5) els.killfeed.firstChild?.remove();
-        window.Renderer.killPopup(msg.killer, mine);
-        if (victimIsMe) {
-          window.SFX.explosion();
-          lastKiller = msg.killer && msg.killer !== msg.victim && msg.killerName ? msg.killerName : "";
-        }
-        if (mine) {
-          window.SFX.kill();
-          window.Renderer.hitStop(80);
-        }
-        const tv = getTrack(msg.victim);
-        tv.streak = 0;
-        tv.rapid = 0;
-        if (msg.killer && msg.killer !== msg.victim) {
-          const t = getTrack(msg.killer);
-          const now = performance.now() / 1e3;
-          t.rapid = now - t.last < 3 ? t.rapid + 1 : 1;
-          t.last = now;
-          t.streak += 1;
-          let toastText = "";
-          let toastKind = "multi";
-          if (t.rapid >= 2) {
-            const multiLabel = t.rapid >= 4 ? "MULTI MEGA SMASH" : t.rapid === 3 ? "MULTI SMASH" : "DOUBLE SMASH";
-            toastText = mine ? `${multiLabel}!` : `${msg.killerName} \u2014 ${multiLabel}`;
-            toastKind = "multi";
-          } else {
-            const streakTiers = [
-              [3, "SMASH STREAK"],
-              [5, "SMASHTACULAR STREAK"],
-              [7, "SMASHOSAURUS STREAK"],
-              [10, "SMASHLVANIA STREAK"],
-              [15, "MONSTER SMASH STREAK"],
-              [20, "SMASH POTATO BURGER STREAK"]
-            ];
-            const tier = streakTiers.find(([n]) => t.streak === n);
-            if (tier) {
-              const streakLabel = tier[1];
-              toastText = mine ? `${streakLabel}!` : `${msg.killerName} \u2014 ${streakLabel}`;
-              toastKind = "streak";
-            }
-          }
-          if (toastText) pushToast(toastText, toastKind);
-        }
-      }
-      function onPickup(msg) {
-        if (!window.Net) return;
-        const isSelf = msg.by === window.Net.sessionId;
-        if (msg.type === "star") {
-          if (isSelf) {
-            pushToast("YOU HAVE THE STAR!", "multi");
-          } else {
-            const name = window.Net.state?.players?.get(msg.by)?.name;
-            pushToast(`${name || "Someone"} grabbed the STAR!`, "multi");
-          }
-        }
-        if (!isSelf) return;
-        window.SFX.pickup();
-        const info = G.POWERUPS[msg.type];
-        showCallout((info ? `${info.icon} ${info.label}` : "POWERUP") + "!");
-      }
-      function setupTouchButtons() {
-        const bind = (el, key) => {
-          let pid = -1;
-          const down = (e) => {
-            e.preventDefault();
-            pid = e.pointerId;
-            try {
-              el.setPointerCapture(e.pointerId);
-            } catch {
-            }
-            window.Input.touch[key] = true;
-            el.classList.add("pressed");
-            buzz(8);
-          };
-          const up = (e) => {
-            if (e.pointerId !== pid) return;
-            pid = -1;
-            window.Input.touch[key] = false;
-            el.classList.remove("pressed");
-          };
-          el.addEventListener("pointerdown", down);
-          el.addEventListener("pointerup", up);
-          el.addEventListener("pointercancel", up);
-        };
-        bind(els.left, "left");
-        bind(els.right, "right");
-        bind(els.climb, "climb");
-        bind(els.dive, "dive");
-        bind(els.boost, "boost");
-        bind(els.fire, "fire");
-        const joystickBase = document.getElementById("joystick-base");
-        const joystickThumb = document.getElementById("joystick-thumb");
-        if (joystickBase && joystickThumb) {
-          window.Input.attachJoystick(joystickBase, joystickThumb);
-        }
-        const tiltCalBtn = document.getElementById("tilt-cal-btn");
-        if (tiltCalBtn) {
-          tiltCalBtn.addEventListener("pointerdown", (e) => {
-            e.preventDefault();
-            window.Input.calibrateTilt();
-            buzz(20);
-            tiltCalBtn.classList.add("pressed");
-            setTimeout(() => tiltCalBtn.classList.remove("pressed"), 120);
-          });
-        }
-      }
-      function applyControlSchemeUI(scheme) {
-        const dpadLeft = document.getElementById("dpad-left");
-        const joystickLeft = document.getElementById("joystick-left");
-        const tiltLeft = document.getElementById("tilt-left");
-        if (dpadLeft) dpadLeft.classList.toggle("hidden", scheme !== "dpad");
-        if (joystickLeft) joystickLeft.classList.toggle("hidden", scheme !== "joystick");
-        if (tiltLeft) tiltLeft.classList.toggle("hidden", scheme !== "tilt");
-      }
-      function togglePause() {
-        if (mode === "playing") {
-          applyMode("paused");
-          window.Net.sendInput(0, 0, false, false);
-          window.SFX.setEngine(0, false);
-          if (activeShareUrl || els.shareLink.value) {
-            els.pauseInviteBtn.classList.remove("hidden");
-          } else {
-            els.pauseInviteBtn.classList.add("hidden");
-          }
-        } else if (mode === "paused") {
-          applyMode("playing");
-        }
-      }
-      function toggleMute() {
-        const muted = window.SFX.toggleMute();
-        els.mute.textContent = muted ? "\u{1F507}" : "\u{1F50A}";
-      }
-      function resetToMenu() {
-        window.Net.onStateChange = null;
-        currentLobbyCode = null;
-        currentLobbyServer = null;
-        currentRoomFriendlyName = null;
-        hideRoomChip();
-        els.p2pMigratingOverlay.classList.add("hidden");
-        try {
-          window.Net.leave();
-        } catch {
-        }
-        if (_isP2PSession && _colyseusNet !== null) {
-          window.Net = _colyseusNet;
-          _colyseusNet = null;
-          _isP2PSession = false;
-          window.Net.onKill = onKill;
-          window.Net.onPickup = onPickup;
-          window.Net.onDisconnect = onDisconnect;
-        }
-        if (window.SFX.stopLoops) window.SFX.stopLoops();
-        if (window.SFX.startMenuAmbient) window.SFX.startMenuAmbient();
-        engineStarted = false;
-        try {
-          const so = screen.orientation;
-          if (so && so.unlock) so.unlock();
-        } catch {
-        }
-        wasAlive = true;
-        deathTime = -1;
-        lastKiller = "";
-        prevLeader = "";
-        smashTrack.clear();
-        countdownActive = false;
-        boostLevel = 0;
-        oobShownUntil = 0;
-        els.countdown.classList.remove("pop", "go");
-        els.countdown.textContent = "";
-        els.time.classList.remove("low");
-        applyMode("menu");
-        els.touch.classList.add("hidden");
-        els.share.classList.add("hidden");
-        els.inter.classList.add("hidden");
-        els.respawn.classList.add("hidden");
-        els.powerChip.classList.add("hidden");
-        els.lobbyTitle.textContent = "Private Room";
-        els.lobbyRoster.innerHTML = '<p class="muted">Waiting for players\u2026</p>';
-        els.lobbySettings.classList.add("hidden");
-        els.lobbyRoomName.value = "";
-        els.lobbyRoundLength.value = "150";
-        els.lobbyBotsCheck.checked = false;
-        els.lobbyMode.value = "ffa";
-        els.hudTeamScore.classList.add("hidden");
-        hideSettings();
-        navReset();
-        closeScanner();
-        stopLocalScanInterval();
-        hideShareQr();
-        clearShareInvite();
-        setBusy(false);
-        fetchLeaderboard();
-        setStatus("");
-        updateMenuMeta(false);
-        updateRotateOverlay();
-      }
-      function onDisconnect(_info) {
-        if (mode === "menu" || mode === "lost") return;
-        if (window.SFX.suspend) window.SFX.suspend();
-        els.connMsg.textContent = "Reconnecting\u2026";
-        els.connRetry.classList.add("hidden");
-        applyMode("lost");
-        window.Net.tryReconnect().then((ok) => {
-          if (mode !== "lost") return;
-          if (ok) {
-            if (window.SFX.resume) window.SFX.resume();
-            const phase = window.Net.getPhase();
-            if (phase === "lobby") {
-              window.Net.onStateChange = onLobbyStateChange;
-              renderLobbyRoster();
-              applyMode("lobby");
-            } else {
-              applyMode("playing");
-            }
-          } else {
-            els.connMsg.textContent = "Couldn't reconnect.";
-            els.connRetry.classList.remove("hidden");
-          }
+    }
+    hangarDraft = null;
+  }
+  function commitHangar(save) {
+    if (hangarDraft && save) {
+      saveProfile({ cosmetics: cloneLoadout(hangarDraft) });
+    }
+    hangarDraft = null;
+  }
+  function renderHangarOptions() {
+    const draft = hangarDraft || profile.cosmetics;
+    const swatch = (targetId, key, options) => {
+      const target = $(targetId);
+      if (!target) return;
+      target.innerHTML = options.map((o) => `
+      <button type="button" class="sc-swatch${draft[key] === o.value ? " is-selected" : ""}"
+              data-key="${key}" data-value="${o.value}" style="--swatch:${o.swatch || "#fff"}"
+              aria-label="${escapeHtml(o.label)}">
+        <span class="sc-swatch-core"></span>
+        <span class="sc-swatch-label">${escapeHtml(o.label)}</span>
+      </button>`).join("");
+      target.querySelectorAll(".sc-swatch").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          uiTap();
+          pickOption(btn.dataset.key, Number(btn.dataset.value));
         });
-      }
-      function enterImmersive() {
-        if (!window.Input.isTouchDevice()) {
-          updateRotateOverlay();
-          return;
-        }
-        const root = document.documentElement;
-        const request = root.requestFullscreen || root.webkitRequestFullscreen || root.msRequestFullscreen;
-        if (request) {
-          try {
-            const res = request.call(root);
-            if (res && res.catch) res.catch(() => {
-            });
-          } catch {
-          }
-        }
-        try {
-          const so = screen.orientation;
-          if (so && so.lock) {
-            so.lock("landscape").catch(() => {
-            });
-          }
-        } catch {
-        }
-        updateRotateOverlay();
-      }
-      function updateRotateOverlay() {
-        const portrait = window.matchMedia && window.matchMedia("(orientation: portrait)").matches;
-        const show = window.Input.isTouchDevice() && portrait;
-        els.rotate.classList.toggle("show", !!show);
-        updateMenuMeta(true);
-      }
-      function init() {
-        readInviteFromUrl();
-        window.Renderer.init(els.canvas);
-        window.Input.attach();
-        loadInputPrefs();
-        window.Assets.load();
-        window.Net.onKill = onKill;
-        window.Net.onPickup = onPickup;
-        window.Net.onDisconnect = onDisconnect;
-        els.localBots.checked = botsEnabled;
-        els.localBots.addEventListener("change", () => {
-          botsEnabled = els.localBots.checked;
-          try {
-            localStorage.setItem("smashcart.bots", botsEnabled ? "1" : "0");
-          } catch {
-          }
-          window.SFX.uiClick();
-        });
-        renderLoadoutUI();
-        persistLoadoutStore();
-        fetchLeaderboard();
-        setupTouchButtons();
-        updateRotateOverlay();
-        updateMenuMeta(false);
-        clearShareInvite();
-        if (window.SFX.startMenuAmbient) window.SFX.startMenuAmbient();
-        if (window.Input.isTouchDevice()) document.body.classList.add("touch-device");
-        els.localRoomName.placeholder = randomLocalRoomName();
-        els.localRoomName.value = "";
-        menuRoot.querySelectorAll(menuNavSelector).forEach((el) => {
-          el.addEventListener("click", () => {
-            const target = useArcadeMenu ? el.dataset.arcadeNav : el.dataset.nav;
-            if (!target) return;
-            window.SFX.uiClick();
-            navGo(target);
-          });
-        });
-        menuRoot.querySelectorAll(menuBackSelector).forEach((el) => {
-          el.addEventListener("click", () => {
-            window.SFX.uiClick();
-            navBack();
-          });
-        });
-        menuRoot.querySelectorAll("[data-hangar-tab]").forEach((tabEl) => {
-          tabEl.addEventListener("click", () => {
-            const target = tabEl.dataset.hangarTab;
-            if (!target) return;
-            window.SFX.uiClick();
-            menuRoot.querySelectorAll("[data-hangar-tab]").forEach((t) => {
-              const active = t === tabEl;
-              t.classList.toggle("is-active", active);
-              t.setAttribute("aria-selected", active ? "true" : "false");
-            });
-            menuRoot.querySelectorAll("[data-hangar-panel]").forEach((panel) => {
-              panel.classList.toggle("is-active", panel.dataset.hangarPanel === target);
-            });
-          });
-        });
-        const initialHashScreen = location.hash.replace(/^#/, "").toLowerCase();
-        if (MENU_SCREENS.includes(initialHashScreen) && initialHashScreen !== "home") {
-          navStack = ["home", initialHashScreen];
-          navShow(initialHashScreen);
-        } else {
-          navReset();
-        }
-        els.ingameMenuBtn.addEventListener("click", () => {
-          window.SFX.uiClick();
-          togglePause();
-        });
-        els.pauseInviteBtn.addEventListener("click", () => {
-          window.SFX.uiClick();
-          showShareQr();
-        });
-        els.hudRoomChip.addEventListener("click", () => {
-          window.SFX.uiClick();
-          showShareQr();
-        });
-        els.hostLeftMenuBtn.addEventListener("click", () => {
-          window.SFX.uiClick();
-          resetToMenu();
-        });
-        els.localCreateBtn.addEventListener("click", () => {
-          window.SFX.uiClick();
-          startLocalRoom();
-        });
-        els.localRoomName.addEventListener("keydown", (e) => {
-          if (e.key === "Enter") {
-            e.preventDefault();
-            window.SFX.uiClick();
-            startLocalRoom();
-          }
-        });
-        els.localScanBtn.addEventListener("click", () => {
-          window.SFX.uiClick();
-          startLocalScanWithAutoRefresh();
-        });
-        try {
-          const savedName = localStorage.getItem("smashcart.name");
-          if (savedName) els.name.value = savedName;
-        } catch {
-        }
-        els.name.addEventListener("change", () => {
-          try {
-            localStorage.setItem("smashcart.name", els.name.value);
-          } catch {
-          }
-        });
-        els.name.addEventListener("blur", () => {
-          try {
-            localStorage.setItem("smashcart.name", els.name.value);
-          } catch {
-          }
-        });
-        els.name.addEventListener("keydown", (e) => {
-          if (e.key === "Enter") {
-            e.preventDefault();
-            try {
-              localStorage.setItem("smashcart.name", els.name.value);
-            } catch {
-            }
-            navGo("create");
-          }
-        });
-        els.qrBtn.addEventListener("click", () => {
-          window.SFX.uiClick();
-          showShareQr();
-        });
-        els.copy.addEventListener("click", async () => {
-          const copied = await copyShareCode();
-          if (copied) {
-            els.copy.textContent = "Copied!";
-            setTimeout(() => els.copy.textContent = "Copy code", 1200);
-          }
-        });
-        els.shareQrCopy.addEventListener("click", async () => {
-          const copied = await copyShareCode();
-          if (copied) {
-            els.shareQrCopy.textContent = "Copied!";
-            setTimeout(() => els.shareQrCopy.textContent = "Copy code", 1200);
-          }
-        });
-        els.shareQrClose.addEventListener("click", () => hideShareQr());
-        els.shareQrOverlay.addEventListener("click", (e) => {
-          if (e.target === els.shareQrOverlay) hideShareQr();
-        });
-        els.mute.addEventListener("click", () => toggleMute());
-        els.resume.addEventListener("click", () => togglePause());
-        els.pauseMenu.addEventListener("click", () => resetToMenu());
-        els.connMenu.addEventListener("click", () => resetToMenu());
-        els.connRetry.addEventListener("click", () => {
-          els.connMsg.textContent = "Reconnecting\u2026";
-          els.connRetry.classList.add("hidden");
-          window.Net.tryReconnect().then((ok) => {
-            if (ok) {
-              if (window.SFX.resume) window.SFX.resume();
-              const phase = window.Net.getPhase();
-              if (phase === "lobby") {
-                window.Net.onStateChange = onLobbyStateChange;
-                renderLobbyRoster();
-                applyMode("lobby");
-              } else {
-                applyMode("playing");
-              }
-            } else {
-              els.connMsg.textContent = "Still down.";
-              els.connRetry.classList.remove("hidden");
-            }
-          });
-        });
-        window.Input.onPause = () => {
-          if (mode !== "menu") togglePause();
-        };
-        window.Input.onMute = () => toggleMute();
-        els.menuSettingsBtn.addEventListener("click", () => {
-          window.SFX.uiClick();
-          showSettings();
-        });
-        els.pauseSettings.addEventListener("click", () => {
-          window.SFX.uiClick();
-          showSettings();
-        });
-        els.settingsCloseBtn.addEventListener("click", () => {
-          window.SFX.uiClick();
-          hideSettings();
-        });
-        els.settingsCloseBtn2.addEventListener("click", () => {
-          window.SFX.uiClick();
-          hideSettings();
-        });
-        els.settingsScreen.addEventListener("click", (e) => {
-          if (e.target === els.settingsScreen) hideSettings();
-        });
-        els.customizeRandomize.addEventListener("click", () => {
-          window.SFX.uiClick();
-          updateSelectedLoadout(randomizeLoadout(), "Random loadout armed.");
-        });
-        els.customizeReset.addEventListener("click", () => {
-          window.SFX.uiClick();
-          updateSelectedLoadout(DEFAULT_LOADOUT, "Loadout reset to deck default.");
-        });
-        const volMasterEl = document.getElementById("set-vol-master");
-        const volSfxEl = document.getElementById("set-vol-sfx");
-        const volMusicEl = document.getElementById("set-vol-music");
-        if (volMasterEl) {
-          volMasterEl.addEventListener("input", () => {
-            window.SFX.setMaster(parseFloat(volMasterEl.value));
-          });
-        }
-        if (volSfxEl) {
-          volSfxEl.addEventListener("input", () => {
-            window.SFX.setSfx(parseFloat(volSfxEl.value));
-          });
-        }
-        if (volMusicEl) {
-          volMusicEl.addEventListener("input", () => {
-            window.SFX.setMusic(parseFloat(volMusicEl.value));
-          });
-        }
-        function applyQualityChoice(value) {
-          if (value === "auto") {
-            window.Quality._auto = true;
-            try {
-              localStorage.removeItem("smashcart.quality");
-            } catch {
-            }
-          } else {
-            window.Quality.set(value, true);
-          }
-        }
-        const qualitySelect = document.getElementById("set-quality");
-        if (qualitySelect && qualitySelect.tagName === "SELECT") {
-          qualitySelect.addEventListener("change", () => {
-            window.SFX.uiClick();
-            applyQualityChoice(qualitySelect.value);
-          });
-        } else {
-          document.querySelectorAll('input[name="set-quality"]').forEach((r) => {
-            r.addEventListener("change", () => {
-              if (r.checked) {
-                window.SFX.uiClick();
-                applyQualityChoice(r.value);
-              }
-            });
-          });
-        }
-        const invertPitchEl = document.getElementById("set-invert-pitch");
-        const invertSteerEl = document.getElementById("set-invert-steer");
-        if (invertPitchEl) {
-          invertPitchEl.addEventListener("change", () => {
-            window.Input.invertPitch = invertPitchEl.checked;
-            try {
-              localStorage.setItem("smashcart.invertPitch", invertPitchEl.checked ? "1" : "0");
-            } catch {
-            }
-          });
-        }
-        if (invertSteerEl) {
-          invertSteerEl.addEventListener("change", () => {
-            window.Input.invertSteer = invertSteerEl.checked;
-            try {
-              localStorage.setItem("smashcart.invertSteer", invertSteerEl.checked ? "1" : "0");
-            } catch {
-            }
-          });
-        }
-        document.querySelectorAll('input[name="difficulty"]').forEach((r) => {
-          r.checked = r.value === botDifficulty;
-        });
-        document.querySelectorAll('input[name="difficulty"]').forEach((r) => {
-          r.addEventListener("change", () => {
-            if (!r.checked) return;
-            const val = r.value;
-            botDifficulty = val;
-            try {
-              localStorage.setItem("smashcart.difficulty", val);
-            } catch {
-            }
-            window.Net?.sendHostSettings?.({ botDifficulty: val });
-          });
-        });
-        try {
-          const saved = localStorage.getItem("smashcart.controls");
-          if (saved === "joystick" || saved === "tilt" || saved === "dpad") {
-            window.Input.controlScheme = saved;
-          }
-        } catch {
-        }
-        const schemeRadios = document.querySelectorAll('input[name="ctrl-scheme"]');
-        schemeRadios.forEach((r) => {
-          r.addEventListener("change", () => {
-            if (!r.checked) return;
-            const scheme = r.value;
-            window.SFX.uiClick();
-            if (scheme === "tilt") {
-              window.Input.attachTilt();
-              const DevOri = DeviceOrientationEvent;
-              if (typeof DevOri.requestPermission !== "function") {
-                window.Input.setControlScheme("tilt");
-                applyControlSchemeUI("tilt");
-              }
-            } else {
-              window.Input.setControlScheme(scheme);
-              applyControlSchemeUI(scheme);
-            }
-          });
-        });
-        window.Input.onSchemeChange = (scheme, msg) => {
-          applyControlSchemeUI(scheme);
-          schemeRadios.forEach((r) => {
-            r.checked = r.value === scheme;
-          });
-          const tiltMsg = document.getElementById("tilt-status-msg");
-          if (tiltMsg) {
-            if (msg) {
-              tiltMsg.textContent = msg;
-              tiltMsg.classList.remove("hidden");
-              setTimeout(() => tiltMsg.classList.add("hidden"), 4e3);
-            } else {
-              tiltMsg.classList.add("hidden");
-            }
-          }
-        };
-        applyControlSchemeUI(window.Input.controlScheme);
-        els.scanOpenBtn.addEventListener("click", () => {
-          window.SFX.uiClick();
-          openScanner();
-        });
-        els.scanCloseBtn.addEventListener("click", () => {
-          window.SFX.uiClick();
-          closeScanner();
-        });
-        els.scanOverlay.addEventListener("click", (e) => {
-          if (e.target === els.scanOverlay) closeScanner();
-        });
-        els.joinCodeInput.addEventListener("input", () => {
-          const cur = els.joinCodeInput.value;
-          if (cur.length <= 6 && !/[:/.]/.test(cur)) {
-            const upper = cur.toUpperCase().replace(/[^A-Z0-9]/g, "");
-            if (cur !== upper) {
-              const sel = els.joinCodeInput.selectionStart ?? upper.length;
-              els.joinCodeInput.value = upper;
-              els.joinCodeInput.setSelectionRange(sel, sel);
-            }
-          }
-        });
-        function submitJoinCode() {
-          const core = normalizeRoomCode(els.joinCodeInput.value);
-          if (!core) {
-            setStatus("Enter the 6-character room code.");
-            return;
-          }
-          window.SFX.uiClick();
-          joinP2PAsGuest("P-" + core);
-        }
-        els.joinCodeSubmit.addEventListener("click", submitJoinCode);
-        els.joinCodeInput.addEventListener("keydown", (e) => {
-          if (e.key === "Enter") {
-            e.preventDefault();
-            submitJoinCode();
-          }
-        });
-        els.interLeave.addEventListener("click", () => {
-          window.SFX.uiClick();
-          resetToMenu();
-        });
-        els.lobbyLeaveBtn.addEventListener("click", () => {
-          window.SFX.uiClick();
-          window.Net.onStateChange = null;
-          resetToMenu();
-        });
-        els.lobbyReadyBtn.addEventListener("click", () => {
-          window.SFX.uiClick();
-          window.Net.sendReady();
-        });
-        els.lobbyStartBtn.addEventListener("click", () => {
-          window.SFX.uiClick();
-          window.Net.sendHostStart();
-        });
-        els.lobbyRoomName.addEventListener("input", () => {
-          if (_settingsDebounce !== null) clearTimeout(_settingsDebounce);
-          _settingsDebounce = setTimeout(() => {
-            _settingsDebounce = null;
-            window.Net.sendHostSettings({ roomName: els.lobbyRoomName.value });
-          }, 400);
-        });
-        els.lobbyRoundLength.addEventListener("change", () => {
-          const v = parseInt(els.lobbyRoundLength.value, 10);
-          if (Number.isFinite(v)) window.Net.sendHostSettings({ roundLength: v });
-        });
-        els.lobbyBotsCheck.addEventListener("change", () => {
-          window.Net.sendHostSettings({ botsInRoom: els.lobbyBotsCheck.checked, botDifficulty });
-        });
-        els.lobbyMode.addEventListener("change", () => {
-          window.Net.sendHostSettings({ mode: els.lobbyMode.value });
-        });
-        document.addEventListener("visibilitychange", () => {
-          if (document.hidden) {
-            if (window.Net.state) window.Net.sendInput(0, 0, false, false);
-            if (window.SFX.suspend) window.SFX.suspend();
-            closeScanner();
-            hideShareQr();
-          } else if (mode === "playing" && window.SFX.resume) {
-            window.SFX.resume();
-          }
-        });
-        window.addEventListener("orientationchange", updateRotateOverlay);
-        window.addEventListener("resize", updateRotateOverlay);
-        try {
-          const portraitMq = window.matchMedia("(orientation: portrait)");
-          const mqHandler = () => updateRotateOverlay();
-          if (portraitMq.addEventListener) portraitMq.addEventListener("change", mqHandler);
-          else if (portraitMq.addListener) portraitMq.addListener(mqHandler);
-        } catch {
-        }
-        document.addEventListener("keydown", (e) => {
-          if (e.key === "Escape") {
-            if (scannerOpen) {
-              closeScanner();
-              return;
-            }
-            if (!els.shareQrOverlay.classList.contains("hidden")) {
-              hideShareQr();
-              return;
-            }
-            if (settingsOpen) {
-              hideSettings();
-              return;
-            }
-            if (mode === "menu" && navStack.length > 1) {
-              navBack();
-              return;
-            }
-          }
-        });
-        els.bootOverlay.classList.add("fade-out");
-        setTimeout(() => els.bootOverlay.classList.add("hidden"), 450);
-        if (inviteRoom && inviteRoom.startsWith("P-")) {
-          setStatus(`Joining room ${roomCodeCore(inviteRoom)}\u2026`);
-          joinP2PAsGuest(inviteRoom);
-        }
-        requestAnimationFrame((t) => {
-          last = t;
-          loop(t);
-        });
-      }
-      window.addEventListener("DOMContentLoaded", init);
-      window.addEventListener("error", (e) => {
-        if (mode !== "menu" && mode !== "lobby" && mode !== "playing" && mode !== "paused") {
-          showFatal(e.message || "An unexpected error occurred.");
-        }
       });
-      window.addEventListener("unhandledrejection", (e) => {
-        if (mode !== "menu" && mode !== "lobby" && mode !== "playing" && mode !== "paused") {
-          const msg = e.reason && e.reason.message ? e.reason.message : String(e.reason);
-          showFatal(msg || "An unexpected error occurred.");
+    };
+    const cards = (targetId, key, options) => {
+      const target = $(targetId);
+      if (!target) return;
+      target.innerHTML = options.map((o) => `
+      <button type="button" class="sc-opt-card${draft[key] === o.value ? " is-selected" : ""}"
+              data-key="${key}" data-value="${o.value}">
+        <strong>${escapeHtml(o.label)}</strong>
+        <span>${escapeHtml(o.note)}</span>
+      </button>`).join("");
+      target.querySelectorAll(".sc-opt-card").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          uiTap();
+          pickOption(btn.dataset.key, Number(btn.dataset.value));
+        });
+      });
+    };
+    swatch("sc-opt-paint", "color", PAINT_OPTIONS);
+    swatch("sc-opt-accent", "accent", ACCENT_OPTIONS);
+    swatch("sc-opt-trail", "trail", TRAIL_OPTIONS);
+    cards("sc-opt-frame", "bodyShape", AIRFRAME_OPTIONS);
+    cards("sc-opt-livery", "livery", LIVERY_OPTIONS);
+  }
+  function pickOption(key, value) {
+    if (!hangarDraft) return;
+    const next = cloneLoadout(hangarDraft);
+    next[key] = value;
+    hangarDraft = next;
+    renderHangarOptions();
+    try {
+      if (window.Renderer && window.Renderer.updateMenuPlane) window.Renderer.updateMenuPlane(hangarDraft);
+    } catch {
+    }
+  }
+  function wireHangar() {
+    root.querySelectorAll("[data-hangar-tab]").forEach((tab) => {
+      tab.addEventListener("click", () => {
+        uiTap();
+        const target = tab.dataset.hangarTab;
+        root.querySelectorAll("[data-hangar-tab]").forEach((t) => {
+          const active = t === tab;
+          t.classList.toggle("is-active", active);
+          t.setAttribute("aria-selected", active ? "true" : "false");
+        });
+        root.querySelectorAll("[data-hangar-panel]").forEach((panel) => {
+          panel.classList.toggle("is-active", panel.dataset.hangarPanel === target);
+        });
+      });
+    });
+    $("sc-hangar-save")?.addEventListener("click", () => {
+      commitHangar(true);
+      uiTap();
+      const saveBtn = $("sc-hangar-save");
+      if (saveBtn) {
+        saveBtn.classList.add("did-save");
+        window.setTimeout(() => saveBtn.classList.remove("did-save"), 900);
+      }
+      beginHangarDraft();
+    });
+  }
+  function populateSettingsUI() {
+    try {
+      const vols = window.SFX.vols();
+      const master = $("sc-vol-master");
+      const sfx = $("sc-vol-sfx");
+      const music = $("sc-vol-music");
+      if (master) master.value = String(vols.master);
+      if (sfx) sfx.value = String(vols.sfx);
+      if (music) music.value = String(vols.music);
+      const muteBtn = $("sc-mute-toggle");
+      if (muteBtn) muteBtn.classList.toggle("is-on", !!vols.muted);
+    } catch {
+    }
+    try {
+      const tier = window.Quality._auto ? "auto" : window.Quality.current;
+      document.querySelectorAll("#sc-quality-group button").forEach((b) => {
+        b.classList.toggle("is-on", b.dataset.q === tier);
+      });
+    } catch {
+    }
+    const nameEl = $("sc-set-name");
+    if (nameEl && document.activeElement !== nameEl) nameEl.value = profile.name;
+    try {
+      document.querySelectorAll("#sc-scheme-group button").forEach((b) => {
+        b.classList.toggle("is-on", b.dataset.scheme === window.Input.controlScheme);
+      });
+    } catch {
+    }
+    const invP = $("sc-inv-pitch");
+    const invS = $("sc-inv-steer");
+    if (invP) invP.checked = !!window.Input.invertPitch;
+    if (invS) invS.checked = !!window.Input.invertSteer;
+  }
+  function wireSettings() {
+    const bindVol = (id, setter, slot) => {
+      const el = $(id);
+      el?.addEventListener("input", () => {
+        const v = parseFloat(el.value);
+        if (!Number.isFinite(v)) return;
+        try {
+          setter(v);
+        } catch {
         }
+        saveProfile({ audio: { [slot]: v } });
+      });
+    };
+    bindVol("sc-vol-master", (v) => window.SFX.setMaster(v), "master");
+    bindVol("sc-vol-sfx", (v) => window.SFX.setSfx(v), "sfx");
+    bindVol("sc-vol-music", (v) => window.SFX.setMusic(v), "music");
+    $("sc-mute-toggle")?.addEventListener("click", () => {
+      uiTap();
+      const muted = window.SFX.toggleMute();
+      $("sc-mute-toggle")?.classList.toggle("is-on", muted);
+    });
+    const applyQuality = (q) => {
+      try {
+        if (q === "auto") {
+          window.Quality._auto = true;
+          try {
+            localStorage.removeItem("sc_quality");
+          } catch {
+          }
+        } else {
+          window.Quality.set(q, true);
+        }
+      } catch {
+      }
+      document.querySelectorAll("#sc-quality-group button").forEach((b) => {
+        b.classList.toggle("is-on", b.dataset.q === q);
+      });
+    };
+    document.querySelectorAll("#sc-quality-group button").forEach((b) => {
+      b.addEventListener("click", () => {
+        uiTap();
+        applyQuality(b.dataset.q);
+      });
+    });
+    const nameEl = $("sc-set-name");
+    const commitName = () => {
+      const clean = nameEl.value.trim().slice(0, 14);
+      nameEl.value = clean;
+      saveProfile({ name: clean });
+      const homeName = $("sc-home-name-input");
+      if (homeName) homeName.value = clean;
+    };
+    nameEl.addEventListener("change", commitName);
+    nameEl.addEventListener("blur", commitName);
+    document.querySelectorAll("#sc-scheme-group button").forEach((b) => {
+      b.addEventListener("click", () => {
+        uiTap();
+        const scheme = b.dataset.scheme;
+        persistControlScheme(scheme);
+        if (scheme === "tilt") {
+          window.Input.attachTilt();
+          const DevOri = DeviceOrientationEvent;
+          if (typeof DevOri.requestPermission !== "function") {
+            window.Input.setControlScheme("tilt");
+          }
+        } else {
+          window.Input.setControlScheme(scheme);
+        }
+        document.querySelectorAll("#sc-scheme-group button").forEach((x) => {
+          x.classList.toggle("is-on", x === b);
+        });
+      });
+    });
+    const invP = $("sc-inv-pitch");
+    invP?.addEventListener("change", () => {
+      window.Input.invertPitch = invP.checked;
+      try {
+        localStorage.setItem("smashcart.invertPitch", invP.checked ? "1" : "0");
+      } catch {
+      }
+    });
+    const invS = $("sc-inv-steer");
+    invS?.addEventListener("change", () => {
+      window.Input.invertSteer = invS.checked;
+      try {
+        localStorage.setItem("smashcart.invertSteer", invS.checked ? "1" : "0");
+      } catch {
+      }
+    });
+  }
+  function setLobbyQr(joinUrl) {
+    const canvas = $("sc-lobby-qr");
+    if (!canvas) return;
+    try {
+      window.QR.render(canvas, joinUrl, { size: 220, margin: 2, errorCorrectionLevel: "M" });
+    } catch {
+      canvas.width = 0;
+      canvas.height = 0;
+    }
+    const urlEl = $("sc-lobby-url");
+    if (urlEl) urlEl.textContent = joinUrl;
+  }
+  function fmtLen(sec) {
+    const m = Math.floor(sec / 60);
+    const s = sec % 60;
+    return s ? `${m}:${String(s).padStart(2, "0")}` : `${m}:00`;
+  }
+  function renderLobby(data) {
+    const sig = JSON.stringify(data);
+    if (sig === lobbySignature) return;
+    lobbySignature = sig;
+    const iAmLeader = !!data.myId && data.myId === data.leaderId;
+    const viewEl = $("sc-lobby-room-name-view");
+    const editEl = $("sc-lobby-room-name-edit");
+    if (viewEl) viewEl.textContent = data.roomName || "Private Room";
+    if (editEl && document.activeElement !== editEl) editEl.value = data.roomName || "";
+    $("sc-lobby-leader-settings")?.classList.toggle("sc-hidden", !iAmLeader);
+    $("sc-lobby-settings-view")?.classList.toggle("sc-hidden", iAmLeader);
+    $("sc-lobby-play")?.classList.toggle("sc-hidden", !iAmLeader);
+    $("sc-lobby-play")?.setAttribute("aria-hidden", iAmLeader ? "false" : "true");
+    $("sc-lobby-kick-hint")?.classList.toggle("sc-hidden", !iAmLeader);
+    if (iAmLeader) {
+      const roundSel = $("sc-lobby-round");
+      if (roundSel && document.activeElement !== roundSel) roundSel.value = String(data.roundLength);
+      const bots = $("sc-lobby-bots");
+      if (bots) bots.checked = !!data.botsInRoom;
+      document.querySelectorAll("#sc-lobby-difficulty button").forEach((b) => {
+        b.classList.toggle("is-on", b.dataset.diff === data.botDifficulty);
+      });
+    } else {
+      const chips = $("sc-lobby-settings-chips");
+      if (chips) {
+        chips.innerHTML = `<span class="sc-chip">ROUND ${fmtLen(data.roundLength)}</span><span class="sc-chip">BOTS ${data.botsInRoom ? "ON" : "OFF"}</span><span class="sc-chip">${escapeHtml(String(data.botDifficulty || "medium").toUpperCase())} BOTS</span>`;
+      }
+    }
+    const rosterEl = $("sc-lobby-roster");
+    if (rosterEl) {
+      const hexOf = (idx) => PAINT_OPTIONS[idx >= 0 && idx < PAINT_OPTIONS.length ? idx : 0]?.swatch || "#fff";
+      rosterEl.innerHTML = data.roster.map((p) => {
+        const mine = p.id === data.myId;
+        const kickable = iAmLeader && !mine && !p.bot;
+        const badge = p.id === data.leaderId ? '<span class="sc-badge sc-badge--lead">LEAD</span>' : p.bot ? '<span class="sc-badge sc-badge--bot">BOT</span>' : "";
+        return `
+        <div class="sc-player${mine ? " is-me" : ""}${kickable ? " is-kickable" : ""}${p.ready ? " is-ready" : ""}" data-id="${escapeHtml(p.id)}"${mine ? ' data-self="1"' : ""}>
+          <span class="sc-dot" style="--dot:${hexOf(p.color)}"></span>
+          <span class="sc-player-name">${escapeHtml(p.name)}${mine ? '<span class="sc-badge sc-badge--you">YOU</span>' : ""}</span>
+          ${badge}
+          <span class="sc-tick"${p.ready ? ' aria-label="Ready"' : ' aria-label="Not ready"'}>${ICON.check}</span>
+        </div>`;
+      }).join("");
+      rosterEl.querySelectorAll(".sc-player.is-kickable").forEach((card) => {
+        attachHoldToKick(card);
+      });
+      rosterEl.querySelectorAll('.sc-player[data-self="1"]').forEach((card) => {
+        card.addEventListener("click", (e) => {
+          if (e.target.closest(".sc-kick")) return;
+          uiTap();
+          handlers?.onLobbyReady();
+        });
       });
     }
+    const countEl = $("sc-lobby-count");
+    if (countEl) countEl.textContent = String(data.roster.length);
+    const me = data.roster.find((p) => p.id === data.myId);
+    const readyBtn = $("sc-lobby-ready");
+    if (readyBtn && me) {
+      readyBtn.classList.toggle("is-on", !!me.ready);
+      const label = readyBtn.querySelector("span");
+      if (label) label.textContent = me.ready ? "UNREADY" : "READY";
+    }
+  }
+  function attachHoldToKick(card) {
+    const clear = () => {
+      if (pressTimer !== null) {
+        window.clearTimeout(pressTimer);
+        pressTimer = null;
+      }
+      card.classList.remove("is-pressing");
+    };
+    card.addEventListener("pointerdown", (e) => {
+      if (e.pointerType === "mouse" && e.button !== 0) return;
+      card.classList.add("is-pressing");
+      pressTimer = window.setTimeout(() => {
+        clear();
+        const name = card.querySelector(".sc-player-name")?.textContent || "this pilot";
+        if (window.confirm(`Kick ${name} from the room?`)) {
+          const id = card.dataset.id;
+          if (id && handlers) handlers.onLobbyKick(id);
+        }
+      }, 550);
+    });
+    card.addEventListener("pointerup", clear);
+    card.addEventListener("pointercancel", clear);
+    card.addEventListener("pointerleave", clear);
+  }
+  function wireLobby() {
+    $("sc-lobby-ready")?.addEventListener("click", () => {
+      uiTap();
+      handlers?.onLobbyReady();
+    });
+    $("sc-lobby-play")?.addEventListener("click", () => {
+      uiTap();
+      handlers?.onLobbyStart();
+    });
+    $("sc-lobby-leave")?.addEventListener("click", () => {
+      uiTap();
+      handlers?.onLobbyLeave();
+    });
+    const edit = $("sc-lobby-room-name-edit");
+    edit?.addEventListener("input", () => {
+      if (settingsDebounce !== null) window.clearTimeout(settingsDebounce);
+      settingsDebounce = window.setTimeout(() => {
+        settingsDebounce = null;
+        handlers?.onLobbySettings({ roomName: edit.value });
+      }, 300);
+    });
+    edit?.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        edit.blur();
+      }
+    });
+    $("sc-lobby-round")?.addEventListener("change", () => {
+      const sel = $("sc-lobby-round");
+      const v = parseInt(sel.value, 10);
+      if (Number.isFinite(v)) handlers?.onLobbySettings({ roundLength: v });
+    });
+    $("sc-lobby-bots")?.addEventListener("change", () => {
+      const box = $("sc-lobby-bots");
+      handlers?.onLobbySettings({ botsInRoom: box.checked });
+    });
+    document.querySelectorAll("#sc-lobby-difficulty button").forEach((b) => {
+      b.addEventListener("click", () => {
+        uiTap();
+        document.querySelectorAll("#sc-lobby-difficulty button").forEach((x) => {
+          x.classList.toggle("is-on", x === b);
+        });
+        handlers?.onLobbySettings({ botDifficulty: b.dataset.diff });
+      });
+    });
+  }
+  function invalidateLobbyCache() {
+    lobbySignature = "";
+  }
+  function showPause() {
+    $("sc-pause")?.classList.remove("sc-hidden");
+  }
+  function hidePause() {
+    $("sc-pause")?.classList.add("sc-hidden");
+  }
+  function wirePause() {
+    $("sc-pause-resume")?.addEventListener("click", () => {
+      uiTap();
+      handlers?.onPauseResume();
+    });
+    $("sc-pause-leave")?.addEventListener("click", () => {
+      uiTap();
+      handlers?.onPauseLeave();
+    });
+  }
+  function loadStoredControlPrefs() {
+    try {
+      window.Input.invertPitch = localStorage.getItem("smashcart.invertPitch") === "1";
+    } catch {
+    }
+    try {
+      window.Input.invertSteer = localStorage.getItem("smashcart.invertSteer") === "1";
+    } catch {
+    }
+    try {
+      const saved = localStorage.getItem("smashcart.controls");
+      if (saved === "joystick" || saved === "tilt" || saved === "dpad") window.Input.controlScheme = saved;
+    } catch {
+    }
+  }
+  function persistControlScheme(scheme) {
+    try {
+      localStorage.setItem("smashcart.controls", scheme);
+    } catch {
+    }
+  }
+
+  // src/client/main.ts
+  var dollar = (id) => document.getElementById(id);
+  var net = new WsTransport();
+  window.Net = net;
+  var G = window.GAME;
+  var buzz2 = (ms) => {
+    try {
+      if (navigator.vibrate) navigator.vibrate(ms);
+    } catch {
+    }
+  };
+  var els = {
+    canvas: dollar("game"),
+    hud: dollar("hud"),
+    score: dollar("hud-score"),
+    time: dollar("hud-time"),
+    alt: dollar("hud-alt"),
+    speed: dollar("hud-speed"),
+    boostFill: dollar("boost-fill"),
+    crosshair: dollar("crosshair"),
+    oobWarning: dollar("oob-warning"),
+    leaderboard: dollar("leaderboard"),
+    health: dollar("healthbar"),
+    healthfill: dollar("healthfill"),
+    respawn: dollar("respawn"),
+    start: dollar(MENU_HOST_ID),
+    mute: dollar("mute-btn"),
+    inter: dollar("intermission"),
+    finalBoard: dollar("final-board"),
+    interTime: dollar("inter-time"),
+    winnerLine: dollar("winner-line"),
+    yourPlace: dollar("your-place"),
+    killfeed: dollar("killfeed"),
+    callout: dollar("callout"),
+    vignette: dollar("vignette"),
+    powerChip: dollar("power-chip"),
+    touch: dollar("touch-controls"),
+    left: dollar("left-btn"),
+    right: dollar("right-btn"),
+    climb: dollar("climb-btn"),
+    dive: dollar("dive-btn"),
+    boost: dollar("boost-btn"),
+    fire: dollar("fire-btn"),
+    rotate: dollar("rotate-overlay"),
+    countdown: dollar("countdown"),
+    interLeave: dollar("intermission-leave"),
+    ingameMenuBtn: dollar("ingame-menu-btn"),
+    toast: dollar("toast"),
+    hudTeamScore: dollar("hud-team-score"),
+    hudTeamBlue: dollar("hud-team-blue"),
+    hudTeamRed: dollar("hud-team-red"),
+    hudTScore0: dollar("hud-tscore0"),
+    hudTScore1: dollar("hud-tscore1"),
+    bootOverlay: dollar("boot-overlay"),
+    fatalOverlay: dollar("fatal-overlay"),
+    fatalMsg: dollar("fatal-msg")
+  };
+  var mode = "menu";
+  var sceneMode = "preflight";
+  var last = 0;
+  var prevPhase = "lobby";
+  var prevHp = G.MAX_HP;
+  var lastFireSnd = 0;
+  var wasEmpd = false;
+  var wasFrozen = false;
+  var smashTrack = /* @__PURE__ */ new Map();
+  function getTrack(id) {
+    let t = smashTrack.get(id);
+    if (!t) {
+      t = { streak: 0, last: 0, rapid: 0 };
+      smashTrack.set(id, t);
+    }
+    return t;
+  }
+  var lastKiller = "";
+  var prevLeader = "";
+  var engineStarted = false;
+  var deathTime = -1;
+  var wasAlive = true;
+  var oobShownUntil = 0;
+  var boostLevel = 0;
+  var countdownActive = false;
+  var ICON_SND_ON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H2v6h4l5 4z"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>';
+  var ICON_SND_OFF = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H2v6h4l5 4z"/><path d="m23 9-6 6"/><path d="m17 9 6 6"/></svg>';
+  function escapeHtml2(s) {
+    return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+  }
+  function ordinal(n) {
+    const s = ["th", "st", "nd", "rd"];
+    const v = n % 100;
+    return n + (s[(v - 20) % 10] || s[v] || s[0]);
+  }
+  function formatClock(totalSeconds) {
+    const safe = Math.max(0, Math.ceil(totalSeconds || 0));
+    const minutes = Math.floor(safe / 60);
+    const seconds = safe % 60;
+    return `${minutes}:${String(seconds).padStart(2, "0")}`;
+  }
+  function deriveSceneMode(state = window.Net?.state) {
+    if (mode === "menu") return currentScreenId() === "hangar" ? "customize" : "preflight";
+    if (mode === "lobby") return "lobby";
+    if (mode === "paused") return "paused";
+    if (mode === "playing") return state && state.phase === "intermission" ? "results" : "playing";
+    return "preflight";
+  }
+  function syncSceneMode(state = window.Net?.state) {
+    const next = deriveSceneMode(state);
+    if (sceneMode === next && document.body.dataset.sceneMode === next) return;
+    sceneMode = next;
+    document.body.dataset.sceneMode = next;
+    if (window.Renderer && window.Renderer.setSceneMode) window.Renderer.setSceneMode(next);
+  }
+  function applyMode(nextMode) {
+    mode = nextMode;
+    const inFlight = mode === "playing" || mode === "paused";
+    const showHost = mode !== "playing" && mode !== "error";
+    els.bootOverlay.classList.add("hidden");
+    els.start.classList.toggle("hidden", !showHost);
+    els.start.classList.toggle("sc-paused-host", mode === "paused");
+    document.body.classList.toggle("sc-menu-open", showHost);
+    els.hud.classList.toggle("hidden", !inFlight);
+    els.health.classList.toggle("hidden", !inFlight);
+    els.crosshair.classList.toggle("hidden", mode !== "playing");
+    els.fatalOverlay.classList.toggle("hidden", mode !== "error");
+    if (mode !== "playing") {
+      els.oobWarning.classList.add("hidden");
+      els.respawn.classList.add("hidden");
+      els.powerChip.classList.add("hidden");
+    }
+    if (!inFlight) els.touch.classList.add("hidden");
+    syncSceneMode(window.Net?.state);
+  }
+  function showFatal(msg) {
+    els.fatalMsg.textContent = msg;
+    applyMode("error");
+  }
+  async function connectAndEnterLobby(serverOrigin) {
+    window.SFX.unlock();
+    let name = getPilotName().trim().slice(0, 14);
+    if (!name) name = "Pilot";
+    net.onKill = onKill;
+    net.onPickup = onPickup;
+    net.onDisconnect = onDisconnect;
+    net.onStateChange = onNetStateChange;
+    setBusy(true);
+    setStatus(serverOrigin ? `Connecting to ${serverOrigin}\u2026` : "Opening room\u2026", serverOrigin ? "join" : "home");
+    try {
+      await net.connect(name, "local", getCosmetics(), serverOrigin);
+    } catch (e) {
+      setBusy(false);
+      setStatus("Could not connect: " + (e && e.message ? e.message : e), serverOrigin ? "join" : "home");
+      return;
+    }
+    setBusy(false);
+    setStatus("", serverOrigin ? "join" : "home");
+    const phase = net.getPhase();
+    if (phase === "playing") {
+      enterPlayingFromNet();
+      return;
+    }
+    enterLobby();
+  }
+  function enterLobby() {
+    invalidateLobbyCache();
+    renderLobbyFromNet();
+    drawLobbyQr();
+    applyMode("lobby");
+    showScreen("lobby");
+  }
+  function drawLobbyQr() {
+    let url = location.origin + location.pathname;
+    try {
+      const u = new URL(location.href);
+      u.hash = "";
+      url = u.toString();
+    } catch {
+    }
+    setLobbyQr(url);
+  }
+  function renderLobbyFromNet() {
+    const state = window.Net.state;
+    if (!state) return;
+    renderLobby({
+      roomName: state.roomName || "",
+      roundLength: typeof state.roundLength === "number" ? state.roundLength : 150,
+      botsInRoom: !!state.botsInRoom,
+      botDifficulty: state.botDifficulty || "medium",
+      leaderId: state.hostId || "",
+      myId: window.Net.sessionId,
+      roster: window.Net.getRosterSnapshot()
+    });
+  }
+  function resetCombatTrackers() {
+    prevPhase = "playing";
+    prevHp = G.MAX_HP;
+    wasAlive = true;
+    deathTime = -1;
+    wasEmpd = false;
+    wasFrozen = false;
+    smashTrack.clear();
+    lastKiller = "";
+    prevLeader = "";
+    boostLevel = 0;
+    oobShownUntil = 0;
+  }
+  function enterImmersive() {
+    requestAppFullscreen();
+    keepAwake();
+  }
+  function exitImmersive() {
+    releaseAwake();
+    exitAppFullscreen();
+  }
+  function enterPlayingFromNet() {
+    resetCombatTrackers();
+    applyMode("playing");
+    enterImmersive();
+    if (window.Input.isTouchDevice()) {
+      els.touch.classList.remove("hidden");
+      applyControlSchemeUI(window.Input.controlScheme);
+    }
+    if (!engineStarted) {
+      window.SFX.startEngine();
+      engineStarted = true;
+    }
+    if (window.SFX.stopMenuAmbient) window.SFX.stopMenuAmbient();
+    window.SFX.startMusic();
+    runCountdown();
+  }
+  function togglePause() {
+    if (mode === "playing") {
+      applyMode("paused");
+      showPause();
+      window.Net.sendInput(0, 0, false, false);
+      window.SFX.setEngine(0, false);
+    } else if (mode === "paused") {
+      hidePause();
+      applyMode("playing");
+    }
+  }
+  function leaveMatch(reason) {
+    hidePause();
+    window.Net.onStateChange = null;
+    try {
+      window.Net.leave();
+    } catch {
+    }
+    resetToHome2(reason);
+  }
+  function resetToHome2(statusMsg) {
+    hidePause();
+    exitImmersive();
+    if (window.SFX.stopLoops) window.SFX.stopLoops();
+    if (window.SFX.startMenuAmbient) window.SFX.startMenuAmbient();
+    engineStarted = false;
+    wasAlive = true;
+    deathTime = -1;
+    lastKiller = "";
+    prevLeader = "";
+    smashTrack.clear();
+    countdownActive = false;
+    boostLevel = 0;
+    oobShownUntil = 0;
+    els.countdown.classList.remove("pop", "go");
+    els.countdown.textContent = "";
+    els.time.classList.remove("low");
+    els.inter.classList.add("hidden");
+    els.respawn.classList.add("hidden");
+    els.powerChip.classList.add("hidden");
+    els.hudTeamScore.classList.add("hidden");
+    prevPhase = "lobby";
+    applyMode("menu");
+    resetToHome();
+    if (statusMsg) setStatus(statusMsg, "home");
+    updateRotateOverlay();
+  }
+  function onDisconnect(info) {
+    if (mode === "error" || mode === "menu") return;
+    const kicked = !!(info && (info.type === "kicked" || info.reason === "kicked"));
+    const msg = kicked ? "You were kicked by the room leader." : "Disconnected from the room.";
+    leaveMatch(msg);
+    pushToast(msg, "leader");
+  }
+  function onNetStateChange() {
+    if (mode !== "lobby") return;
+    renderLobbyFromNet();
+    const phase = window.Net.getPhase();
+    if (phase === "playing") {
+      enterPlayingFromNet();
+    }
+  }
+  function loop(ts) {
+    requestAnimationFrame(loop);
+    let dt = (ts - last) / 1e3;
+    last = ts;
+    if (!isFinite(dt) || dt <= 0) return;
+    dt = Math.min(dt, 0.05);
+    const state = window.Net.state;
+    syncSceneMode(state);
+    if (mode === "playing" && state) {
+      const myId = window.Net.sessionId;
+      const input = window.Input.get();
+      window.Net.sendInput(input.turn, input.climb, input.boost, input.fire);
+      window.Net.stepLocal(dt);
+      window.Quality.sample(dt);
+      window.Renderer.sync(state, dt, myId);
+      window.Renderer.draw(state, myId);
+      updateHud(state, myId);
+      const me = state.players.get(myId);
+      if (me && engineStarted) {
+        window.SFX.setEngine(me.boosting ? 1 : 0.5, !!me.boosting);
+        const fireCd = G.FIRE_COOLDOWN * (me.power === "rapid" ? G.RAPID_FACTOR : 1);
+        if (me.alive && input.fire && ts / 1e3 - lastFireSnd > fireCd) {
+          window.SFX.fire();
+          lastFireSnd = ts / 1e3;
+        }
+      }
+    } else if (mode === "lobby" && state) {
+      window.Renderer.draw(state, window.Net.sessionId);
+    } else if (mode === "menu") {
+      window.Renderer.drawMenu(dt, getCosmetics());
+    } else if (state) {
+      window.Renderer.draw(state, window.Net.sessionId);
+    }
+  }
+  function updateHud(state, myId) {
+    const me = state.players.get(myId);
+    const local = window.Net.localPose;
+    els.score.textContent = String(me ? me.score : 0);
+    els.time.textContent = formatClock(state.timeLeft);
+    const altitude = local && local.active ? local.p.y : me ? me.py : 0;
+    const speed = local && local.active ? local.speed : me ? me.speed : 0;
+    els.alt.textContent = String(Math.round(altitude));
+    els.speed.textContent = String(Math.round(speed));
+    const inputNow = window.Input.get();
+    const isBoosting = inputNow.boost;
+    const boostTarget = isBoosting ? 1 : 0;
+    boostLevel += (boostTarget - boostLevel) * (isBoosting ? 0.18 : 0.08);
+    boostLevel = Math.max(0, Math.min(1, boostLevel));
+    els.boostFill.style.width = (boostLevel * 100).toFixed(1) + "%";
+    const posX = local && local.active ? local.p.x : me ? me.px : 0;
+    const posZ = local && local.active ? local.p.z : me ? me.pz : 0;
+    const isOob = Math.abs(posX) > G.MAP_HALF - G.MAP_EDGE_SOFT || Math.abs(posZ) > G.MAP_HALF - G.MAP_EDGE_SOFT;
+    const nowSec = performance.now() / 1e3;
+    if (isOob && me && me.alive) {
+      if (nowSec >= oobShownUntil) {
+        els.oobWarning.classList.remove("hidden");
+        oobShownUntil = nowSec + 2;
+      }
+    } else {
+      els.oobWarning.classList.add("hidden");
+      oobShownUntil = 0;
+    }
+    const isLowTime = state.phase === "playing" && state.timeLeft <= 10;
+    els.time.classList.toggle("low", isLowTime);
+    if (me) {
+      els.healthfill.style.width = Math.max(0, me.hp / G.MAX_HP * 100) + "%";
+      if (!me.alive) {
+        if (wasAlive) {
+          deathTime = performance.now() / 1e3;
+          wasAlive = false;
+        }
+        const elapsed = performance.now() / 1e3 - deathTime;
+        const remaining = Math.max(0, Math.ceil(G.RESPAWN_DELAY - elapsed));
+        const respawnBy = document.getElementById("respawn-by");
+        const respawnCount = document.getElementById("respawn-count");
+        if (respawnBy) respawnBy.textContent = lastKiller ? "by " + lastKiller : "";
+        if (respawnCount) respawnCount.textContent = remaining > 0 ? "Respawning in " + remaining + "\u2026" : "Respawning\u2026";
+        els.respawn.classList.remove("hidden");
+      } else {
+        wasAlive = true;
+        els.respawn.classList.add("hidden");
+      }
+      if (me.alive && me.hp < prevHp) {
+        els.vignette.classList.add("hit");
+        setTimeout(() => els.vignette.classList.remove("hit"), 120);
+        window.SFX.hit();
+      }
+      els.vignette.classList.toggle("low", me.alive && me.hp > 0 && me.hp < 30);
+      prevHp = me.hp;
+      if (me.power && me.power !== "repair") {
+        const info = G.POWERUPS[me.power] || { label: me.power, icon: "\u2605", color: 16777215 };
+        const left = typeof me.powerLeft === "number" ? me.powerLeft : G.POWERUP_DURATION;
+        const pct = Math.max(0, Math.min(100, left / G.POWERUP_DURATION * 100));
+        const hex = "#" + info.color.toString(16).padStart(6, "0");
+        els.powerChip.classList.remove("hidden");
+        els.powerChip.innerHTML = `<span class="pc-label">${escapeHtml2(info.icon)} ${escapeHtml2(info.label)}</span><span class="pc-bar"><span class="pc-fill" style="width:${pct}%;background:${hex}"></span></span>`;
+      } else {
+        els.powerChip.classList.add("hidden");
+      }
+      const empLeft = me.empLeft || 0;
+      const frozenLeft = me.frozenLeft || 0;
+      if (empLeft > 0 && !wasEmpd) showCallout("EMP'D \u2014 guns offline");
+      wasEmpd = empLeft > 0;
+      if (frozenLeft > 0 && !wasFrozen) showCallout("FROZEN");
+      wasFrozen = frozenLeft > 0;
+    }
+    const isTdm = state.mode === "tdm";
+    if (isTdm) {
+      els.hudTeamScore.classList.remove("hidden");
+      const ts0 = state.teamScore0 ?? 0;
+      const ts1 = state.teamScore1 ?? 0;
+      els.hudTScore0.textContent = String(ts0);
+      els.hudTScore1.textContent = String(ts1);
+      const myTeam = me ? me.team ?? -1 : -1;
+      els.hudTeamBlue.classList.toggle("is-my-team", myTeam === 0);
+      els.hudTeamRed.classList.toggle("is-my-team", myTeam === 1);
+    } else {
+      els.hudTeamScore.classList.add("hidden");
+    }
+    const list = [];
+    state.players.forEach((p, id) => list.push({ id, name: p.name, score: p.score, bot: p.bot, team: p.team ?? -1 }));
+    list.sort((a, b) => b.score - a.score);
+    const top5 = list.slice(0, 5);
+    els.leaderboard.innerHTML = `<div class="lb-header">SMASHES</div>` + top5.map((p, i) => {
+      const teamDot = isTdm && p.team >= 0 ? `<span class="lb-team-dot" style="background:${p.team === 0 ? "#4aa3ff" : "#ff5a5a"}"></span>` : "";
+      return `<div class="lb-row ${p.id === myId ? "me" : ""}"><span>${teamDot}${i + 1}. ${escapeHtml2(p.name)}${p.bot ? " BOT" : ""}</span><span>${p.score}</span></div>`;
+    }).join("");
+    if (list.length >= 2 && list.filter((p) => p.score > 0).length >= 2) {
+      const leaderId = list[0].id;
+      if (prevLeader !== "" && prevLeader !== leaderId) {
+        pushToast(list[0].name + " takes the lead!", "leader");
+      }
+      prevLeader = leaderId;
+    }
+    if (state.phase !== prevPhase) {
+      if (state.phase === "intermission") {
+        window.SFX.explosion();
+      } else if (state.phase === "playing") {
+        runCountdown();
+      } else {
+        window.SFX.go();
+      }
+      prevPhase = state.phase;
+    }
+    if (state.phase === "intermission") {
+      els.inter.classList.remove("hidden");
+      els.interTime.textContent = formatClock(state.timeLeft);
+      if (isTdm) {
+        const ts0 = state.teamScore0 ?? 0;
+        const ts1 = state.teamScore1 ?? 0;
+        const myTeam = me ? me.team ?? -1 : -1;
+        const winTeam = ts0 > ts1 ? 0 : ts1 > ts0 ? 1 : -1;
+        const winTeamName = winTeam === 0 ? "Blue" : winTeam === 1 ? "Red" : null;
+        if (winTeam < 0) {
+          els.winnerLine.textContent = "Draw!";
+        } else if (myTeam === winTeam) {
+          els.winnerLine.textContent = `${winTeamName} team wins! (You're on it!)`;
+        } else {
+          els.winnerLine.textContent = `${winTeamName} team wins!`;
+        }
+      } else {
+        const winner = list[0];
+        els.winnerLine.textContent = winner ? winner.id === myId ? "You win!" : `${winner.name} wins!` : "";
+      }
+      els.finalBoard.innerHTML = list.slice(0, 6).map((p, i) => {
+        const teamDot = isTdm && p.team >= 0 ? `<span class="lb-team-dot" style="background:${p.team === 0 ? "#4aa3ff" : "#ff5a5a"}"></span>` : "";
+        return `<li class="${p.id === myId ? "me" : ""}${i === 0 ? " win" : ""}"><span>${teamDot}${i + 1}. ${escapeHtml2(p.name)}${p.bot ? " BOT" : ""}</span><span>${p.score}</span></li>`;
+      }).join("");
+      const myRank = list.findIndex((p) => p.id === myId);
+      els.yourPlace.textContent = myRank >= 0 ? `You placed ${ordinal(myRank + 1)} of ${list.length}` : "";
+    } else {
+      els.inter.classList.add("hidden");
+    }
+  }
+  function pushToast(text, kind) {
+    while (els.toast.children.length >= 3) {
+      els.toast.firstChild?.remove();
+    }
+    const item = document.createElement("div");
+    item.className = `toast-item toast--${kind}`;
+    item.textContent = text;
+    els.toast.appendChild(item);
+    void item.offsetWidth;
+    item.classList.add("show");
+    setTimeout(() => {
+      item.classList.remove("show");
+      setTimeout(() => item.remove(), 200);
+    }, 2600);
+  }
+  function showCallout(text) {
+    els.callout.textContent = text;
+    els.callout.classList.remove("show");
+    void els.callout.offsetWidth;
+    els.callout.classList.add("show");
+  }
+  function runCountdown() {
+    if (countdownActive) return;
+    countdownActive = true;
+    const steps = ["3", "2", "1", "GO!"];
+    let i = 0;
+    function showStep() {
+      if (i >= steps.length) {
+        countdownActive = false;
+        els.countdown.classList.remove("pop", "go");
+        els.countdown.textContent = "";
+        return;
+      }
+      const label = steps[i];
+      const isGo = label === "GO!";
+      els.countdown.textContent = label;
+      els.countdown.classList.toggle("go", isGo);
+      els.countdown.classList.remove("pop");
+      void els.countdown.offsetWidth;
+      els.countdown.classList.add("pop");
+      if (isGo) {
+        try {
+          window.SFX.go();
+        } catch {
+        }
+      } else {
+        try {
+          window.SFX.uiClick && window.SFX.uiClick();
+        } catch {
+        }
+      }
+      i++;
+      setTimeout(showStep, isGo ? 900 : 850);
+    }
+    showStep();
+  }
+  function onKill(msg) {
+    const myId = window.Net.sessionId;
+    const mine = msg.killer === myId;
+    const victimIsMe = msg.victim === myId;
+    const row = document.createElement("div");
+    row.className = "kill-msg" + (mine ? " mine" : "");
+    row.innerHTML = `${escapeHtml2(mine ? "You" : msg.killerName)} <span class="kf-verb">smashed</span> <span class="vic">${escapeHtml2(victimIsMe ? "You" : msg.victimName)}</span>`;
+    els.killfeed.appendChild(row);
+    setTimeout(() => row.remove(), 3600);
+    while (els.killfeed.children.length > 5) els.killfeed.firstChild?.remove();
+    window.Renderer.killPopup(msg.killer, mine);
+    if (victimIsMe) {
+      window.SFX.explosion();
+      lastKiller = msg.killer && msg.killer !== msg.victim && msg.killerName ? msg.killerName : "";
+    }
+    if (mine) {
+      window.SFX.kill();
+      window.Renderer.hitStop(80);
+    }
+    const tv = getTrack(msg.victim);
+    tv.streak = 0;
+    tv.rapid = 0;
+    if (msg.killer && msg.killer !== msg.victim) {
+      const t = getTrack(msg.killer);
+      const now = performance.now() / 1e3;
+      t.rapid = now - t.last < 3 ? t.rapid + 1 : 1;
+      t.last = now;
+      t.streak += 1;
+      let toastText = "";
+      let toastKind = "multi";
+      if (t.rapid >= 2) {
+        const multiLabel = t.rapid >= 4 ? "MULTI MEGA SMASH" : t.rapid === 3 ? "MULTI SMASH" : "DOUBLE SMASH";
+        toastText = mine ? `${multiLabel}!` : `${msg.killerName} \u2014 ${multiLabel}`;
+        toastKind = "multi";
+      } else {
+        const streakTiers = [
+          [3, "SMASH STREAK"],
+          [5, "SMASHTACULAR STREAK"],
+          [7, "SMASHOSAURUS STREAK"],
+          [10, "SMASHLVANIA STREAK"],
+          [15, "MONSTER SMASH STREAK"],
+          [20, "SMASH POTATO BURGER STREAK"]
+        ];
+        const tier = streakTiers.find(([n]) => t.streak === n);
+        if (tier) {
+          toastText = mine ? `${tier[1]}!` : `${msg.killerName} \u2014 ${tier[1]}`;
+          toastKind = "streak";
+        }
+      }
+      if (toastText) pushToast(toastText, toastKind);
+    }
+  }
+  function onPickup(msg) {
+    if (!window.Net) return;
+    const isSelf = msg.by === window.Net.sessionId;
+    if (msg.type === "star") {
+      if (isSelf) {
+        pushToast("YOU HAVE THE STAR!", "multi");
+      } else {
+        const name = window.Net.state?.players?.get(msg.by)?.name;
+        pushToast(`${name || "Someone"} grabbed the STAR!`, "multi");
+      }
+    }
+    if (!isSelf) return;
+    window.SFX.pickup();
+    const info = G.POWERUPS[msg.type];
+    showCallout((info ? `${info.icon} ${info.label}` : "POWERUP") + "!");
+  }
+  function setupTouchButtons() {
+    const bind = (el, key) => {
+      let pid = -1;
+      const down = (e) => {
+        e.preventDefault();
+        pid = e.pointerId;
+        try {
+          el.setPointerCapture(e.pointerId);
+        } catch {
+        }
+        window.Input.touch[key] = true;
+        el.classList.add("pressed");
+        buzz2(8);
+      };
+      const up = (e) => {
+        if (e.pointerId !== pid) return;
+        pid = -1;
+        window.Input.touch[key] = false;
+        el.classList.remove("pressed");
+      };
+      el.addEventListener("pointerdown", down);
+      el.addEventListener("pointerup", up);
+      el.addEventListener("pointercancel", up);
+    };
+    bind(els.left, "left");
+    bind(els.right, "right");
+    bind(els.climb, "climb");
+    bind(els.dive, "dive");
+    bind(els.boost, "boost");
+    bind(els.fire, "fire");
+    const joystickBase = document.getElementById("joystick-base");
+    const joystickThumb = document.getElementById("joystick-thumb");
+    if (joystickBase && joystickThumb) {
+      window.Input.attachJoystick(joystickBase, joystickThumb);
+    }
+    const tiltCalBtn = document.getElementById("tilt-cal-btn");
+    if (tiltCalBtn) {
+      tiltCalBtn.addEventListener("pointerdown", (e) => {
+        e.preventDefault();
+        window.Input.calibrateTilt();
+        buzz2(20);
+        tiltCalBtn.classList.add("pressed");
+        setTimeout(() => tiltCalBtn.classList.remove("pressed"), 120);
+      });
+    }
+  }
+  function applyControlSchemeUI(scheme) {
+    const dpadLeft = document.getElementById("dpad-left");
+    const joystickLeft = document.getElementById("joystick-left");
+    const tiltLeft = document.getElementById("tilt-left");
+    if (dpadLeft) dpadLeft.classList.toggle("hidden", scheme !== "dpad");
+    if (joystickLeft) joystickLeft.classList.toggle("hidden", scheme !== "joystick");
+    if (tiltLeft) tiltLeft.classList.toggle("hidden", scheme !== "tilt");
+  }
+  function toggleMute() {
+    const muted = window.SFX.toggleMute();
+    els.mute.innerHTML = muted ? ICON_SND_OFF : ICON_SND_ON;
+  }
+  function updateRotateOverlay() {
+    const portrait = window.matchMedia && window.matchMedia("(orientation: portrait)").matches;
+    const show = window.Input.isTouchDevice() && portrait && (mode === "menu" || mode === "lobby" || mode === "playing" || mode === "paused");
+    els.rotate.classList.toggle("show", !!show);
+  }
+  var handlers2 = {
+    onCreate: () => {
+      void connectAndEnterLobby(null);
+    },
+    onJoinHost: (host) => {
+      void connectAndEnterLobby(host);
+    },
+    onLobbyStart: () => {
+      window.Net.sendHostStart();
+    },
+    onLobbyReady: () => {
+      window.Net.sendReady();
+    },
+    onLobbyKick: (targetId) => {
+      window.Net.sendHostKick(targetId);
+    },
+    onLobbySettings: (patch) => {
+      window.Net.sendHostSettings(patch);
+    },
+    onLobbyLeave: () => {
+      leaveMatch();
+    },
+    onPauseResume: () => {
+      togglePause();
+    },
+    onPauseLeave: () => {
+      leaveMatch("Left the match.");
+    }
+  };
+  function init() {
+    void registerServiceWorker();
+    window.Renderer.init(els.canvas);
+    window.Input.attach();
+    loadStoredControlPrefs();
+    window.Assets.load();
+    mountScreens(els.start, handlers2);
+    applyInitialHash();
+    window.Net.onKill = onKill;
+    window.Net.onPickup = onPickup;
+    window.Net.onDisconnect = onDisconnect;
+    window.Net.onStateChange = onNetStateChange;
+    setupTouchButtons();
+    applyControlSchemeUI(window.Input.controlScheme);
+    updateRotateOverlay();
+    if (window.SFX.startMenuAmbient) window.SFX.startMenuAmbient();
+    if (window.Input.isTouchDevice()) document.body.classList.add("touch-device");
+    els.mute.addEventListener("click", () => toggleMute());
+    els.mute.innerHTML = window.SFX.isMuted() ? ICON_SND_OFF : ICON_SND_ON;
+    els.ingameMenuBtn.addEventListener("click", () => {
+      window.SFX.uiClick();
+      togglePause();
+    });
+    els.interLeave.addEventListener("click", () => {
+      window.SFX.uiClick();
+      leaveMatch();
+    });
+    window.Input.onPause = () => {
+      if (mode === "playing" || mode === "paused") togglePause();
+    };
+    window.Input.onMute = () => toggleMute();
+    document.addEventListener("visibilitychange", () => {
+      if (document.hidden) {
+        if (window.Net.state) window.Net.sendInput(0, 0, false, false);
+        if (window.SFX.suspend) window.SFX.suspend();
+      } else if (mode === "playing" && window.SFX.resume) {
+        window.SFX.resume();
+      }
+    });
+    window.addEventListener("orientationchange", updateRotateOverlay);
+    window.addEventListener("resize", updateRotateOverlay);
+    try {
+      const portraitMq = window.matchMedia("(orientation: portrait)");
+      const mqHandler = () => updateRotateOverlay();
+      if (portraitMq.addEventListener) portraitMq.addEventListener("change", mqHandler);
+      else if (portraitMq.addListener) portraitMq.addListener(mqHandler);
+    } catch {
+    }
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") {
+        if (mode === "paused") {
+          togglePause();
+          return;
+        }
+        if (mode === "menu" && currentScreenId() !== "home") {
+          navBack();
+          return;
+        }
+      }
+    });
+    els.bootOverlay.classList.add("fade-out");
+    setTimeout(() => els.bootOverlay.classList.add("hidden"), 450);
+    requestAnimationFrame((t) => {
+      last = t;
+      loop(t);
+    });
+  }
+  window.addEventListener("DOMContentLoaded", init);
+  window.addEventListener("error", (e) => {
+    if (mode !== "menu" && mode !== "lobby" && mode !== "playing" && mode !== "paused") {
+      showFatal(e.message || "An unexpected error occurred.");
+    }
   });
-  require_main();
+  window.addEventListener("unhandledrejection", (e) => {
+    if (mode !== "menu" && mode !== "lobby" && mode !== "playing" && mode !== "paused") {
+      const msg = e.reason && e.reason.message ? e.reason.message : String(e.reason);
+      showFatal(msg || "An unexpected error occurred.");
+    }
+  });
 })();

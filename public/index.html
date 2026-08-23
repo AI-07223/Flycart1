@@ -1,9 +1,9 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-  <title>SmashCart — Flat-World Air Combat</title>
+  <title>SmashCart â€” Flat-World Air Combat</title>
   <link rel="manifest" href="/manifest.webmanifest">
   <meta name="theme-color" content="#0b0f14">
   <link rel="icon" type="image/svg+xml" href="/icons/icon.svg">
@@ -26,7 +26,7 @@
     <div id="boot-overlay">
       <div class="boot-inner">
         <div class="boot-spinner" aria-hidden="true"></div>
-        <p class="boot-label">Loading…</p>
+        <p class="boot-label">Loadingâ€¦</p>
       </div>
     </div>
 
@@ -47,7 +47,7 @@
 
     <div id="rotate-overlay">
       <div class="rot-inner">
-        <div class="rot-icon">⟳</div>
+        <div class="rot-icon">âŸ³</div>
         <div class="rot-title">Rotate to Landscape</div>
         <div class="rot-sub">Turn your device sideways to play</div>
       </div>
@@ -58,12 +58,12 @@
       <div class="ch-v"></div>
     </div>
 
-    <div id="oob-warning" class="hidden" aria-live="assertive">⚠ OUT OF BOUNDS — TURN BACK</div>
+    <div id="oob-warning" class="hidden" aria-live="assertive">âš  OUT OF BOUNDS â€” TURN BACK</div>
 
     <div id="hud" class="hidden">
       <div class="hud-cluster hud-cluster--telemetry">
         <div class="hud-cluster-head">
-          <button id="ingame-menu-btn" class="hud-menu-btn" title="Menu" aria-label="Menu">☰</button>
+          <button id="ingame-menu-btn" class="hud-menu-btn" title="Menu" aria-label="Menu">â˜°</button>
           <button id="hud-room-chip" class="hidden" title="Show invite" aria-label="Show room invite"></button>
         </div>
         <div class="hud-row">
@@ -75,7 +75,7 @@
             <span class="hud-item-label">Boost</span>
             <span class="boost-bar"><span id="boost-fill"></span></span>
           </div>
-          <button id="mute-btn" class="icon-btn" title="Mute (M)">🔊</button>
+          <button id="mute-btn" class="icon-btn" title="Mute (M)">ðŸ”Š</button>
         </div>
         <div id="hud-team-score" class="hidden hud-team-score">
           <span id="hud-team-blue" class="hud-team hud-team--blue"><span class="hud-team-name">Blue</span> <span id="hud-tscore0">0</span></span>
@@ -89,18 +89,18 @@
 
     <div id="healthbar" class="hidden"><div id="healthfill"></div></div>
     <div id="killfeed"></div>
-    <div id="respawn" class="hidden"><div class="ks-burst">💥</div><div class="ks-title">SMASHED</div><div class="ks-by" id="respawn-by"></div><div class="ks-count" id="respawn-count"></div></div>
+    <div id="respawn" class="hidden"><div class="ks-burst">ðŸ’¥</div><div class="ks-title">SMASHED</div><div class="ks-by" id="respawn-by"></div><div class="ks-count" id="respawn-count"></div></div>
 
     <div id="touch-controls" class="hidden">
       <!-- D-Pad layout (scheme=dpad) -->
       <div class="touch-left" id="dpad-left">
         <div class="touch-stack horizontal">
-          <button class="tbtn arrow" id="left-btn" aria-label="Turn left">◀</button>
-          <button class="tbtn arrow" id="right-btn" aria-label="Turn right">▶</button>
+          <button class="tbtn arrow" id="left-btn" aria-label="Turn left">â—€</button>
+          <button class="tbtn arrow" id="right-btn" aria-label="Turn right">â–¶</button>
         </div>
         <div class="touch-stack vertical">
-          <button class="tbtn climb" id="climb-btn" aria-label="Climb">▲</button>
-          <button class="tbtn dive" id="dive-btn" aria-label="Dive">▼</button>
+          <button class="tbtn climb" id="climb-btn" aria-label="Climb">â–²</button>
+          <button class="tbtn dive" id="dive-btn" aria-label="Dive">â–¼</button>
         </div>
       </div>
       <!-- Joystick layout (scheme=joystick) -->
@@ -109,9 +109,9 @@
           <div id="joystick-thumb"></div>
         </div>
       </div>
-      <!-- Tilt layout (scheme=tilt) — just a calibrate button on left -->
+      <!-- Tilt layout (scheme=tilt) â€” just a calibrate button on left -->
       <div class="touch-left tilt-left hidden" id="tilt-left">
-        <button class="tbtn tilt-cal" id="tilt-cal-btn" aria-label="Recalibrate tilt">⊕<span>CAL</span></button>
+        <button class="tbtn tilt-cal" id="tilt-cal-btn" aria-label="Recalibrate tilt">âŠ•<span>CAL</span></button>
       </div>
       <!-- Right side: BOOST + FIRE (shared across all schemes) -->
       <div class="touch-right">
@@ -120,39 +120,8 @@
       </div>
     </div>
 
-    <div id="share-bar" class="hidden">
-      <div class="share-copy">
-        <span class="share-label">Room code</span>
-        <div class="share-link-wrap">
-          <span class="share-link-label">Share this with friends</span>
-          <div id="share-qr-code-bar" class="share-qr-code" aria-label="Room code"></div>
-          <input id="share-link" readonly class="hidden" />
-        </div>
-        <div class="share-actions">
-          <button id="qr-btn" class="secondary">Show QR</button>
-          <button id="copy-btn">Copy code</button>
-        </div>
-      </div>
-    </div>
-
-    <div id="share-qr-overlay" class="overlay hidden">
-      <div class="share-qr-card">
-        <div class="panel-head">
-          <div>
-            <p class="eyebrow">Room invite</p>
-            <h2 id="share-qr-room">Room</h2>
-          </div>
-          <button id="share-qr-close" class="secondary">Close</button>
-        </div>
-        <div id="share-qr-code" class="share-qr-code" aria-label="Room code"></div>
-        <canvas id="share-qr-canvas" aria-label="Room invite QR code"></canvas>
-        <p class="muted share-qr-caption">Players scan this QR, or enter the code</p>
-        <p id="share-qr-note" class="muted">Scan to join this room.</p>
-        <input id="share-qr-link" readonly class="hidden" />
-        <button id="share-qr-copy">Copy code</button>
-      </div>
-    </div>
-
+    <!-- MENU HOST: menu.ts (screen router) mounts home/join/hangar/settings/lobby
+         and the pause overlay into this div. Kept empty on purpose. -->
     <div id="arcade-start-screen" class="overlay hidden"></div>
 
     <div id="intermission" class="overlay hidden">
@@ -180,261 +149,16 @@
       </div>
     </div>
 
-    <div id="pause-screen" class="overlay hidden">
-      <div class="ops-modal pause-modal">
-        <div class="ops-modal-head">
-          <div>
-            <p class="eyebrow">Flight Hold</p>
-            <h2>Paused</h2>
-            <p class="ops-modal-copy">Your plane keeps drifting forward. Resume when you're ready, or route back to the menu.</p>
-          </div>
-        </div>
-        <div class="pause-hints">
-          <span class="signal-chip subtle">Resume returns you to live flight instantly.</span>
-          <span class="signal-chip subtle">Private rooms keep invite tools available while paused.</span>
-        </div>
-        <div class="btn-row pause-actions">
-          <button id="resume-btn">Resume</button>
-          <button id="pause-invite-btn" class="secondary hidden">Invite</button>
-          <button id="pause-settings-btn" class="secondary">Settings</button>
-          <button id="pause-menu-btn" class="secondary">Main Menu</button>
-        </div>
-      </div>
-    </div>
-
-    <div id="conn-lost" class="overlay hidden">
-      <div class="ops-modal conn-modal">
-        <div class="ops-modal-head">
-          <div>
-            <p class="eyebrow">Signal Alert</p>
-            <h2>Connection Lost</h2>
-            <p id="conn-msg" class="ops-modal-copy muted">Reconnecting…</p>
-          </div>
-        </div>
-        <div class="btn-row conn-actions">
-          <button id="conn-retry" class="hidden">Reconnect</button>
-          <button id="conn-menu" class="secondary">Main Menu</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- LOBBY SCREEN: pre-game waiting room, shown after createPrivateRoom -->
-    <div id="lobby-screen" class="overlay hidden">
-      <div class="ops-modal lobby-modal">
-        <div class="ops-modal-head">
-          <div>
-            <p class="eyebrow">Squad Room</p>
-            <h2 id="lobby-title">Private Room</h2>
-            <p id="lobby-subtitle" class="ops-modal-copy">Invite a squad, tune the rules, then launch when everyone is ready.</p>
-          </div>
-          <button id="lobby-leave-btn" class="secondary">Leave</button>
-        </div>
-        <div class="lobby-meta-strip">
-          <span id="lobby-room-chip" class="signal-chip">Room code</span>
-          <span id="lobby-mode-chip" class="signal-chip subtle">Free-for-all</span>
-          <span id="lobby-plane-summary" class="signal-chip subtle">Selected plane</span>
-        </div>
-        <div id="lobby-settings" class="lobby-settings hidden">
-          <div class="lobby-settings-row">
-            <label for="lobby-room-name" class="lobby-settings-label">Room name</label>
-            <input id="lobby-room-name" type="text" class="lobby-settings-input" maxlength="20" placeholder="Optional name…" autocomplete="off" />
-          </div>
-          <div class="lobby-settings-row">
-            <label for="lobby-round-length" class="lobby-settings-label">Round length</label>
-            <select id="lobby-round-length" class="lobby-settings-select">
-              <option value="60">1 min</option>
-              <option value="120">2 min</option>
-              <option value="150" selected>2:30</option>
-              <option value="180">3 min</option>
-              <option value="240">4 min</option>
-              <option value="300">5 min</option>
-            </select>
-          </div>
-          <div class="lobby-settings-row">
-            <label for="lobby-bots-check" class="lobby-settings-label">Bots</label>
-            <label class="lobby-settings-checkbox-label">
-              <input id="lobby-bots-check" type="checkbox" class="lobby-settings-checkbox" />
-              Fill empty seats with bots
-            </label>
-          </div>
-          <div class="lobby-settings-row">
-            <label for="lobby-mode" class="lobby-settings-label">Mode</label>
-            <select id="lobby-mode" class="lobby-settings-select">
-              <option value="ffa" selected>Free-for-All</option>
-              <option value="tdm">Team Deathmatch</option>
-            </select>
-          </div>
-        </div>
-        <section class="panel-surface lobby-roster-panel">
-          <div class="panel-head">
-            <div>
-              <p class="deck-label">Roster</p>
-              <h3>Ready Check</h3>
-            </div>
-            <span class="panel-chip subtle">Live</span>
-          </div>
-          <div id="lobby-roster" class="lobby-roster">
-            <p class="muted">Waiting for players…</p>
-          </div>
-        </section>
-        <div class="btn-row lobby-actions">
-          <button id="lobby-ready-btn" class="secondary">Ready</button>
-          <button id="lobby-start-btn" class="hidden">Start Game</button>
-        </div>
-      </div>
-      <!-- share bar is reused here when in lobby; #share-bar is shown separately -->
-    </div>
-
-    <!-- SETTINGS SCREEN: modal overlay, reachable from menu and pause -->
-    <div id="settings-screen" class="overlay hidden" role="dialog" aria-labelledby="settings-title">
-      <div class="settings-card">
-        <div class="panel-head">
-          <h2 id="settings-title">Settings</h2>
-          <button id="settings-close-btn" class="secondary" aria-label="Close settings">✕</button>
-        </div>
-
-        <div class="settings-section">
-          <h3 class="settings-heading">Audio</h3>
-          <label class="settings-row">
-            <span class="settings-label">Master Volume</span>
-            <input type="range" id="set-vol-master" min="0" max="1" step="0.01" value="1" />
-          </label>
-          <label class="settings-row">
-            <span class="settings-label">SFX Volume</span>
-            <input type="range" id="set-vol-sfx" min="0" max="1" step="0.01" value="1" />
-          </label>
-          <label class="settings-row">
-            <span class="settings-label">Music Volume</span>
-            <input type="range" id="set-vol-music" min="0" max="1" step="0.01" value="0.5" />
-          </label>
-        </div>
-
-        <div class="settings-section">
-          <h3 class="settings-heading">Graphics</h3>
-          <div class="settings-row">
-            <span class="settings-label">Quality</span>
-            <div class="settings-quality" id="set-quality" role="radiogroup" aria-label="Quality">
-              <label class="quality-opt"><input type="radio" name="set-quality" value="low" /> Low</label>
-              <label class="quality-opt"><input type="radio" name="set-quality" value="med" /> Medium</label>
-              <label class="quality-opt"><input type="radio" name="set-quality" value="high" /> High</label>
-              <label class="quality-opt"><input type="radio" name="set-quality" value="auto" checked /> Auto</label>
-            </div>
-          </div>
-        </div>
-
-        <div class="settings-section">
-          <h3 class="settings-heading">Controls</h3>
-          <div class="settings-row touch-only" id="ctrl-scheme-row">
-            <span class="settings-label">Touch Controls</span>
-            <div class="scheme-picker" role="radiogroup" aria-label="Touch control scheme">
-              <label class="scheme-opt"><input type="radio" name="ctrl-scheme" value="dpad" checked /> D-Pad</label>
-              <label class="scheme-opt"><input type="radio" name="ctrl-scheme" value="joystick" /> Joystick</label>
-              <label class="scheme-opt"><input type="radio" name="ctrl-scheme" value="tilt" /> Tilt</label>
-            </div>
-          </div>
-          <p id="tilt-status-msg" class="muted hidden" style="font-size:12px;padding:4px 0;"></p>
-          <label class="settings-row">
-            <span class="settings-label">Invert Pitch</span>
-            <input type="checkbox" id="set-invert-pitch" class="settings-check" />
-          </label>
-          <label class="settings-row">
-            <span class="settings-label">Invert Steer</span>
-            <input type="checkbox" id="set-invert-steer" class="settings-check" />
-          </label>
-          <div class="settings-row">
-            <span class="settings-label">Bot Difficulty</span>
-            <div class="scheme-picker" role="radiogroup" aria-label="Bot difficulty">
-              <label class="scheme-opt"><input type="radio" name="difficulty" id="set-diff-easy" value="easy" /> Easy</label>
-              <label class="scheme-opt"><input type="radio" name="difficulty" id="set-diff-medium" value="medium" checked /> Medium</label>
-              <label class="scheme-opt"><input type="radio" name="difficulty" id="set-diff-high" value="high" /> Hard</label>
-            </div>
-          </div>
-        </div>
-
-        <div class="btn-row">
-          <button id="settings-close-btn2">CLOSE</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- SCAN OVERLAY: camera QR scanner -->
-    <div id="scan-overlay" class="overlay hidden" role="dialog" aria-labelledby="scan-title">
-      <div class="scan-card">
-        <div class="panel-head">
-          <h2 id="scan-title">Scan QR Code</h2>
-          <button id="scan-close-btn" class="secondary">Close</button>
-        </div>
-        <div class="scan-viewport">
-          <video id="scan-video" playsinline muted></video>
-          <canvas id="scan-canvas" aria-hidden="true"></canvas>
-          <div class="scan-reticle" aria-hidden="true"></div>
-        </div>
-        <p id="scan-status" class="muted scan-status">Starting camera…</p>
-      </div>
-    </div>
-
-    <!-- HOST-LEFT OVERLAY: shown when the P2P host disconnects or a guest is kicked -->
-    <div id="host-left-overlay" class="overlay hidden" role="alertdialog" aria-labelledby="host-left-msg">
-      <div class="fatal-card">
-        <h2>Match Ended</h2>
-        <p id="host-left-msg" class="muted">The host left — the match has ended.</p>
-        <button id="host-left-menu-btn">Main Menu</button>
-      </div>
-    </div>
-
-    <!-- P2P MIGRATING OVERLAY: shown while electing a new host during migration -->
-    <div id="p2p-migrating-overlay" class="overlay hidden" role="status" aria-live="polite">
-      <div class="migrating-card">
-        <div class="migrating-spinner" aria-hidden="true"></div>
-        <p class="migrating-label">Reconnecting to new host…</p>
-      </div>
-    </div>
   </div>
 
-  <script src="vendor/jsqr.min.js"></script>
-  <script src="vendor/colyseus.js"></script>
   <script src="js/sphere.js"></script>
   <script src="js/constants.js"></script>
   <script src="js/quality.js"></script>
   <script src="js/audio.js"></script>
   <script src="js/assets.js"></script>
   <script src="js/input.js"></script>
-  <script src="js/net.js"></script>
   <script src="js/qr.js"></script>
   <script type="module" src="js/render3d.js"></script>
   <script src="js/main.js"></script>
-  <script>
-    window.addEventListener("error", function (e) {
-      try {
-        fetch("/api/errors", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ message: e.message, filename: e.filename, lineno: e.lineno, colno: e.colno, stack: e.error && e.error.stack }),
-          keepalive: true,
-        });
-      } catch {}
-    });
-    window.addEventListener("unhandledrejection", function (e) {
-      try {
-        fetch("/api/errors", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ message: "Unhandled: " + ((e.reason && e.reason.message) || e.reason), stack: e.reason && e.reason.stack }),
-          keepalive: true,
-        });
-      } catch {}
-    });
-  </script>
 </body>
 </html>
-
-
-
-
-
-
-
-
-
-
-

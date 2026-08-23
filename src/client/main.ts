@@ -1,28 +1,29 @@
-// Orchestration: menu, HUD, connection, and render loop for the flat-world reboot.
+// Orchestration: boot flow, network wiring, HUD, and the render loop for the
+// flat-world local-only build. All menu screens (home / join / hangar /
+// settings / lobby / pause) live in menu.ts — this file reacts to menu events,
+// drives net-ws, and keeps the in-game systems running.
 import { WsTransport } from "./net-ws";
-import { ARCADE_MENU_HOST_ID, ARCADE_MENU_SCREEN_CLASS, arcadeScreenId, mountArcadeMenu } from "./arcadeMenu";
+import { registerServiceWorker, requestAppFullscreen, exitAppFullscreen, keepAwake, releaseAwake } from "./appshell";
 import {
-  ACCENT_OPTIONS,
-  AIRFRAME_OPTIONS,
-  DEFAULT_LOADOUT,
-  LEGACY_LOADOUT_KEYS,
-  LOADOUT_STORAGE_KEY,
-  LIVERY_OPTIONS,
-  PAINT_OPTIONS,
-  PRESET_SLOTS,
-  TRAIL_OPTIONS,
-  cloneLoadout,
-  createDefaultLoadoutStore,
-  getLoadoutDetailRows,
-  getLoadoutSummary,
-  loadoutFromLegacy,
-  parseLoadoutStore,
-  randomizeLoadout,
-  sameLoadout,
-  type CosmeticLoadout,
-  type CosmeticOption,
-  type LoadoutStore,
-} from "../shared/loadout";
+  mountScreens,
+  showScreen,
+  navBack,
+  resetToHome as menuResetToHome,
+  currentScreenId,
+  applyInitialHash,
+  setBusy,
+  setStatus,
+  renderLobby,
+  invalidateLobbyCache,
+  setLobbyQr,
+  showPause,
+  hidePause,
+  loadStoredControlPrefs,
+  getCosmetics,
+  getPilotName,
+  MENU_HOST_ID,
+  type MenuHandlers,
+} from "./menu";
 
 const dollar = (id: string) => document.getElementById(id)!;
 
@@ -31,19 +32,6 @@ const dollar = (id: string) => document.getElementById(id)!;
 export const net = new WsTransport();
 (window as any).Net = net;
 
-const menuRoot = mountArcadeMenu()!;
-const useArcadeMenu = menuRoot.id === ARCADE_MENU_HOST_ID;
-const menuDollar = (...ids: string[]) => {
-  for (const id of ids) {
-    const el = document.getElementById(id);
-    if (el) return el;
-  }
-  throw new Error(`Missing DOM element: ${ids.join(", ")}`);
-};
-const menuScreenSelector = useArcadeMenu ? `.${ARCADE_MENU_SCREEN_CLASS}` : ".menu-screen";
-const menuNavSelector = useArcadeMenu ? "[data-arcade-nav]" : "[data-nav]";
-const menuBackSelector = useArcadeMenu ? "[data-arcade-back]" : "[data-back]";
-const menuScreenElementId = (id: string) => useArcadeMenu ? arcadeScreenId(id) : `screen-${id}`;
 const G = window.GAME;
 const buzz = (ms: number): void => { try { if (navigator.vibrate) navigator.vibrate(ms); } catch {} };
 
@@ -61,35 +49,8 @@ const els = {
   health: dollar("healthbar"),
   healthfill: dollar("healthfill"),
   respawn: dollar("respawn"),
-  start: menuRoot,
-  name: menuDollar("arcade-name-input", "name-input") as HTMLInputElement,
-  orientationNote: menuDollar("arcade-orientation-note", "orientation-note"),
-  friendsNote: menuDollar("arcade-friends-note", "friends-note"),
-  status: menuDollar("arcade-status", "status"),
+  start: dollar(MENU_HOST_ID),
   mute: dollar("mute-btn") as HTMLButtonElement,
-  pause: dollar("pause-screen"),
-  resume: dollar("resume-btn") as HTMLButtonElement,
-  pauseMenu: dollar("pause-menu-btn") as HTMLButtonElement,
-  pauseSettings: dollar("pause-settings-btn") as HTMLButtonElement,
-  share: dollar("share-bar"),
-  shareLink: dollar("share-link") as HTMLInputElement,
-  shareCodeBar: dollar("share-qr-code-bar"),
-  qrBtn: dollar("qr-btn") as HTMLButtonElement,
-  copy: dollar("copy-btn") as HTMLButtonElement,
-  shareQrOverlay: dollar("share-qr-overlay"),
-  shareQrCanvas: dollar("share-qr-canvas") as HTMLCanvasElement,
-  shareQrRoom: dollar("share-qr-room"),
-  shareQrCode: dollar("share-qr-code"),
-  shareQrNote: dollar("share-qr-note"),
-  shareQrLink: dollar("share-qr-link") as HTMLInputElement,
-  shareQrCopy: dollar("share-qr-copy") as HTMLButtonElement,
-  shareQrClose: dollar("share-qr-close") as HTMLButtonElement,
-  scanOverlay: dollar("scan-overlay"),
-  scanVideo: dollar("scan-video") as HTMLVideoElement,
-  scanCanvas: dollar("scan-canvas") as HTMLCanvasElement,
-  scanStatus: dollar("scan-status"),
-  scanCloseBtn: dollar("scan-close-btn") as HTMLButtonElement,
-  scanOpenBtn: menuDollar("arcade-scan-open-btn", "scan-open-btn") as HTMLButtonElement,
   inter: dollar("intermission"),
   finalBoard: dollar("final-board"),
   interTime: dollar("inter-time"),
@@ -107,82 +68,32 @@ const els = {
   boost: dollar("boost-btn"),
   fire: dollar("fire-btn"),
   rotate: dollar("rotate-overlay"),
-  connLost: dollar("conn-lost"),
-  connMsg: dollar("conn-msg"),
-  connRetry: dollar("conn-retry") as HTMLButtonElement,
-  connMenu: dollar("conn-menu") as HTMLButtonElement,
-  localBots: menuDollar("arcade-local-bots-check", "arcade-local-bots-check") as HTMLInputElement,
   countdown: dollar("countdown"),
   interLeave: dollar("intermission-leave") as HTMLButtonElement,
-  hostLeftOverlay: dollar("host-left-overlay"),
-  hostLeftMenuBtn: dollar("host-left-menu-btn") as HTMLButtonElement,
-  p2pMigratingOverlay: dollar("p2p-migrating-overlay"),
-  bootOverlay: dollar("boot-overlay"),
-  fatalOverlay: dollar("fatal-overlay"),
-  fatalMsg: dollar("fatal-msg"),
-  lobbyScreen: dollar("lobby-screen"),
-  lobbyTitle: dollar("lobby-title"),
-  lobbySettings: dollar("lobby-settings"),
-  lobbyRoomName: dollar("lobby-room-name") as HTMLInputElement,
-  lobbyRoundLength: dollar("lobby-round-length") as HTMLSelectElement,
-  lobbyBotsCheck: dollar("lobby-bots-check") as HTMLInputElement,
-  lobbyMode: dollar("lobby-mode") as HTMLSelectElement,
+  ingameMenuBtn: dollar("ingame-menu-btn") as HTMLButtonElement,
+  toast: dollar("toast"),
   hudTeamScore: dollar("hud-team-score"),
   hudTeamBlue: dollar("hud-team-blue"),
   hudTeamRed: dollar("hud-team-red"),
   hudTScore0: dollar("hud-tscore0"),
   hudTScore1: dollar("hud-tscore1"),
-  lobbyRoster: dollar("lobby-roster"),
-  lobbyReadyBtn: dollar("lobby-ready-btn") as HTMLButtonElement,
-  lobbyStartBtn: dollar("lobby-start-btn") as HTMLButtonElement,
-  lobbyLeaveBtn: dollar("lobby-leave-btn") as HTMLButtonElement,
-  settingsScreen: dollar("settings-screen"),
-  settingsCloseBtn: dollar("settings-close-btn") as HTMLButtonElement,
-  settingsCloseBtn2: dollar("settings-close-btn2") as HTMLButtonElement,
-  menuSettingsBtn: menuDollar("arcade-menu-settings-btn", "menu-settings-btn") as HTMLButtonElement,
-  joinCodeInput: menuDollar("arcade-join-code-input", "join-code-input") as HTMLInputElement,
-  joinCodeSubmit: menuDollar("arcade-join-code-submit", "join-code-submit") as HTMLButtonElement,
-  menuLeaderboard: menuDollar("arcade-menu-leaderboard", "menu-leaderboard"),
-  lobbyRoomChip: dollar("lobby-room-chip"),
-  lobbyModeChip: dollar("lobby-mode-chip"),
-  lobbyPlaneSummary: dollar("lobby-plane-summary"),
-  customizeSummaryName: menuDollar("arcade-customize-summary-name", "customize-summary-name"),
-  customizeSummaryText: menuDollar("arcade-customize-summary-text", "customize-summary-text"),
-  customizeFeedback: menuDollar("arcade-customize-feedback", "customize-feedback"),
-  presetGrid: menuDollar("arcade-preset-grid", "preset-grid"),
-  customizeAirframe: menuDollar("arcade-customize-airframe", "customize-airframe"),
-  customizePaint: menuDollar("arcade-customize-paint", "customize-paint"),
-  customizeAccent: menuDollar("arcade-customize-accent", "customize-accent"),
-  customizeLivery: menuDollar("arcade-customize-livery", "customize-livery"),
-  customizeTrail: menuDollar("arcade-customize-trail", "customize-trail"),
-  customizeRandomize: menuDollar("arcade-customize-randomize", "customize-randomize") as HTMLButtonElement,
-  customizeReset: menuDollar("arcade-customize-reset", "customize-reset") as HTMLButtonElement,
-  customizeDone: menuDollar("arcade-customize-done", "customize-done") as HTMLButtonElement,
-  ingameMenuBtn: dollar("ingame-menu-btn") as HTMLButtonElement,
-  pauseInviteBtn: dollar("pause-invite-btn") as HTMLButtonElement,
-  hudRoomChip: dollar("hud-room-chip") as HTMLButtonElement,
-  localRoomName: menuDollar("arcade-local-room-name", "local-room-name") as HTMLInputElement,
-  localCreateBtn: menuDollar("arcade-local-create-btn", "local-create-btn") as HTMLButtonElement,
-  localScanBtn: menuDollar("arcade-local-scan-btn", "local-scan-btn") as HTMLButtonElement,
-  localRoomList: menuDollar("arcade-local-room-list", "local-room-list"),
-  toast: dollar("toast"),
-  respawnBy: dollar("respawn-by"),
-  respawnCount: dollar("respawn-count"),
+  bootOverlay: dollar("boot-overlay"),
+  fatalOverlay: dollar("fatal-overlay"),
+  fatalMsg: dollar("fatal-msg"),
 };
 
 type SceneMode = "preflight" | "customize" | "lobby" | "results" | "playing" | "paused";
 
-let mode: "menu" | "lobby" | "playing" | "paused" | "lost" | "error" = "menu";
+let mode: "menu" | "lobby" | "playing" | "paused" | "error" = "menu";
 let sceneMode: SceneMode = "preflight";
-let settingsOpen = false;
 let last = 0;
-let prevPhase = "playing";
+let prevPhase = "lobby";
 let prevHp = G.MAX_HP;
 let lastFireSnd = 0;
 let wasEmpd = false;
 let wasFrozen = false;
 
-// ── Smash-tracking state (replaces old streak/lastKill) ──────────────────
+// ── Smash-tracking state ─────────────────────────────────────────────────────
 const smashTrack = new Map<string, { streak: number; last: number; rapid: number }>();
 function getTrack(id: string): { streak: number; last: number; rapid: number } {
   let t = smashTrack.get(id);
@@ -190,88 +101,17 @@ function getTrack(id: string): { streak: number; last: number; rapid: number } {
   return t;
 }
 
-// Last killer name — used by the kill/death card
 let lastKiller = "";
-
-// Leader-change tracking
 let prevLeader = "";
 let engineStarted = false;
-let botsEnabled = true;
-let botDifficulty: "easy" | "medium" | "high" = "medium";
-let inviteRoom: string | null = null;
-let inviteServer: string | null = null;
-let activeShareUrl: string | null = null;
 let deathTime: number = -1;
-let wasAlive: boolean = true;
-let oobShownUntil: number = 0;
-let boostLevel: number = 0;
+let wasAlive = true;
+let oobShownUntil = 0;
+let boostLevel = 0;
 let countdownActive = false;
-let currentLobbyCode: string | null = null;
-let currentLobbyServer: string | null = null;
-let currentRoomFriendlyName: string | null = null;
-let _settingsDebounce: ReturnType<typeof setTimeout> | null = null;
-let scannerOpen = false;
-let scanRafId: number | null = null;
-let _localScanInterval: ReturnType<typeof setInterval> | null = null;
-let presetFeedbackTimeout: ReturnType<typeof setTimeout> | null = null;
 
-const COLORS_HEX = PAINT_OPTIONS.map((option) => option.swatch || "#ffffff");
-
-function readLegacyLoadout(): CosmeticLoadout {
-  return loadoutFromLegacy({
-    skin: localStorage.getItem(LEGACY_LOADOUT_KEYS.skin),
-    color: localStorage.getItem(LEGACY_LOADOUT_KEYS.color),
-    bodyShape: localStorage.getItem(LEGACY_LOADOUT_KEYS.bodyShape),
-    accent: localStorage.getItem(LEGACY_LOADOUT_KEYS.accent),
-    trail: localStorage.getItem(LEGACY_LOADOUT_KEYS.trail),
-    livery: localStorage.getItem(LEGACY_LOADOUT_KEYS.livery),
-  });
-}
-
-function loadPersistedLoadoutStore(): LoadoutStore {
-  try {
-    const saved = parseLoadoutStore(localStorage.getItem(LOADOUT_STORAGE_KEY));
-    if (saved) return saved;
-  } catch {}
-  const store = createDefaultLoadoutStore();
-  try {
-    store.active = readLegacyLoadout();
-  } catch {
-    store.active = cloneLoadout(DEFAULT_LOADOUT);
-  }
-  return store;
-}
-
-let loadoutStore: LoadoutStore = loadPersistedLoadoutStore();
-let selectedCosmetics: CosmeticLoadout = cloneLoadout(loadoutStore.active);
-loadoutStore.active = selectedCosmetics;
-
-function persistLoadoutStore(): void {
-  try {
-    localStorage.setItem(LOADOUT_STORAGE_KEY, JSON.stringify(loadoutStore));
-    localStorage.setItem(LEGACY_LOADOUT_KEYS.color, String(selectedCosmetics.color));
-    localStorage.setItem(LEGACY_LOADOUT_KEYS.bodyShape, String(selectedCosmetics.bodyShape));
-    localStorage.setItem(LEGACY_LOADOUT_KEYS.accent, String(selectedCosmetics.accent));
-    localStorage.setItem(LEGACY_LOADOUT_KEYS.trail, String(selectedCosmetics.trail));
-    localStorage.setItem(LEGACY_LOADOUT_KEYS.livery, String(selectedCosmetics.livery));
-  } catch {}
-}
-
-try {
-  botsEnabled = localStorage.getItem("smashcart.bots") !== "0";
-} catch {}
-try {
-  const savedDiff = localStorage.getItem("smashcart.difficulty");
-  if (savedDiff === "easy" || savedDiff === "medium" || savedDiff === "high") {
-    botDifficulty = savedDiff;
-  }
-} catch {}
-
-// Persisted input inversion flags — loaded into Input after Input is available
-function loadInputPrefs(): void {
-  try { window.Input.invertPitch = localStorage.getItem("smashcart.invertPitch") === "1"; } catch {}
-  try { window.Input.invertSteer = localStorage.getItem("smashcart.invertSteer") === "1"; } catch {}
-}
+const ICON_SND_ON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H2v6h4l5 4z"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>';
+const ICON_SND_OFF = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H2v6h4l5 4z"/><path d="m23 9-6 6"/><path d="m17 9 6 6"/></svg>';
 
 function escapeHtml(s: string): string {
   return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c] as string));
@@ -290,252 +130,10 @@ function formatClock(totalSeconds: number): string {
   return `${minutes}:${String(seconds).padStart(2, "0")}`;
 }
 
-function genCode(): string {
-  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-  let out = "";
-  for (let i = 0; i < 6; i++) out += chars[Math.floor(Math.random() * chars.length)];
-  return out;
-}
-
-function readInviteFromUrl(): void {
-  const params = new URLSearchParams(location.search);
-
-  // P2P invite: ?p2p=P-XXXXXX
-  const p2pParam = params.get("p2p");
-  if (p2pParam) {
-    const p2pCode = p2pParam.trim().toUpperCase().slice(0, 8); // "P-" + 6 chars
-    if (p2pCode.startsWith("P-")) {
-      inviteRoom = p2pCode;
-    }
-  }
-}
-
-function hideShareQr(): void {
-  els.shareQrOverlay.classList.add("hidden");
-}
-
-// Room codes are always transported as "P-XXXXXX" internally (P2P host/join
-// protocol prefix). Everywhere a code is shown to a human, strip the prefix
-// so players only ever see/share the 6-char core, e.g. "ABCDEF".
-function roomCodeCore(code: string): string {
-  return code.startsWith("P-") ? code.slice(2) : code;
-}
-
-// Copies just the 6-char room code (not the full invite URL) — the code is
-// the primary invite surface now. The QR button still encodes the full URL
-// so a phone camera scan can auto-join.
-async function copyShareCode(): Promise<boolean> {
-  const value = els.shareQrCode.textContent || (currentLobbyCode ? roomCodeCore(currentLobbyCode) : "");
-  if (!value) return false;
-  try {
-    if (navigator.clipboard) await navigator.clipboard.writeText(value);
-    else {
-      els.shareQrLink.value = value;
-      els.shareQrLink.select();
-      document.execCommand("copy");
-      els.shareQrLink.value = activeShareUrl || "";
-    }
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-function clearShareInvite(): void {
-  activeShareUrl = null;
-  els.shareLink.value = "";
-  els.shareQrLink.value = "";
-  els.shareCodeBar.textContent = "";
-  els.shareQrRoom.textContent = "Room";
-  els.shareQrCode.textContent = "";
-  els.shareQrNote.textContent = "Scan to join this room.";
-  els.shareQrCanvas.width = 0;
-  els.shareQrCanvas.height = 0;
-  els.copy.disabled = true;
-  els.shareQrCopy.disabled = true;
-  els.qrBtn.disabled = true;
-  els.copy.textContent = "Copy code";
-  els.shareQrCopy.textContent = "Copy code";
-  hideShareQr();
-}
-
-function showShareQr(): void {
-  if (!activeShareUrl || els.qrBtn.disabled) return;
-  els.shareQrOverlay.classList.remove("hidden");
-}
-
-function hideRoomChip(): void {
-  els.hudRoomChip.classList.add("hidden");
-  els.hudRoomChip.textContent = "";
-}
-
-function updateRoomChip(): void {
-  if (!currentLobbyCode) { hideRoomChip(); return; }
-  const core = roomCodeCore(currentLobbyCode);
-  els.hudRoomChip.textContent = currentRoomFriendlyName ? `📶 ${currentRoomFriendlyName} · ${core}` : `📶 ${core}`;
-  els.hudRoomChip.classList.remove("hidden");
-}
-
-function updateLobbyMeta(): void {
-  const state = window.Net.state;
-  const modeLabel = state?.mode === "tdm" ? "Team Deathmatch" : "Free-for-all";
-  const roundLength = typeof state?.roundLength === "number" ? state.roundLength : 150;
-  const roomLabel = currentLobbyCode ? `Code ${roomCodeCore(currentLobbyCode)}` : "Private room";
-  els.lobbyRoomChip.textContent = roomLabel;
-  els.lobbyModeChip.textContent = `${modeLabel} · ${formatClock(roundLength)}`;
-}
-
-// ─── LOBBY ROSTER ────────────────────────────────────────────────────────────
-function renderLobbyRoster(): void {
-  const myId = window.Net.sessionId;
-  const hostId = window.Net.getHostId();
-  const roster = window.Net.getRosterSnapshot();
-  const iAmHost = myId === hostId;
-
-  // Update title: prefer roomName from state, fallback to code label
-  const stateName = window.Net.state?.roomName;
-  if (stateName) {
-    els.lobbyTitle.textContent = stateName;
-  } else if (currentLobbyCode) {
-    els.lobbyTitle.textContent = `Room ${roomCodeCore(currentLobbyCode)}`;
-  }
-  updateLobbyMeta();
-
-  // Show/hide and reflect settings panel (host only)
-  if (iAmHost) {
-    els.lobbySettings.classList.remove("hidden");
-    // Reflect server state into inputs only when they are not focused (avoid clobbering typing)
-    const serverRoomName = window.Net.state?.roomName ?? "";
-    const serverRoundLength = String(window.Net.state?.roundLength ?? 150);
-    if (document.activeElement !== els.lobbyRoomName) {
-      els.lobbyRoomName.value = serverRoomName;
-    }
-    if (document.activeElement !== els.lobbyRoundLength) {
-      els.lobbyRoundLength.value = serverRoundLength;
-    }
-    // Reflect botsInRoom from server state (checkbox doesn't need focus-guard — it's a click, not typing)
-    const serverBotsInRoom = window.Net.state?.botsInRoom ?? false;
-    els.lobbyBotsCheck.checked = serverBotsInRoom;
-    // Reflect mode from server state
-    const serverMode = window.Net.state?.mode ?? "ffa";
-    els.lobbyMode.value = serverMode;
-  } else {
-    els.lobbySettings.classList.add("hidden");
-  }
-
-  if (!roster.length) {
-    els.lobbyRoster.innerHTML = '<p class="muted">Waiting for players…</p>';
-    return;
-  }
-
-  els.lobbyRoster.innerHTML = roster.map((p) => {
-    const isMe = p.id === myId;
-    const isHost = p.id === hostId;
-    const isLocalHost = myId === hostId;
-
-    const hostBadge = isHost
-      ? '<span class="lobby-badge lobby-badge--host">HOST</span>'
-      : '';
-    const botBadge = p.bot
-      ? '<span class="lobby-badge lobby-badge--bot">BOT</span>'
-      : '';
-    const readyMark = !p.bot
-      ? `<span class="lobby-ready-mark ${p.ready ? 'is-ready' : ''}">${p.ready ? '✓' : '○'}</span>`
-      : '';
-    const kickBtn = (isLocalHost && !isMe && !p.bot)
-      ? `<button class="lobby-kick-btn secondary" data-target="${escapeHtml(p.id)}" title="Kick">✕</button>`
-      : '';
-    // Color dot — uses the player's cosmetic color index (p.color), falling back to 0
-    const colorHex = COLORS_HEX[typeof p.color === 'number' && p.color >= 0 && p.color < COLORS_HEX.length ? p.color : 0];
-    const colorDot = `<span class="lobby-color-dot" style="background:${colorHex}"></span>`;
-
-    return `<div class="lobby-row${isMe ? ' lobby-row--me' : ''}">
-  <span class="lobby-row-name">${colorDot}${hostBadge}${botBadge}${escapeHtml(p.name)}</span>
-  <span class="lobby-row-right">${readyMark}${kickBtn}</span>
-</div>`;
-  }).join('');
-
-  // Wire kick buttons (re-attached every render since innerHTML is replaced)
-  els.lobbyRoster.querySelectorAll<HTMLButtonElement>('.lobby-kick-btn').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      const targetId = btn.dataset.target;
-      if (targetId) { window.SFX.uiClick(); window.Net.sendHostKick(targetId); }
-    });
-  });
-
-  // Update ready button label from server state (not optimistic)
-  const me = roster.find((p) => p.id === myId);
-  if (me) {
-    els.lobbyReadyBtn.textContent = me.ready ? 'Unready' : 'Ready';
-    els.lobbyReadyBtn.classList.toggle('active', me.ready);
-  }
-
-  // Show/hide start button — host only
-  els.lobbyStartBtn.classList.toggle('hidden', !iAmHost);
-}
-
-// Transition from lobby to in-game (called when server phase flips to 'playing')
-function enterPlayingFromLobby(): void {
-  prevPhase = "playing";
-  prevHp = G.MAX_HP;
-  wasAlive = true;
-  deathTime = -1;
-  wasEmpd = false;
-  wasFrozen = false;
-  applyMode("playing");
-  els.respawn.classList.add("hidden");
-  els.inter.classList.add("hidden");
-  if (window.Input.isTouchDevice()) { els.touch.classList.remove("hidden"); applyControlSchemeUI(window.Input.controlScheme); }
-  if (!engineStarted) {
-    window.SFX.startEngine();
-    engineStarted = true;
-  }
-  if (window.SFX.stopMenuAmbient) window.SFX.stopMenuAmbient();
-  window.SFX.startMusic();
-  runCountdown(); // 3-2-1-GO! on a fresh lobby match start (prevPhase is pre-set, so the loop won't)
-}
-
-function setStatus(text = ""): void {
-  els.status.textContent = text;
-}
-
-function setBusy(busy: boolean): void {
-  [els.localCreateBtn, els.localScanBtn, els.joinCodeSubmit].forEach((button) => {
-    button.disabled = busy;
-  });
-}
-
-function updateMenuMeta(preserveStatus = true): void {
-  const portrait = !!(window.matchMedia && window.matchMedia("(orientation: portrait)").matches);
-  if (!window.Input.isTouchDevice()) {
-    els.orientationNote.textContent = "Keyboard flight: A/D steer, W/S climb, Shift boost, Space fire.";
-  } else if (portrait) {
-    els.orientationNote.textContent = "Portrait is fine for setup. Rotate to landscape before you launch.";
-  } else {
-    els.orientationNote.textContent = "Landscape ready. Touch controls appear after launch.";
-  }
-
-  if (inviteRoom) {
-    if (els.friendsNote) els.friendsNote.textContent = `Invite ready for room ${roomCodeCore(inviteRoom)}. Joining…`;
-    if (!preserveStatus || !els.status.textContent) setStatus(`Invite ready: room ${roomCodeCore(inviteRoom)}`);
-  } else {
-    if (els.friendsNote) els.friendsNote.textContent = "";
-    if (!preserveStatus) setStatus("");
-  }
-}
-
-// ─── MENU SCREEN ROUTER ──────────────────────────────────────────────────────
-// Operates ONLY over the active menu shell, whether arcade or legacy fallback.
-// Does NOT disturb mode/applyMode — those control top-level screen visibility.
-const MENU_SCREENS = ["home", "create", "join", "leaders", "customize"] as const;
-let navStack: string[] = ["home"];
-
-function currentMenuScreen(): string {
-  return navStack[navStack.length - 1] || "home";
-}
+// ─── SCENE MODE SYNC ─────────────────────────────────────────────────────────
 
 function deriveSceneMode(state: any = window.Net?.state): SceneMode {
-  if (mode === "menu") return currentMenuScreen() === "customize" ? "customize" : "preflight";
+  if (mode === "menu") return currentScreenId() === "hangar" ? "customize" : "preflight";
   if (mode === "lobby") return "lobby";
   if (mode === "paused") return "paused";
   if (mode === "playing") return state && state.phase === "intermission" ? "results" : "playing";
@@ -550,516 +148,228 @@ function syncSceneMode(state: any = window.Net?.state): void {
   if (window.Renderer && window.Renderer.setSceneMode) window.Renderer.setSceneMode(next);
 }
 
-function navShow(id: string): void {
-  document.body.dataset.menuScreen = id;
-  menuRoot.querySelectorAll<HTMLElement>(menuScreenSelector).forEach((screen) =>
-    screen.classList.toggle("active", screen.id === menuScreenElementId(id)));
-  menuRoot.scrollTop = 0;
-  const menuShell = menuRoot.firstElementChild;
-  if (menuShell instanceof HTMLElement) menuShell.scrollTop = 0;
-  if (id === "join") startLocalScanWithAutoRefresh();
-  else stopLocalScanInterval();
-  syncSceneMode(window.Net?.state);
-}
-function navGo(id: string): void {
-  if (navStack[navStack.length - 1] === id) return;
-  navStack.push(id);
-  navShow(id);
-}
-function navBack(): void {
-  if (navStack.length > 1) { navStack.pop(); navShow(navStack[navStack.length - 1]); }
-}
-function navReset(): void { navStack = ["home"]; navShow("home"); }
+// ─── TOP-LEVEL MODE SWITCH ───────────────────────────────────────────────────
+// applyMode() is the single source of truth for which top-level layers are
+// visible. Menu screens inside #arcade-start-screen are managed by menu.ts.
 
-// ─── STATE MACHINE ───────────────────────────────────────────────────────────
-// applyMode() is the single source of truth for which top-level screens are
-// visible. Sub-state overlays (settings, join-code, share-qr, intermission,
-// rotate) are managed by their own helpers and do NOT change `mode`.
 function applyMode(nextMode: typeof mode): void {
   mode = nextMode;
 
-  const isMenu    = mode === "menu";
-  const isLobby   = mode === "lobby";
-  const isPlaying = mode === "playing" || mode === "paused";
-  const isLost    = mode === "lost";
-  const isError   = mode === "error";
-
+  // The menu host carries the pause overlay too, so it stays visible while
+  // paused — only the router (menu screens) is hidden behind the overlay.
+  const inFlight = mode === "playing" || mode === "paused";
+  const showHost = mode !== "playing" && mode !== "error";
   els.bootOverlay.classList.add("hidden");
-  els.start.classList.toggle("hidden", !isMenu);
-  els.lobbyScreen.classList.toggle("hidden", !isLobby);
-  els.hud.classList.toggle("hidden", !isPlaying);
-  els.health.classList.toggle("hidden", !isPlaying);
-  els.pause.classList.toggle("hidden", mode !== "paused");
-  els.connLost.classList.toggle("hidden", !isLost);
-  els.fatalOverlay.classList.toggle("hidden", !isError);
+  els.start.classList.toggle("hidden", !showHost);
+  els.start.classList.toggle("sc-paused-host", mode === "paused");
+  document.body.classList.toggle("sc-menu-open", showHost);
+  els.hud.classList.toggle("hidden", !inFlight);
+  els.health.classList.toggle("hidden", !inFlight);
   els.crosshair.classList.toggle("hidden", mode !== "playing");
-  if (mode !== "playing") els.oobWarning.classList.add("hidden");
-  els.hostLeftOverlay.classList.add("hidden");
-  els.p2pMigratingOverlay.classList.add("hidden");
-  if (mode !== "lobby") els.share.classList.add("hidden");
-  if (!isMenu) stopLocalScanInterval();
-  if (mode === "playing") updateRoomChip();
-  else if (isMenu) hideRoomChip();
+  els.fatalOverlay.classList.toggle("hidden", mode !== "error");
+  if (mode !== "playing") {
+    els.oobWarning.classList.add("hidden");
+    els.respawn.classList.add("hidden");
+    els.powerChip.classList.add("hidden");
+  }
+  if (!inFlight) els.touch.classList.add("hidden");
   syncSceneMode(window.Net?.state);
 }
 
-function showHostLeftOverlay(): void {
-  els.hostLeftOverlay.classList.remove("hidden");
-}
-
-// ─── FATAL ERROR ─────────────────────────────────────────────────────────────
 function showFatal(msg: string): void {
   els.fatalMsg.textContent = msg;
   applyMode("error");
 }
 
-// ─── SETTINGS OVERLAY ────────────────────────────────────────────────────────
-// Settings is a sub-state: it doesn't change `mode`, it overlays on top.
+// ─── CONNECT FLOWS ───────────────────────────────────────────────────────────
+// Create and join are the same operation against a single-room server:
+// one WebSocket to whoever served this page. `serverOrigin` is only non-null
+// when joining via the join screen (smashcart.local hit or manual address).
 
-// Sync all settings controls to current live state so the UI matches reality.
-function populateSettingsUI(): void {
-  const vols = window.SFX.vols();
-  const volMasterEl = document.getElementById("set-vol-master") as HTMLInputElement | null;
-  const volSfxEl    = document.getElementById("set-vol-sfx")    as HTMLInputElement | null;
-  const volMusicEl  = document.getElementById("set-vol-music")  as HTMLInputElement | null;
-  if (volMasterEl) volMasterEl.value = String(vols.master);
-  if (volSfxEl)    volSfxEl.value    = String(vols.sfx);
-  if (volMusicEl)  volMusicEl.value  = String(vols.music);
-
-  // Quality — #set-quality may be a <select> or a group of <input type="radio">
-  const qualityTier = window.Quality._auto ? "auto" : window.Quality.current;
-  const qualitySelect = document.getElementById("set-quality") as HTMLSelectElement | null;
-  if (qualitySelect && qualitySelect.tagName === "SELECT") {
-    qualitySelect.value = qualityTier;
-  } else {
-    // Radio group
-    const radios = document.querySelectorAll<HTMLInputElement>('input[name="set-quality"]');
-    radios.forEach((r) => { r.checked = r.value === qualityTier; });
-  }
-
-  const invertPitchEl = document.getElementById("set-invert-pitch") as HTMLInputElement | null;
-  const invertSteerEl = document.getElementById("set-invert-steer") as HTMLInputElement | null;
-  if (invertPitchEl) invertPitchEl.checked = window.Input.invertPitch;
-  if (invertSteerEl) invertSteerEl.checked = window.Input.invertSteer;
-
-  // Reflect control scheme
-  const schemeRadios = document.querySelectorAll<HTMLInputElement>('input[name="ctrl-scheme"]');
-  schemeRadios.forEach((r) => { r.checked = r.value === window.Input.controlScheme; });
-
-  // Reflect bot difficulty — prefer live room value, fall back to local pref
-  const liveDiff = (window.Net?.state as any)?.botDifficulty;
-  const activeDiff: string = (liveDiff === "easy" || liveDiff === "medium" || liveDiff === "high")
-    ? liveDiff
-    : botDifficulty;
-  document.querySelectorAll<HTMLInputElement>('input[name="difficulty"]').forEach((r) => {
-    r.checked = r.value === activeDiff;
-  });
-}
-
-function showSettings(): void {
-  settingsOpen = true;
-  populateSettingsUI();
-  els.settingsScreen.classList.remove("hidden");
-}
-
-function hideSettings(): void {
-  settingsOpen = false;
-  els.settingsScreen.classList.add("hidden");
-}
-
-// ─── CAMERA QR SCANNER ────────────────────────────────────────────────────────
-function stopScanCamera(): void {
-  if (scanRafId !== null) { cancelAnimationFrame(scanRafId); scanRafId = null; }
-  const vid = els.scanVideo;
-  const s = vid.srcObject as MediaStream | null;
-  if (s) { s.getTracks().forEach((t) => t.stop()); vid.srcObject = null; }
-}
-
-// Normalize any join input (bare code, "P-XXXXXX", or invite URL with ?p2p=/?room=/?code=)
-// to the 6-char room-code core. All rooms are P2P: joining is always "P-"+core.
-// BUG HISTORY: earlier code sliced "P-ABCDEF" to "P-ABCD" and routed bare codes to the
-// removed VPS lobby — every manual/QR join landed in the wrong (empty) room.
-function normalizeRoomCode(raw: string): string | null {
-  let s = raw.trim();
-  if (!s) return null;
-  try {
-    const url = new URL(s);
-    s = url.searchParams.get("p2p") || url.searchParams.get("room") || url.searchParams.get("code") || "";
-  } catch { /* not a URL — fall through */ }
-  s = s.trim().toUpperCase();
-  if (s.startsWith("P-")) s = s.slice(2);
-  s = s.replace(/[^A-Z0-9]/g, "");
-  return s.length === 6 ? s : null;
-}
-
-function openScanner(): void {
-  scannerOpen = true;
-  els.scanOverlay.classList.remove("hidden");
-  els.scanStatus.textContent = "Starting camera…";
-
-  // Feature-detect: requires secure context + getUserMedia
-  if (!window.isSecureContext || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-    els.scanStatus.textContent =
-      "Camera needs a secure (HTTPS) connection. On a local Wi-Fi host this isn't available — " +
-      "type the code instead, or scan the host's QR with your phone's normal camera app.";
-    return;
-  }
-
-  navigator.mediaDevices
-    .getUserMedia({ video: { facingMode: "environment" }, audio: false })
-    .then((stream) => {
-      if (!scannerOpen) { stream.getTracks().forEach((t) => t.stop()); return; }
-      els.scanVideo.srcObject = stream;
-      els.scanStatus.textContent = "Point at a SmashCart QR code…";
-      els.scanVideo.play().catch(() => {});
-
-      function tick(): void {
-        if (!scannerOpen) return;
-        const vid = els.scanVideo;
-        if (vid.readyState < vid.HAVE_ENOUGH_DATA) {
-          scanRafId = requestAnimationFrame(tick);
-          return;
-        }
-        const w = vid.videoWidth;
-        const h = vid.videoHeight;
-        if (!w || !h) { scanRafId = requestAnimationFrame(tick); return; }
-        const cvs = els.scanCanvas;
-        cvs.width = w;
-        cvs.height = h;
-        const ctx = cvs.getContext("2d")!;
-        ctx.drawImage(vid, 0, 0, w, h);
-        const img = ctx.getImageData(0, 0, w, h);
-        const result = (typeof jsQR !== "undefined" ? jsQR : (window as any).jsQR)?.(img.data, w, h);
-        if (result && result.data) {
-          const core = normalizeRoomCode(result.data);
-          if (core) {
-            els.scanStatus.textContent = "QR detected — joining…";
-            stopScanCamera();
-            scannerOpen = false;
-            els.scanOverlay.classList.add("hidden");
-            els.joinCodeInput.value = core;
-            window.SFX.uiClick();
-            joinP2PAsGuest("P-" + core);
-            return;
-          }
-        }
-        scanRafId = requestAnimationFrame(tick);
-      }
-
-      scanRafId = requestAnimationFrame(tick);
-    })
-    .catch((err: DOMException) => {
-      let msg = "Camera error. Type the code instead.";
-      if (err.name === "NotAllowedError" || err.name === "PermissionDeniedError") {
-        msg = "Camera permission denied. Allow camera access in your browser settings, or type the code instead.";
-      } else if (err.name === "NotFoundError" || err.name === "DevicesNotFoundError") {
-        msg = "No camera found on this device. Type the code instead.";
-      } else if (err.name === "NotReadableError") {
-        msg = "Camera is in use by another app. Close it and try again, or type the code instead.";
-      }
-      els.scanStatus.textContent = msg;
-    });
-}
-
-function closeScanner(): void {
-  scannerOpen = false;
-  stopScanCamera();
-  els.scanOverlay.classList.add("hidden");
-}
-
-function fetchLeaderboard(): void {
-  fetch("/leaderboard?n=10")
-    .then((r) => (r.ok ? r.json() : []))
-    .then((rows) => {
-      if (!Array.isArray(rows) || !rows.length) {
-        els.leaderboard.innerHTML = '<div class="lb-row muted">No scores yet</div>';
-        els.menuLeaderboard.innerHTML = '<div class="lb-row muted">No scores yet</div>';
-        return;
-      }
-      const makeRow = (entry: any, i: number) =>
-        `<div class="lb-row"><span>${i + 1}. ${escapeHtml(entry.name)}</span><span>${entry.score | 0}</span></div>`;
-      els.leaderboard.innerHTML = rows.slice(0, 5).map(makeRow).join("");
-      els.menuLeaderboard.innerHTML = rows.slice(0, 10).map(makeRow).join("");
-    })
-    .catch(() => {
-      els.leaderboard.innerHTML = '<div class="lb-row muted">Leaderboard unavailable</div>';
-      els.menuLeaderboard.innerHTML = '<div class="lb-row muted">Leaderboard unavailable</div>';
-    });
-}
-
-// ─── LOADOUT UI ──────────────────────────────────────────────────────────────
-
-function setCustomizeFeedback(text: string, sticky = false): void {
-  els.customizeFeedback.textContent = text;
-  if (presetFeedbackTimeout !== null) {
-    clearTimeout(presetFeedbackTimeout);
-    presetFeedbackTimeout = null;
-  }
-  if (!sticky) {
-    presetFeedbackTimeout = setTimeout(() => {
-      presetFeedbackTimeout = null;
-      els.customizeFeedback.textContent = "Cosmetics are visual only. No effect on flight or damage.";
-    }, 2200);
-  }
-}
-
-function findActivePresetIndex(): number {
-  return loadoutStore.presets.findIndex((preset) => sameLoadout(preset, selectedCosmetics));
-}
-
-function updateSelectedLoadout(next: CosmeticLoadout, feedback?: string): void {
-  selectedCosmetics = cloneLoadout(next);
-  loadoutStore.active = selectedCosmetics;
-  persistLoadoutStore();
-  renderLoadoutUI();
-  if (window.Renderer && window.Renderer.updateMenuPlane) window.Renderer.updateMenuPlane(selectedCosmetics);
-  if (feedback) setCustomizeFeedback(feedback);
-}
-
-function updateLoadoutField<K extends keyof CosmeticLoadout>(key: K, value: CosmeticLoadout[K]): void {
-  const next = cloneLoadout(selectedCosmetics);
-  next[key] = value;
-  updateSelectedLoadout(next);
-}
-
-function renderPresetGrid(): void {
-  const activePreset = findActivePresetIndex();
-  els.presetGrid.innerHTML = PRESET_SLOTS.map((slot) => {
-    const preset = loadoutStore.presets[slot.index] || cloneLoadout(DEFAULT_LOADOUT);
-    const summary = getLoadoutSummary(preset);
-    const isActive = activePreset === slot.index;
-    const swatches = [
-      PAINT_OPTIONS[preset.color]?.swatch || "#ffffff",
-      ACCENT_OPTIONS[preset.accent]?.swatch || "#ffffff",
-      TRAIL_OPTIONS[preset.trail]?.swatch || "#ffffff",
-    ];
-    return `
-      <article class="preset-card${isActive ? " is-active" : ""}">
-        <div class="preset-card-head">
-          <div>
-            <p class="preset-label">${escapeHtml(slot.label)}</p>
-            <h4>${escapeHtml(summary.title)}</h4>
-          </div>
-          <span class="preset-state">${isActive ? "Armed" : "Stored"}</span>
-        </div>
-        <p class="preset-copy">${escapeHtml(summary.subtitle)}</p>
-        <div class="preset-swatch-row">${swatches.map((swatch) => `<span class="preset-swatch" style="--swatch:${swatch}"></span>`).join("")}</div>
-        <div class="preset-actions">
-          <button class="preset-apply-btn" data-slot="${slot.index}">APPLY</button>
-          <button class="preset-save-btn secondary" data-slot="${slot.index}">SAVE</button>
-        </div>
-      </article>`;
-  }).join("");
-
-  els.presetGrid.querySelectorAll<HTMLButtonElement>(".preset-apply-btn").forEach((button) => {
-    button.addEventListener("click", () => {
-      const slot = Number.parseInt(button.dataset.slot || "", 10);
-      if (!Number.isFinite(slot) || !loadoutStore.presets[slot]) return;
-      window.SFX.uiClick();
-      updateSelectedLoadout(loadoutStore.presets[slot], `${PRESET_SLOTS[slot].label} armed.`);
-    });
-  });
-
-  els.presetGrid.querySelectorAll<HTMLButtonElement>(".preset-save-btn").forEach((button) => {
-    button.addEventListener("click", () => {
-      const slot = Number.parseInt(button.dataset.slot || "", 10);
-      if (!Number.isFinite(slot) || !loadoutStore.presets[slot]) return;
-      loadoutStore.presets[slot] = cloneLoadout(selectedCosmetics);
-      persistLoadoutStore();
-      renderLoadoutUI();
-      window.SFX.uiClick();
-      setCustomizeFeedback(`${PRESET_SLOTS[slot].label} saved.`);
-    });
-  });
-}
-
-function renderOptionGroup<K extends keyof CosmeticLoadout>(
-  target: HTMLElement,
-  key: K,
-  options: CosmeticOption[],
-  variant: "cards" | "swatches",
-): void {
-  target.innerHTML = options.map((option) => {
-    const selected = selectedCosmetics[key] === option.value;
-    if (variant === "swatches") {
-      return `
-        <button class="option-btn option-btn--swatch${selected ? " is-selected" : ""}" data-key="${key}" data-value="${option.value}" style="--swatch:${option.swatch || "#ffffff"}">
-          <span class="option-swatch"></span>
-          <span class="option-copy">
-            <strong>${escapeHtml(option.label)}</strong>
-            <span>${escapeHtml(option.note)}</span>
-          </span>
-        </button>`;
-    }
-    return `
-      <button class="option-btn option-btn--card${selected ? " is-selected" : ""}" data-key="${key}" data-value="${option.value}">
-        <strong>${escapeHtml(option.label)}</strong>
-        <span>${escapeHtml(option.note)}</span>
-      </button>`;
-  }).join("");
-
-  target.querySelectorAll<HTMLButtonElement>(".option-btn").forEach((button) => {
-    button.addEventListener("click", () => {
-      const value = Number.parseInt(button.dataset.value || "", 10);
-      if (!Number.isFinite(value)) return;
-      window.SFX.uiClick();
-      updateLoadoutField(key, value as CosmeticLoadout[K]);
-    });
-  });
-}
-
-function renderLoadoutUI(): void {
-  const summary = getLoadoutSummary(selectedCosmetics);
-  const rows = getLoadoutDetailRows(selectedCosmetics);
-  els.lobbyPlaneSummary.textContent = `${summary.title} · ${rows.map((row) => row.value).join(" · ")}`;
-  els.customizeSummaryName.textContent = summary.title;
-  els.customizeSummaryText.textContent = summary.subtitle;
-  renderPresetGrid();
-  renderOptionGroup(els.customizeAirframe, "bodyShape", AIRFRAME_OPTIONS, "cards");
-  renderOptionGroup(els.customizePaint, "color", PAINT_OPTIONS, "swatches");
-  renderOptionGroup(els.customizeAccent, "accent", ACCENT_OPTIONS, "swatches");
-  renderOptionGroup(els.customizeLivery, "livery", LIVERY_OPTIONS, "cards");
-  renderOptionGroup(els.customizeTrail, "trail", TRAIL_OPTIONS, "swatches");
-}
-
-function buildP2PShareUrl(code: string): string {
-  const url = new URL(location.pathname, location.origin);
-  url.searchParams.set("p2p", code);
-  return url.toString();
-}
-
-// ─── LOCAL WI-FI ROOM NAME PREFILL ───────────────────────────────────────────
-const LOCAL_ROOM_ADJECTIVES = ["Ace", "Bolt", "Cobalt", "Dusk", "Echo", "Flare", "Ghost", "Hyper", "Iron", "Jade", "Keen", "Laser", "Mach", "Nova", "Orbit", "Pixel", "Quick", "Red", "Solar", "Turbo", "Ultra", "Venom", "Wild", "Xenon", "Zero"];
-const LOCAL_ROOM_NOUNS      = ["Arena", "Base", "Circuit", "Dome", "Engine", "Field", "Grid", "Haven", "Isle", "Junction", "Lair", "Mesa", "Nexus", "Orbit", "Peak", "Range", "Sector", "Tower", "Vault", "Wing", "Zone"];
-
-function randomLocalRoomName(): string {
-  const adj  = LOCAL_ROOM_ADJECTIVES[Math.floor(Math.random() * LOCAL_ROOM_ADJECTIVES.length)];
-  const noun = LOCAL_ROOM_NOUNS[Math.floor(Math.random() * LOCAL_ROOM_NOUNS.length)];
-  return `${adj} ${noun}`;
-}
-
-// ─── SINGLE CONNECT FLOW ─────────────────────────────────────────────────────
-// Local-only build: create and join are the same operation — one WebSocket to
-// the server that serves this page. Room codes are decorative labels kept for
-// the share/QR UI; the server hosts a single room.
-async function joinRoom(code: string, friendlyName?: string): Promise<void> {
+async function connectAndEnterLobby(serverOrigin: string | null): Promise<void> {
   window.SFX.unlock();
-  enterImmersive();
 
-  const name = (els.name.value || "Pilot").slice(0, 14);
+  let name = getPilotName().trim().slice(0, 14);
+  if (!name) name = "Pilot";
 
   net.onKill = onKill;
   net.onPickup = onPickup;
   net.onDisconnect = onDisconnect;
-  net.onStateChange = onLobbyStateChange;
+  net.onStateChange = onNetStateChange;
 
-  setStatus("Connecting…");
   setBusy(true);
+  setStatus(serverOrigin ? `Connecting to ${serverOrigin}…` : "Opening room…", serverOrigin ? "join" : "home");
 
   try {
-    await net.connect(name, code, selectedCosmetics, null);
+    await net.connect(name, "local", getCosmetics(), serverOrigin);
   } catch (e: any) {
-    setStatus("Could not connect: " + (e && e.message ? e.message : e));
     setBusy(false);
+    setStatus("Could not connect: " + (e && e.message ? e.message : e), serverOrigin ? "join" : "home");
     return;
   }
 
-  setStatus("");
   setBusy(false);
+  setStatus("", serverOrigin ? "join" : "home");
 
-  currentLobbyCode = code;
-  currentLobbyServer = null;
-  currentRoomFriendlyName = friendlyName || null;
-
-  // Share bar shows the invite label — code first, QR still encodes a join URL.
-  const p2pUrl = buildP2PShareUrl(code);
-  const core = roomCodeCore(code);
-  activeShareUrl = p2pUrl;
-  els.shareLink.value = p2pUrl;
-  els.shareQrLink.value = p2pUrl;
-  els.shareCodeBar.textContent = core;
-  els.shareQrRoom.textContent = friendlyName || `Room ${core}`;
-  els.shareQrCode.textContent = core;
-  els.shareQrNote.textContent = `Others can join from the same server.`;
-  els.copy.disabled = false;
-  els.shareQrCopy.disabled = false;
-  try {
-    window.QR.render(els.shareQrCanvas, p2pUrl, {
-      size: window.Input.isTouchDevice() ? 220 : 256,
-      errorCorrectionLevel: "M",
-    });
-    els.qrBtn.disabled = false;
-  } catch {
-    els.qrBtn.disabled = true;
-    els.shareQrCanvas.width = 0;
-  }
-  els.share.classList.remove("hidden");
-
-  els.lobbyTitle.textContent = friendlyName ? `${friendlyName} · ${core}` : `Room ${core}`;
-  renderLobbyRoster();
-  applyMode("lobby");
-
+  // The room may already be mid-match (late join). Land accordingly.
   const phase = net.getPhase();
   if (phase === "playing") {
-    net.onStateChange = null;
-    enterPlayingFromLobby();
+    enterPlayingFromNet();
+    return;
+  }
+  enterLobby();
+}
+
+function enterLobby(): void {
+  invalidateLobbyCache();
+  renderLobbyFromNet();
+  drawLobbyQr();
+  applyMode("lobby");
+  showScreen("lobby");
+}
+
+function drawLobbyQr(): void {
+  let url = location.origin + location.pathname;
+  try {
+    const u = new URL(location.href);
+    u.hash = "";
+    url = u.toString();
+  } catch {}
+  setLobbyQr(url);
+}
+
+function renderLobbyFromNet(): void {
+  const state = window.Net.state;
+  if (!state) return;
+  renderLobby({
+    roomName: state.roomName || "",
+    roundLength: typeof state.roundLength === "number" ? state.roundLength : 150,
+    botsInRoom: !!state.botsInRoom,
+    botDifficulty: state.botDifficulty || "medium",
+    leaderId: state.hostId || "",
+    myId: window.Net.sessionId,
+    roster: window.Net.getRosterSnapshot(),
+  });
+}
+
+// ─── LOBBY → PLAYING TRANSITION ──────────────────────────────────────────────
+
+function resetCombatTrackers(): void {
+  prevPhase = "playing";
+  prevHp = G.MAX_HP;
+  wasAlive = true;
+  deathTime = -1;
+  wasEmpd = false;
+  wasFrozen = false;
+  smashTrack.clear();
+  lastKiller = "";
+  prevLeader = "";
+  boostLevel = 0;
+  oobShownUntil = 0;
+}
+
+function enterImmersive(): void {
+  requestAppFullscreen();
+  keepAwake();
+}
+
+function exitImmersive(): void {
+  releaseAwake();
+  exitAppFullscreen();
+}
+
+function enterPlayingFromNet(): void {
+  resetCombatTrackers();
+  applyMode("playing");
+  enterImmersive();
+  if (window.Input.isTouchDevice()) {
+    els.touch.classList.remove("hidden");
+    applyControlSchemeUI(window.Input.controlScheme);
+  }
+  if (!engineStarted) {
+    window.SFX.startEngine();
+    engineStarted = true;
+  }
+  if (window.SFX.stopMenuAmbient) window.SFX.stopMenuAmbient();
+  window.SFX.startMusic();
+  runCountdown();
+}
+
+function togglePause(): void {
+  if (mode === "playing") {
+    applyMode("paused");
+    showPause();
+    window.Net.sendInput(0, 0, false, false);
+    window.SFX.setEngine(0, false);
+  } else if (mode === "paused") {
+    hidePause();
+    applyMode("playing");
   }
 }
 
-// ─── CREATE ROOM PATH ────────────────────────────────────────────────────────
-// Same connect as joining; afterwards push initial settings (the creator is
-// normally elected leader and the server applies leader-only settings).
-async function startLocalRoom(): Promise<void> {
-  const roomName = (els.localRoomName.value.trim() || els.localRoomName.placeholder || randomLocalRoomName()).slice(0, 20);
-  await joinRoom("P-" + genCode(), roomName); // ponytail: code is a display label; server has one room
-  if (net.sessionId) {
-    net.sendHostSettings({ roomName, botsInRoom: els.localBots.checked, botDifficulty });
-  }
+/** Leave Match (pause) or Leave (lobby) or intermission Main Menu. */
+function leaveMatch(reason?: string): void {
+  hidePause();
+  window.Net.onStateChange = null;
+  try { window.Net.leave(); } catch {}
+  resetToHome(reason);
 }
 
-// ─── ROOM LIST (removed) ─────────────────────────────────────────────────────
-// TODO-for-menu-agent: there is exactly one server room now; rework the join
-// screen around a single "Join" button instead of a Wi-Fi scan list.
-function stopLocalScanInterval(): void {
-  if (_localScanInterval !== null) {
-    clearInterval(_localScanInterval);
-    _localScanInterval = null;
-  }
+/** Full teardown back to HOME. Safe to call from any mode. */
+function resetToHome(statusMsg?: string): void {
+  hidePause();
+  exitImmersive();
+  if (window.SFX.stopLoops) window.SFX.stopLoops();
+  if (window.SFX.startMenuAmbient) window.SFX.startMenuAmbient();
+  engineStarted = false;
+
+  // Reset gameplay HUD state.
+  wasAlive = true;
+  deathTime = -1;
+  lastKiller = "";
+  prevLeader = "";
+  smashTrack.clear();
+  countdownActive = false;
+  boostLevel = 0;
+  oobShownUntil = 0;
+  els.countdown.classList.remove("pop", "go");
+  els.countdown.textContent = "";
+  els.time.classList.remove("low");
+  els.inter.classList.add("hidden");
+  els.respawn.classList.add("hidden");
+  els.powerChip.classList.add("hidden");
+  els.hudTeamScore.classList.add("hidden");
+
+  prevPhase = "lobby";
+  applyMode("menu");
+  menuResetToHome();
+  if (statusMsg) setStatus(statusMsg, "home");
+  updateRotateOverlay();
 }
 
-function runLocalScan(): void {
-  els.localRoomList.innerHTML =
-    '<article class="local-state-card"><p class="deck-label">Single server</p><h4>One room hosts everyone</h4><p class="muted">Use Create Room to connect — no scanning needed.</p></article>';
+function onDisconnect(info?: any): void {
+  if (mode === "error" || mode === "menu") return;
+  const kicked = !!(info && (info.type === "kicked" || info.reason === "kicked"));
+  const msg = kicked
+    ? "You were kicked by the room leader."
+    : "Disconnected from the room.";
+  leaveMatch(msg);
+  pushToast(msg, "leader");
 }
 
-function startLocalScanWithAutoRefresh(): void {
-  runLocalScan();
-  stopLocalScanInterval();
-}
+// ─── NET STATE STREAM ────────────────────────────────────────────────────────
 
-// ─── JOIN PATH ───────────────────────────────────────────────────────────────
-// Kept as a named entry point for the join-code / QR deep-link flows; the code
-// param is a display label only (single server room).
-async function joinP2PAsGuest(code: string, friendlyName?: string): Promise<void> {
-  await joinRoom(code, friendlyName);
-}
-
-// Called every time the Colyseus state changes while in the lobby
-function onLobbyStateChange(): void {
+function onNetStateChange(): void {
+  if (mode !== "lobby") return;
+  renderLobbyFromNet();
   const phase = window.Net.getPhase();
-
-  if (mode === "lobby") {
-    renderLobbyRoster();
-    if (phase === "playing") {
-      // Server flipped to playing — everyone enters the game
-      window.Net.onStateChange = null;
-      enterPlayingFromLobby();
-    }
-  } else if (mode === "playing" || mode === "paused") {
-    // Already playing — normal state changes are handled by the render loop
-    // (updateHud). Nothing extra needed here.
+  if (phase === "playing") {
+    // Leader pressed PLAY (or auto-start fired) — everyone enters the match.
+    enterPlayingFromNet();
   }
 }
+
+// ─── RENDER LOOP ─────────────────────────────────────────────────────────────
 
 function loop(ts: number): void {
   requestAnimationFrame(loop);
@@ -1092,10 +402,10 @@ function loop(ts: number): void {
       }
     }
   } else if (mode === "lobby" && state) {
-    // Draw the 3D scene behind the lobby card; no input sent in lobby
+    // Draw the live arena behind the lobby card; no input is sent.
     window.Renderer.draw(state, window.Net.sessionId);
   } else if (mode === "menu") {
-    window.Renderer.drawMenu(dt, selectedCosmetics);
+    window.Renderer.drawMenu(dt, getCosmetics());
   } else if (state) {
     window.Renderer.draw(state, window.Net.sessionId);
   }
@@ -1120,7 +430,7 @@ function updateHud(state: any, myId: string): void {
   boostLevel = Math.max(0, Math.min(1, boostLevel));
   els.boostFill.style.width = (boostLevel * 100).toFixed(1) + "%";
 
-  // OOB warning: show when within MAP_EDGE_SOFT of MAP_HALF boundary on x or z
+  // OOB warning: near map edge on x or z
   const posX = local && local.active ? local.p.x : me ? me.px : 0;
   const posZ = local && local.active ? local.p.z : me ? me.pz : 0;
   const isOob = Math.abs(posX) > (G.MAP_HALF - G.MAP_EDGE_SOFT) ||
@@ -1129,7 +439,7 @@ function updateHud(state: any, myId: string): void {
   if (isOob && me && me.alive) {
     if (nowSec >= oobShownUntil) {
       els.oobWarning.classList.remove("hidden");
-      oobShownUntil = nowSec + 2.0; // throttle: don't re-show for 2s after it hides
+      oobShownUntil = nowSec + 2.0;
     }
   } else {
     els.oobWarning.classList.add("hidden");
@@ -1145,15 +455,16 @@ function updateHud(state: any, myId: string): void {
 
     // Respawn countdown (kill/death card)
     if (!me.alive) {
-      // Detect alive->dead transition
       if (wasAlive) {
         deathTime = performance.now() / 1000;
         wasAlive = false;
       }
       const elapsed = performance.now() / 1000 - deathTime;
       const remaining = Math.max(0, Math.ceil(G.RESPAWN_DELAY - elapsed));
-      els.respawnBy.textContent = lastKiller ? ("by " + lastKiller) : "";
-      els.respawnCount.textContent = remaining > 0 ? ("Respawning in " + remaining + "…") : "Respawning…";
+      const respawnBy = document.getElementById("respawn-by");
+      const respawnCount = document.getElementById("respawn-count");
+      if (respawnBy) respawnBy.textContent = lastKiller ? ("by " + lastKiller) : "";
+      if (respawnCount) respawnCount.textContent = remaining > 0 ? ("Respawning in " + remaining + "…") : "Respawning…";
       els.respawn.classList.remove("hidden");
     } else {
       wasAlive = true;
@@ -1168,7 +479,7 @@ function updateHud(state: any, myId: string): void {
     els.vignette.classList.toggle("low", me.alive && me.hp > 0 && me.hp < 30);
     prevHp = me.hp;
 
-    // Power chip — hide for 'repair' (instantaneous, no timer bar meaningful)
+    // Power chip — hidden for 'repair' (instantaneous)
     if (me.power && me.power !== "repair") {
       const info = G.POWERUPS[me.power] || { label: me.power, icon: "★", color: 0xffffff };
       const left = typeof me.powerLeft === "number" ? me.powerLeft : G.POWERUP_DURATION;
@@ -1180,17 +491,12 @@ function updateHud(state: any, myId: string): void {
       els.powerChip.classList.add("hidden");
     }
 
-    // EMP / Freeze local status callouts — rising-edge only (fire once when the
-    // affliction starts, not every frame while it's active).
+    // EMP / Freeze callouts — rising-edge only
     const empLeft = (me as any).empLeft || 0;
     const frozenLeft = (me as any).frozenLeft || 0;
-    if (empLeft > 0 && !wasEmpd) {
-      showCallout("🌀 EMP'D — guns offline");
-    }
+    if (empLeft > 0 && !wasEmpd) showCallout("EMP'D — guns offline");
     wasEmpd = empLeft > 0;
-    if (frozenLeft > 0 && !wasFrozen) {
-      showCallout("❄️ FROZEN");
-    }
+    if (frozenLeft > 0 && !wasFrozen) showCallout("FROZEN");
     wasFrozen = frozenLeft > 0;
   }
 
@@ -1203,7 +509,6 @@ function updateHud(state: any, myId: string): void {
     const ts1 = state.teamScore1 ?? 0;
     els.hudTScore0.textContent = String(ts0);
     els.hudTScore1.textContent = String(ts1);
-    // Highlight the local player's team chip
     const myTeam = me ? (me.team ?? -1) : -1;
     els.hudTeamBlue.classList.toggle("is-my-team", myTeam === 0);
     els.hudTeamRed.classList.toggle("is-my-team", myTeam === 1);
@@ -1221,10 +526,10 @@ function updateHud(state: any, myId: string): void {
       const teamDot = isTdm && p.team >= 0
         ? `<span class="lb-team-dot" style="background:${p.team === 0 ? "#4aa3ff" : "#ff5a5a"}"></span>`
         : "";
-      return `<div class="lb-row ${p.id === myId ? "me" : ""}"><span>${teamDot}${i + 1}. ${escapeHtml(p.name)}${p.bot ? " 🤖" : ""}</span><span>${p.score}</span></div>`;
+      return `<div class="lb-row ${p.id === myId ? "me" : ""}"><span>${teamDot}${i + 1}. ${escapeHtml(p.name)}${p.bot ? " BOT" : ""}</span><span>${p.score}</span></div>`;
     }).join("");
 
-  // Leader-change toast (game-wide)
+  // Leader-change toast
   if (list.length >= 2 && list.filter(p => p.score > 0).length >= 2) {
     const leaderId = list[0].id;
     if (prevLeader !== "" && prevLeader !== leaderId) {
@@ -1238,8 +543,6 @@ function updateHud(state: any, myId: string): void {
     if (state.phase === "intermission") {
       window.SFX.explosion();
     } else if (state.phase === "playing") {
-      // Transitioning INTO playing — fire the 3-2-1-GO! countdown
-      // (SFX.go() is called inside runCountdown on "GO!" step)
       runCountdown();
     } else {
       window.SFX.go();
@@ -1257,21 +560,21 @@ function updateHud(state: any, myId: string): void {
       const winTeam = ts0 > ts1 ? 0 : ts1 > ts0 ? 1 : -1;
       const winTeamName = winTeam === 0 ? "Blue" : winTeam === 1 ? "Red" : null;
       if (winTeam < 0) {
-        els.winnerLine.textContent = "🏆 Draw!";
+        els.winnerLine.textContent = "Draw!";
       } else if (myTeam === winTeam) {
-        els.winnerLine.textContent = `🏆 ${winTeamName} team wins! (You're on it!)`;
+        els.winnerLine.textContent = `${winTeamName} team wins! (You're on it!)`;
       } else {
-        els.winnerLine.textContent = `🏆 ${winTeamName} team wins!`;
+        els.winnerLine.textContent = `${winTeamName} team wins!`;
       }
     } else {
       const winner = list[0];
-      els.winnerLine.textContent = winner ? (winner.id === myId ? "🏆 You win!" : `🏆 ${winner.name} wins!`) : "";
+      els.winnerLine.textContent = winner ? (winner.id === myId ? "You win!" : `${winner.name} wins!`) : "";
     }
     els.finalBoard.innerHTML = list.slice(0, 6).map((p, i) => {
       const teamDot = isTdm && p.team >= 0
         ? `<span class="lb-team-dot" style="background:${p.team === 0 ? "#4aa3ff" : "#ff5a5a"}"></span>`
         : "";
-      return `<li class="${p.id === myId ? "me" : ""}${i === 0 ? " win" : ""}"><span>${teamDot}${i + 1}. ${escapeHtml(p.name)}${p.bot ? " 🤖" : ""}</span><span>${p.score}</span></li>`;
+      return `<li class="${p.id === myId ? "me" : ""}${i === 0 ? " win" : ""}"><span>${teamDot}${i + 1}. ${escapeHtml(p.name)}${p.bot ? " BOT" : ""}</span><span>${p.score}</span></li>`;
     }).join("");
     const myRank = list.findIndex((p) => p.id === myId);
     els.yourPlace.textContent = myRank >= 0 ? `You placed ${ordinal(myRank + 1)} of ${list.length}` : "";
@@ -1280,9 +583,9 @@ function updateHud(state: any, myId: string): void {
   }
 }
 
-// ── Toast / announcement system ─────────────────────────────────────────────
+// ── Toasts / callouts / countdown ────────────────────────────────────────────
+
 function pushToast(text: string, kind: "streak" | "multi" | "leader"): void {
-  // Cap at 3 visible toasts — remove oldest
   while (els.toast.children.length >= 3) {
     els.toast.firstChild?.remove();
   }
@@ -1290,10 +593,8 @@ function pushToast(text: string, kind: "streak" | "multi" | "leader"): void {
   item.className = `toast-item toast--${kind}`;
   item.textContent = text;
   els.toast.appendChild(item);
-  // Force reflow then add .show for CSS transition
   void item.offsetWidth;
   item.classList.add("show");
-  // Auto-remove after 2600ms
   setTimeout(() => {
     item.classList.remove("show");
     setTimeout(() => item.remove(), 200);
@@ -1337,12 +638,13 @@ function runCountdown(): void {
   showStep();
 }
 
+// ─── COMBAT EVENTS ───────────────────────────────────────────────────────────
+
 function onKill(msg: any): void {
   const myId = window.Net.sessionId;
   const mine = msg.killer === myId;
   const victimIsMe = msg.victim === myId;
 
-  // ── Kill feed row ─────────────────────────────────────────────────────────
   const row = document.createElement("div");
   row.className = "kill-msg" + (mine ? " mine" : "");
   row.innerHTML = `${escapeHtml(mine ? "You" : msg.killerName)} <span class="kf-verb">smashed</span> <span class="vic">${escapeHtml(victimIsMe ? "You" : msg.victimName)}</span>`;
@@ -1350,11 +652,9 @@ function onKill(msg: any): void {
   setTimeout(() => row.remove(), 3600);
   while (els.killfeed.children.length > 5) els.killfeed.firstChild?.remove();
 
-  // ── Local kill juice ─────────────────────────────────────────────────────
   window.Renderer.killPopup(msg.killer, mine);
   if (victimIsMe) {
     window.SFX.explosion();
-    // Record who killed us for the death card
     lastKiller = (msg.killer && msg.killer !== msg.victim && msg.killerName) ? msg.killerName : "";
   }
   if (mine) {
@@ -1362,8 +662,6 @@ function onKill(msg: any): void {
     window.Renderer.hitStop(80);
   }
 
-  // ── Game-wide smash tracking ──────────────────────────────────────────────
-  // Victim's streak resets
   const tv = getTrack(msg.victim);
   tv.streak = 0;
   tv.rapid = 0;
@@ -1375,19 +673,16 @@ function onKill(msg: any): void {
     t.last = now;
     t.streak += 1;
 
-    // Determine announcement: MULTI has priority over STREAK
     let toastText = "";
     let toastKind: "multi" | "streak" = "multi";
 
     if (t.rapid >= 2) {
-      // Multi-kill tier
       const multiLabel = t.rapid >= 4 ? "MULTI MEGA SMASH"
         : t.rapid === 3 ? "MULTI SMASH"
         : "DOUBLE SMASH";
       toastText = mine ? `${multiLabel}!` : `${msg.killerName} — ${multiLabel}`;
       toastKind = "multi";
     } else {
-      // Streak tier — only announce at these thresholds
       const streakTiers: Array<[number, string]> = [
         [3, "SMASH STREAK"],
         [5, "SMASHTACULAR STREAK"],
@@ -1398,8 +693,7 @@ function onKill(msg: any): void {
       ];
       const tier = streakTiers.find(([n]) => t.streak === n);
       if (tier) {
-        const streakLabel = tier[1];
-        toastText = mine ? `${streakLabel}!` : `${msg.killerName} — ${streakLabel}`;
+        toastText = mine ? `${tier[1]}!` : `${msg.killerName} — ${tier[1]}`;
         toastKind = "streak";
       }
     }
@@ -1412,10 +706,6 @@ function onPickup(msg: any): void {
   if (!window.Net) return;
   const isSelf = msg.by === window.Net.sessionId;
 
-  // Star is a rare, game-changing pickup — announce it to everyone (SmashKarts-style),
-  // not just the player who grabbed it. Both transports (Colyseus room broadcast and
-  // the P2P _broadcastEvent path) fan the "pickup" event out to all clients, so a
-  // single event-driven toast here covers both netcode paths uniformly.
   if (msg.type === "star") {
     if (isSelf) {
       pushToast("YOU HAVE THE STAR!", "multi");
@@ -1430,6 +720,8 @@ function onPickup(msg: any): void {
   const info = G.POWERUPS[msg.type];
   showCallout((info ? `${info.icon} ${info.label}` : "POWERUP") + "!");
 }
+
+// ─── TOUCH CONTROLS ──────────────────────────────────────────────────────────
 
 function setupTouchButtons(): void {
   const bind = (el: HTMLElement, key: keyof typeof window.Input.touch) => {
@@ -1459,14 +751,12 @@ function setupTouchButtons(): void {
   bind(els.boost, "boost");
   bind(els.fire, "fire");
 
-  // Joystick setup
-  const joystickBase  = document.getElementById("joystick-base")!;
+  const joystickBase = document.getElementById("joystick-base")!;
   const joystickThumb = document.getElementById("joystick-thumb")!;
   if (joystickBase && joystickThumb) {
     window.Input.attachJoystick(joystickBase, joystickThumb);
   }
 
-  // Tilt calibrate button
   const tiltCalBtn = document.getElementById("tilt-cal-btn");
   if (tiltCalBtn) {
     tiltCalBtn.addEventListener("pointerdown", (e) => {
@@ -1480,637 +770,113 @@ function setupTouchButtons(): void {
 }
 
 function applyControlSchemeUI(scheme: ControlScheme): void {
-  const dpadLeft    = document.getElementById("dpad-left");
-  const joystickLeft= document.getElementById("joystick-left");
-  const tiltLeft    = document.getElementById("tilt-left");
-  if (dpadLeft)     dpadLeft.classList.toggle("hidden", scheme !== "dpad");
+  const dpadLeft = document.getElementById("dpad-left");
+  const joystickLeft = document.getElementById("joystick-left");
+  const tiltLeft = document.getElementById("tilt-left");
+  if (dpadLeft) dpadLeft.classList.toggle("hidden", scheme !== "dpad");
   if (joystickLeft) joystickLeft.classList.toggle("hidden", scheme !== "joystick");
-  if (tiltLeft)     tiltLeft.classList.toggle("hidden", scheme !== "tilt");
-}
-
-function togglePause(): void {
-  if (mode === "playing") {
-    applyMode("paused");
-    window.Net.sendInput(0, 0, false, false);
-    window.SFX.setEngine(0, false);
-    // §E: show pause-invite-btn only when there is an active invite URL
-    if (activeShareUrl || els.shareLink.value) {
-      els.pauseInviteBtn.classList.remove("hidden");
-    } else {
-      els.pauseInviteBtn.classList.add("hidden");
-    }
-  } else if (mode === "paused") {
-    applyMode("playing");
-  }
+  if (tiltLeft) tiltLeft.classList.toggle("hidden", scheme !== "tilt");
 }
 
 function toggleMute(): void {
   const muted = window.SFX.toggleMute();
-  els.mute.textContent = muted ? "🔇" : "🔊";
+  els.mute.innerHTML = muted ? ICON_SND_OFF : ICON_SND_ON;
 }
 
-function resetToMenu(): void {
-  window.Net.onStateChange = null;
-  currentLobbyCode = null;
-  currentLobbyServer = null;
-  currentRoomFriendlyName = null;
-  hideRoomChip();
-  els.p2pMigratingOverlay.classList.add("hidden");
-  try { window.Net.leave(); } catch {}
-
-  if (window.SFX.stopLoops) window.SFX.stopLoops();
-  if (window.SFX.startMenuAmbient) window.SFX.startMenuAmbient();
-  engineStarted = false;
-  // Release orientation lock on return to menu (best-effort)
-  try {
-    const so = (screen as any).orientation;
-    if (so && so.unlock) so.unlock();
-  } catch {}
-  // Reset respawn / countdown tracking
-  wasAlive = true;
-  deathTime = -1;
-  lastKiller = "";
-  prevLeader = "";
-  smashTrack.clear();
-  countdownActive = false;
-  boostLevel = 0;
-  oobShownUntil = 0;
-  els.countdown.classList.remove("pop", "go");
-  els.countdown.textContent = "";
-  els.time.classList.remove("low");
-  applyMode("menu");
-  els.touch.classList.add("hidden");
-  els.share.classList.add("hidden");
-  els.inter.classList.add("hidden");
-  els.respawn.classList.add("hidden");
-  els.powerChip.classList.add("hidden");
-  els.lobbyTitle.textContent = "Private Room";
-  els.lobbyRoster.innerHTML = '<p class="muted">Waiting for players…</p>';
-  els.lobbySettings.classList.add("hidden");
-  els.lobbyRoomName.value = "";
-  els.lobbyRoundLength.value = "150";
-  els.lobbyBotsCheck.checked = false;
-  els.lobbyMode.value = "ffa";
-  els.hudTeamScore.classList.add("hidden");
-  hideSettings();
-  navReset();
-  closeScanner();
-  stopLocalScanInterval();
-  hideShareQr();
-  clearShareInvite();
-  setBusy(false);
-  fetchLeaderboard();
-  setStatus("");
-  updateMenuMeta(false);
-  updateRotateOverlay();
-}
-
-function onDisconnect(info?: any): void {
-  if (mode === "menu" || mode === "lost") return;
-  if (info && info.type === "kicked") {
-    // Kicked by the leader — host-left overlay, no reconnect attempt.
-    els.p2pMigratingOverlay.classList.add("hidden");
-    if (window.SFX.suspend) window.SFX.suspend();
-    showHostLeftOverlay();
-    return;
-  }
-  if (window.SFX.suspend) window.SFX.suspend();
-  els.connMsg.textContent = "Reconnecting…";
-  els.connRetry.classList.add("hidden");
-  applyMode("lost");
-  window.Net.tryReconnect().then((ok) => {
-    if (mode !== "lost") return;
-    if (ok) {
-      if (window.SFX.resume) window.SFX.resume();
-      // Land in the correct mode based on current server phase
-      const phase = window.Net.getPhase();
-      if (phase === "lobby") {
-        // Re-wire the state-change callback and return to lobby
-        window.Net.onStateChange = onLobbyStateChange;
-        renderLobbyRoster();
-        applyMode("lobby");
-      } else {
-        applyMode("playing");
-      }
-    } else {
-      els.connMsg.textContent = "Couldn't reconnect.";
-      els.connRetry.classList.remove("hidden");
-    }
-  });
-}
-
-function enterImmersive(): void {
-  if (!window.Input.isTouchDevice()) { updateRotateOverlay(); return; }
-  // Best-effort fullscreen
-  const root = document.documentElement as any;
-  const request = root.requestFullscreen || root.webkitRequestFullscreen || root.msRequestFullscreen;
-  if (request) {
-    try {
-      const res = request.call(root);
-      if (res && res.catch) res.catch(() => {});
-    } catch {}
-  }
-  // Best-effort landscape lock — iOS Safari lacks this; must fail silently
-  try {
-    const so = (screen as any).orientation;
-    if (so && so.lock) {
-      so.lock("landscape").catch(() => {});
-    }
-  } catch {}
-  updateRotateOverlay();
-}
+// ─── ROTATE OVERLAY ──────────────────────────────────────────────────────────
 
 function updateRotateOverlay(): void {
   const portrait = window.matchMedia && window.matchMedia("(orientation: portrait)").matches;
-  // Block portrait on ALL screens on touch devices — including the menu.
-  // This ensures a phone loading in portrait shows the overlay immediately.
-  const show = window.Input.isTouchDevice() && portrait;
+  const show = window.Input.isTouchDevice() && portrait && (mode === "menu" || mode === "lobby" || mode === "playing" || mode === "paused");
   els.rotate.classList.toggle("show", !!show);
-  updateMenuMeta(true);
 }
 
+// ─── BOOT ────────────────────────────────────────────────────────────────────
+
+const handlers: MenuHandlers = {
+  onCreate: () => { void connectAndEnterLobby(null); },
+  onJoinHost: (host) => { void connectAndEnterLobby(host); },
+  onLobbyStart: () => { window.Net.sendHostStart(); },
+  onLobbyReady: () => { window.Net.sendReady(); },
+  onLobbyKick: (targetId) => { window.Net.sendHostKick(targetId); },
+  onLobbySettings: (patch) => { window.Net.sendHostSettings(patch); },
+  onLobbyLeave: () => { leaveMatch(); },
+  onPauseResume: () => { togglePause(); },
+  onPauseLeave: () => { leaveMatch("Left the match."); },
+};
+
 function init(): void {
-  readInviteFromUrl();
+  void registerServiceWorker();
 
   window.Renderer.init(els.canvas);
   window.Input.attach();
-  loadInputPrefs();
+  loadStoredControlPrefs();
   window.Assets.load();
+
+  mountScreens(els.start, handlers);
+  applyInitialHash();
+
   window.Net.onKill = onKill;
   window.Net.onPickup = onPickup;
   window.Net.onDisconnect = onDisconnect;
+  window.Net.onStateChange = onNetStateChange;
 
-  els.localBots.checked = botsEnabled;
-  els.localBots.addEventListener("change", () => {
-    botsEnabled = els.localBots.checked;
-    try { localStorage.setItem("smashcart.bots", botsEnabled ? "1" : "0"); } catch {}
-    window.SFX.uiClick();
-  });
-
-  renderLoadoutUI();
-  persistLoadoutStore();
-  fetchLeaderboard();
   setupTouchButtons();
+  applyControlSchemeUI(window.Input.controlScheme);
   updateRotateOverlay();
-  updateMenuMeta(false);
-  clearShareInvite();
 
   if (window.SFX.startMenuAmbient) window.SFX.startMenuAmbient();
   if (window.Input.isTouchDevice()) document.body.classList.add("touch-device");
 
-  // ─── LOCAL WI-FI PREFILL ─────────────────────────────────────────────────
-  // Seed the room-name input with a fun random default on every load
-  els.localRoomName.placeholder = randomLocalRoomName();
-  els.localRoomName.value = "";
-
-  // ─── MENU NAV ROUTER WIRING ───────────────────────────────────────────────
-  // Wire nav buttons only inside the active menu shell.
-  menuRoot.querySelectorAll<HTMLElement>(menuNavSelector).forEach((el) => {
-    el.addEventListener("click", () => {
-      const target = useArcadeMenu ? el.dataset.arcadeNav : el.dataset.nav;
-      if (!target) return;
-      window.SFX.uiClick();
-      navGo(target);
-    });
-  });
-  menuRoot.querySelectorAll<HTMLElement>(menuBackSelector).forEach((el) => {
-    el.addEventListener("click", () => {
-      window.SFX.uiClick();
-      navBack();
-    });
-  });
-
-  // ─── HANGAR TAB WIRING ────────────────────────────────────────────────────
-  // Bottom-sheet tabs on the customize screen: exactly one option row visible.
-  menuRoot.querySelectorAll<HTMLElement>("[data-hangar-tab]").forEach((tabEl) => {
-    tabEl.addEventListener("click", () => {
-      const target = tabEl.dataset.hangarTab;
-      if (!target) return;
-      window.SFX.uiClick();
-      menuRoot.querySelectorAll<HTMLElement>("[data-hangar-tab]").forEach((t) => {
-        const active = t === tabEl;
-        t.classList.toggle("is-active", active);
-        t.setAttribute("aria-selected", active ? "true" : "false");
-      });
-      menuRoot.querySelectorAll<HTMLElement>("[data-hangar-panel]").forEach((panel) => {
-        panel.classList.toggle("is-active", panel.dataset.hangarPanel === target);
-      });
-    });
-  });
-
-  // Allow direct QA/deep-link entry to a menu screen via location hash (#customize, #lan, etc.)
-  const initialHashScreen = location.hash.replace(/^#/, "").toLowerCase();
-  if (MENU_SCREENS.includes(initialHashScreen as (typeof MENU_SCREENS)[number]) && initialHashScreen !== "home") {
-    // Seed home under the deep-linked screen so Back/Done still work.
-    navStack = ["home", initialHashScreen];
-    navShow(initialHashScreen);
-  } else {
-    navReset();
-  }
-
-  // ─── IN-GAME MENU BUTTON (§E) ─────────────────────────────────────────────
+  els.mute.addEventListener("click", () => toggleMute());
+  els.mute.innerHTML = window.SFX.isMuted() ? ICON_SND_OFF : ICON_SND_ON;
   els.ingameMenuBtn.addEventListener("click", () => {
     window.SFX.uiClick();
     togglePause();
   });
-
-  // ─── PAUSE INVITE BUTTON (§E) ─────────────────────────────────────────────
-  els.pauseInviteBtn.addEventListener("click", () => {
-    window.SFX.uiClick();
-    showShareQr();
-  });
-
-  // ─── IN-GAME ROOM CHIP (P2P/local room name, tap to show invite) ──────────
-  els.hudRoomChip.addEventListener("click", () => {
-    window.SFX.uiClick();
-    showShareQr();
-  });
-
-  // Host-left overlay — main menu button
-  els.hostLeftMenuBtn.addEventListener("click", () => {
-    window.SFX.uiClick();
-    resetToMenu();
-  });
-
-  // ─── LOCAL WI-FI PARTY WIRING ─────────────────────────────────────────────
-  els.localCreateBtn.addEventListener("click", () => {
-    window.SFX.uiClick();
-    startLocalRoom();
-  });
-  els.localRoomName.addEventListener("keydown", (e: KeyboardEvent) => {
-    if (e.key === "Enter") { e.preventDefault(); window.SFX.uiClick(); startLocalRoom(); }
-  });
-  els.localScanBtn.addEventListener("click", () => {
-    window.SFX.uiClick();
-    startLocalScanWithAutoRefresh();
-  });
-
-  // Load persisted call sign
-  try {
-    const savedName = localStorage.getItem("smashcart.name");
-    if (savedName) els.name.value = savedName;
-  } catch {}
-  // Persist call sign on change and blur
-  els.name.addEventListener("change", () => {
-    try { localStorage.setItem("smashcart.name", els.name.value); } catch {}
-  });
-  els.name.addEventListener("blur", () => {
-    try { localStorage.setItem("smashcart.name", els.name.value); } catch {}
-  });
-  els.name.addEventListener("keydown", (e: KeyboardEvent) => {
-    if (e.key === "Enter") {
-      e.preventDefault();
-      try { localStorage.setItem("smashcart.name", els.name.value); } catch {}
-      navGo("create");
-    }
-  });
-  els.qrBtn.addEventListener("click", () => {
-    window.SFX.uiClick();
-    showShareQr();
-  });
-  els.copy.addEventListener("click", async () => {
-    const copied = await copyShareCode();
-    if (copied) {
-      els.copy.textContent = "Copied!";
-      setTimeout(() => (els.copy.textContent = "Copy code"), 1200);
-    }
-  });
-  els.shareQrCopy.addEventListener("click", async () => {
-    const copied = await copyShareCode();
-    if (copied) {
-      els.shareQrCopy.textContent = "Copied!";
-      setTimeout(() => (els.shareQrCopy.textContent = "Copy code"), 1200);
-    }
-  });
-  els.shareQrClose.addEventListener("click", () => hideShareQr());
-  els.shareQrOverlay.addEventListener("click", (e: MouseEvent) => {
-    if (e.target === els.shareQrOverlay) hideShareQr();
-  });
-  els.mute.addEventListener("click", () => toggleMute());
-  els.resume.addEventListener("click", () => togglePause());
-  els.pauseMenu.addEventListener("click", () => resetToMenu());
-  els.connMenu.addEventListener("click", () => resetToMenu());
-  els.connRetry.addEventListener("click", () => {
-    els.connMsg.textContent = "Reconnecting…";
-    els.connRetry.classList.add("hidden");
-    window.Net.tryReconnect().then((ok) => {
-      if (ok) {
-        if (window.SFX.resume) window.SFX.resume();
-        const phase = window.Net.getPhase();
-        if (phase === "lobby") {
-          window.Net.onStateChange = onLobbyStateChange;
-          renderLobbyRoster();
-          applyMode("lobby");
-        } else {
-          applyMode("playing");
-        }
-      } else {
-        els.connMsg.textContent = "Still down.";
-        els.connRetry.classList.remove("hidden");
-      }
-    });
-  });
-
-  window.Input.onPause = () => { if (mode !== "menu") togglePause(); };
-  window.Input.onMute = () => toggleMute();
-
-  // Settings overlay — menu button
-  els.menuSettingsBtn.addEventListener("click", () => {
-    window.SFX.uiClick();
-    showSettings();
-  });
-  // Settings overlay — pause button
-  els.pauseSettings.addEventListener("click", () => {
-    window.SFX.uiClick();
-    showSettings();
-  });
-  // Settings overlay — close buttons
-  els.settingsCloseBtn.addEventListener("click", () => {
-    window.SFX.uiClick();
-    hideSettings();
-  });
-  els.settingsCloseBtn2.addEventListener("click", () => {
-    window.SFX.uiClick();
-    hideSettings();
-  });
-  // Click-outside to close settings
-  els.settingsScreen.addEventListener("click", (e: MouseEvent) => {
-    if (e.target === els.settingsScreen) hideSettings();
-  });
-
-  // ─── LOADOUT QUICK ACTIONS ────────────────────────────────────────────────
-  els.customizeRandomize.addEventListener("click", () => {
-    window.SFX.uiClick();
-    updateSelectedLoadout(randomizeLoadout(), "Random loadout armed.");
-  });
-  els.customizeReset.addEventListener("click", () => {
-    window.SFX.uiClick();
-    updateSelectedLoadout(DEFAULT_LOADOUT, "Loadout reset to deck default.");
-  });
-
-  // ─── SETTINGS CONTROLS ───────────────────────────────────────────────────
-  // Volume sliders
-  const volMasterEl = document.getElementById("set-vol-master") as HTMLInputElement | null;
-  const volSfxEl    = document.getElementById("set-vol-sfx")    as HTMLInputElement | null;
-  const volMusicEl  = document.getElementById("set-vol-music")  as HTMLInputElement | null;
-  if (volMasterEl) {
-    volMasterEl.addEventListener("input", () => { window.SFX.setMaster(parseFloat(volMasterEl.value)); });
-  }
-  if (volSfxEl) {
-    volSfxEl.addEventListener("input", () => { window.SFX.setSfx(parseFloat(volSfxEl.value)); });
-  }
-  if (volMusicEl) {
-    volMusicEl.addEventListener("input", () => { window.SFX.setMusic(parseFloat(volMusicEl.value)); });
-  }
-
-  // Quality control — supports both <select> and radio group
-  function applyQualityChoice(value: string): void {
-    if (value === "auto") {
-      // Re-enable adaptive sampling: reset the auto flag and let sample() drive it
-      window.Quality._auto = true;
-      try { localStorage.removeItem("smashcart.quality"); } catch {}
-    } else {
-      window.Quality.set(value, true); // persists to localStorage as sc_quality
-    }
-  }
-  const qualitySelect = document.getElementById("set-quality") as HTMLSelectElement | null;
-  if (qualitySelect && qualitySelect.tagName === "SELECT") {
-    qualitySelect.addEventListener("change", () => { window.SFX.uiClick(); applyQualityChoice(qualitySelect.value); });
-  } else {
-    // Radio group
-    document.querySelectorAll<HTMLInputElement>('input[name="set-quality"]').forEach((r) => {
-      r.addEventListener("change", () => { if (r.checked) { window.SFX.uiClick(); applyQualityChoice(r.value); } });
-    });
-  }
-
-  // Invert pitch / steer checkboxes
-  const invertPitchEl = document.getElementById("set-invert-pitch") as HTMLInputElement | null;
-  const invertSteerEl = document.getElementById("set-invert-steer") as HTMLInputElement | null;
-  if (invertPitchEl) {
-    invertPitchEl.addEventListener("change", () => {
-      window.Input.invertPitch = invertPitchEl.checked;
-      try { localStorage.setItem("smashcart.invertPitch", invertPitchEl.checked ? "1" : "0"); } catch {}
-    });
-  }
-  if (invertSteerEl) {
-    invertSteerEl.addEventListener("change", () => {
-      window.Input.invertSteer = invertSteerEl.checked;
-      try { localStorage.setItem("smashcart.invertSteer", invertSteerEl.checked ? "1" : "0"); } catch {}
-    });
-  }
-
-  // ─── BOT DIFFICULTY PICKER ────────────────────────────────────────────────
-  // Reflect persisted value into radios on boot
-  document.querySelectorAll<HTMLInputElement>('input[name="difficulty"]').forEach((r) => {
-    r.checked = r.value === botDifficulty;
-  });
-  // Wire change: persist + notify server (guarded — server ignores it for non-hosts)
-  document.querySelectorAll<HTMLInputElement>('input[name="difficulty"]').forEach((r) => {
-    r.addEventListener("change", () => {
-      if (!r.checked) return;
-      const val = r.value as "easy" | "medium" | "high";
-      botDifficulty = val;
-      try { localStorage.setItem("smashcart.difficulty", val); } catch {}
-      window.Net?.sendHostSettings?.({ botDifficulty: val });
-    });
-  });
-
-  // ─── CONTROL SCHEME PICKER ────────────────────────────────────────────────
-  // Load persisted scheme
-  try {
-    const saved = localStorage.getItem("smashcart.controls") as ControlScheme | null;
-    if (saved === "joystick" || saved === "tilt" || saved === "dpad") {
-      window.Input.controlScheme = saved;
-    }
-  } catch {}
-
-  // Wire radio buttons
-  const schemeRadios = document.querySelectorAll<HTMLInputElement>('input[name="ctrl-scheme"]');
-  schemeRadios.forEach((r) => {
-    r.addEventListener("change", () => {
-      if (!r.checked) return;
-      const scheme = r.value as ControlScheme;
-      window.SFX.uiClick();
-      if (scheme === "tilt") {
-        // attachTilt handles iOS permission and potential fallback
-        window.Input.attachTilt();
-        // Only switch scheme optimistically if non-iOS; iOS waits for permission cb
-        const DevOri = DeviceOrientationEvent as any;
-        if (typeof DevOri.requestPermission !== "function") {
-          window.Input.setControlScheme("tilt");
-          applyControlSchemeUI("tilt");
-        }
-        // (iOS: setControlScheme called after permission granted via onSchemeChange cb)
-      } else {
-        window.Input.setControlScheme(scheme);
-        applyControlSchemeUI(scheme);
-      }
-    });
-  });
-
-  // Handle scheme-change notifications from Input (tilt permission fallbacks, etc.)
-  window.Input.onSchemeChange = (scheme: ControlScheme, msg?: string) => {
-    applyControlSchemeUI(scheme);
-    // Reflect in settings UI
-    schemeRadios.forEach((r) => { r.checked = r.value === scheme; });
-    // Show status message if provided
-    const tiltMsg = document.getElementById("tilt-status-msg");
-    if (tiltMsg) {
-      if (msg) {
-        tiltMsg.textContent = msg;
-        tiltMsg.classList.remove("hidden");
-        setTimeout(() => tiltMsg.classList.add("hidden"), 4000);
-      } else {
-        tiltMsg.classList.add("hidden");
-      }
-    }
-  };
-
-  // Apply initial scheme UI
-  applyControlSchemeUI(window.Input.controlScheme);
-
-  // Join screen — scan and submit (moved from #join-code-modal to #screen-join)
-  // #join-code-open-btn and #join-code-cancel no longer exist; their listeners are removed.
-  els.scanOpenBtn.addEventListener("click", () => {
-    window.SFX.uiClick();
-    openScanner();
-  });
-  els.scanCloseBtn.addEventListener("click", () => {
-    window.SFX.uiClick();
-    closeScanner();
-  });
-  els.scanOverlay.addEventListener("click", (e: MouseEvent) => {
-    if (e.target === els.scanOverlay) closeScanner();
-  });
-  // Force uppercase ONLY for short bare codes; leave longer input alone (could be a pasted URL)
-  els.joinCodeInput.addEventListener("input", () => {
-    const cur = els.joinCodeInput.value;
-    // Only auto-uppercase if it looks like a bare code (no URL-like characters)
-    if (cur.length <= 6 && !/[:/.]/.test(cur)) {
-      const upper = cur.toUpperCase().replace(/[^A-Z0-9]/g, "");
-      if (cur !== upper) {
-        const sel = els.joinCodeInput.selectionStart ?? upper.length;
-        els.joinCodeInput.value = upper;
-        els.joinCodeInput.setSelectionRange(sel, sel);
-      }
-    }
-  });
-  function submitJoinCode(): void {
-    const core = normalizeRoomCode(els.joinCodeInput.value);
-    if (!core) {
-      setStatus("Enter the 6-character room code.");
-      return;
-    }
-    window.SFX.uiClick();
-    joinP2PAsGuest("P-" + core);
-  }
-  els.joinCodeSubmit.addEventListener("click", submitJoinCode);
-  els.joinCodeInput.addEventListener("keydown", (e: KeyboardEvent) => {
-    if (e.key === "Enter") {
-      e.preventDefault();
-      submitJoinCode();
-    }
-  });
-
-  // Intermission leave button
   els.interLeave.addEventListener("click", () => {
     window.SFX.uiClick();
-    resetToMenu();
+    leaveMatch();
   });
 
-  // Lobby buttons (Slice 6)
-  els.lobbyLeaveBtn.addEventListener("click", () => {
-    window.SFX.uiClick();
-    window.Net.onStateChange = null;
-    resetToMenu();
-  });
-  els.lobbyReadyBtn.addEventListener("click", () => {
-    window.SFX.uiClick();
-    // Drive from server state via onLobbyStateChange, not optimistically
-    window.Net.sendReady();
-  });
-  els.lobbyStartBtn.addEventListener("click", () => {
-    window.SFX.uiClick();
-    window.Net.sendHostStart();
-  });
-
-  // Host settings: room name input (debounced ~400ms)
-  els.lobbyRoomName.addEventListener("input", () => {
-    if (_settingsDebounce !== null) clearTimeout(_settingsDebounce);
-    _settingsDebounce = setTimeout(() => {
-      _settingsDebounce = null;
-      window.Net.sendHostSettings({ roomName: els.lobbyRoomName.value });
-    }, 400);
-  });
-
-  // Host settings: round length select (immediate on change)
-  els.lobbyRoundLength.addEventListener("change", () => {
-    const v = parseInt(els.lobbyRoundLength.value, 10);
-    if (Number.isFinite(v)) window.Net.sendHostSettings({ roundLength: v });
-  });
-
-  // Host settings: bots toggle (immediate on change) — also sends difficulty so room starts at chosen tier
-  els.lobbyBotsCheck.addEventListener("change", () => {
-    window.Net.sendHostSettings({ botsInRoom: els.lobbyBotsCheck.checked, botDifficulty });
-  });
-
-  // Host settings: mode select (immediate on change)
-  els.lobbyMode.addEventListener("change", () => {
-    window.Net.sendHostSettings({ mode: els.lobbyMode.value });
-  });
+  window.Input.onPause = () => { if (mode === "playing" || mode === "paused") togglePause(); };
+  window.Input.onMute = () => toggleMute();
 
   document.addEventListener("visibilitychange", () => {
     if (document.hidden) {
       if (window.Net.state) window.Net.sendInput(0, 0, false, false);
       if (window.SFX.suspend) window.SFX.suspend();
-      closeScanner();
-      hideShareQr();
     } else if (mode === "playing" && window.SFX.resume) {
       window.SFX.resume();
     }
   });
   window.addEventListener("orientationchange", updateRotateOverlay);
   window.addEventListener("resize", updateRotateOverlay);
-  // matchMedia change listener catches portrait↔landscape without relying solely on orientationchange
   try {
     const portraitMq = window.matchMedia("(orientation: portrait)");
     const mqHandler = () => updateRotateOverlay();
     if (portraitMq.addEventListener) portraitMq.addEventListener("change", mqHandler);
-    else if ((portraitMq as any).addListener) (portraitMq as any).addListener(mqHandler); // Safari <14 fallback
+    else if ((portraitMq as any).addListener) (portraitMq as any).addListener(mqHandler);
   } catch {}
+
   document.addEventListener("keydown", (e: KeyboardEvent) => {
     if (e.key === "Escape") {
-      if (scannerOpen) { closeScanner(); return; }
-      if (!els.shareQrOverlay.classList.contains("hidden")) { hideShareQr(); return; }
-      if (settingsOpen) { hideSettings(); return; }
-      // §C: nav back within menu (modal closes take priority above)
-      if (mode === "menu" && navStack.length > 1) { navBack(); return; }
+      if (mode === "paused") { togglePause(); return; }
+      if (mode === "menu" && currentScreenId() !== "home") { navBack(); return; }
     }
   });
 
-  // Fade out the boot overlay now that init is complete
   els.bootOverlay.classList.add("fade-out");
   setTimeout(() => els.bootOverlay.classList.add("hidden"), 450);
-
-  // Invite deep link (?p2p=P-XXXXXX from a shared URL/QR): join the room directly —
-  // the menu no longer has a "JOIN <code>" button, so without this the link dead-ends.
-  if (inviteRoom && inviteRoom.startsWith("P-")) {
-    setStatus(`Joining room ${roomCodeCore(inviteRoom)}…`);
-    joinP2PAsGuest(inviteRoom);
-  }
 
   requestAnimationFrame((t) => { last = t; loop(t); });
 }
 
 window.addEventListener("DOMContentLoaded", init);
 
-// Fatal overlay: surface unrecoverable JS errors to the user.
-// The existing inline <script> in index.html already POSTs to /api/errors
-// for server-side logging — these listeners add the user-visible layer on top.
+// Fatal overlay: surface unrecoverable JS errors to the user. The inline
+// <script> in index.html already POSTs to /api/errors for server-side logging.
 window.addEventListener("error", (e: ErrorEvent) => {
-  // Only show fatal if the game has started past boot; ignore render/asset
-  // warnings that are non-fatal. A simple heuristic: only show if mode is
-  // already set (i.e. DOMContentLoaded has fired and init() ran).
   if (mode !== "menu" && mode !== "lobby" && mode !== "playing" && mode !== "paused") {
     showFatal(e.message || "An unexpected error occurred.");
   }
@@ -2121,36 +887,3 @@ window.addEventListener("unhandledrejection", (e: PromiseRejectionEvent) => {
     showFatal(msg || "An unexpected error occurred.");
   }
 });
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
