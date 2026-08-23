@@ -1,16 +1,19 @@
 # SmashCart
 
-Online 3D plane combat on a large flat battlefield. Launch straight into `Quick Play` or share a private room code; bots keep public matches populated when humans are scarce. The game is self-hosted: the Colyseus server, browser client, and vendored runtime assets all live in this repository.
+Local Wi-Fi dogfight: a server-authoritative 3D plane combat arena you host on your own laptop or Raspberry Pi, with friends joining from phones and tablets on the same network.
 
 ![gameplay](docs/screenshot.png)
 
 ## Features
 
-- Server-authoritative multiplayer at 30 Hz with client-side interpolation, local prediction, and reconnect support.
-- Flat-world 3D flight with altitude control, slow readable pacing, boost, pickups, and AI bots.
-- Quick Play plus 6-character private room codes and share links.
-- Desktop and touch controls, including dedicated climb and dive inputs.
-- Vendored browser dependencies under `public/vendor/` so deployment does not depend on a CDN.
+- Server-authoritative multiplayer at 30 Hz with client-side prediction and interpolation.
+- One process IS one room: Express serves the client, a single plain-WebSocket room host (`src/server/RoomHost.ts`) drives the simulation (`src/sim/GameSim.ts`).
+- Installable PWA — fullscreen landscape on phones, works offline after first load.
+- Bots fill the lobby so a match always has targets; difficulty is host-adjustable.
+- 12 powerups including ghost and magnet, plus mines, homing rounds, freeze ray, EMP, and shields.
+- Hangar customization: skin color, body shape, accent, trail, and livery.
+- Zero-account join: scan the host's QR code or type `http://<lan-ip>:2567` — mDNS advertisement makes the room discoverable on the LAN.
+- Flat-world flight model with altitude control, boost, and readable pacing.
 
 ## Controls
 
@@ -30,21 +33,27 @@ Online 3D plane combat on a large flat battlefield. Launch straight into `Quick 
 
 Use the on-screen `LEFT`, `RIGHT`, `CLIMB`, `DIVE`, `BOOST`, and `FIRE` buttons.
 
-## Tech Stack
+## How to play with friends
 
-- Server: Node.js, TypeScript, Express, Colyseus `0.16`
-- Client source: `src/client/*.ts`, bundled into `public/js/*.js`
-- Renderer: hand-authored Three.js scene code in `public/js/render3d.js`
-- Shared game model: `src/shared/constants.ts` and `src/shared/sphere.ts`
+1. **Host:** run the server on any machine on the same network (laptop, desktop, Raspberry Pi):
+   ```bash
+   npm run build && npm start
+   ```
+2. **Host:** open `http://localhost:2567`, create a room, and start the match when everyone is in.
+3. **Friends:** connect to the same Wi-Fi, then either
+   - scan the QR code shown by the host client, or
+   - browse to `http://<lan-ip>:2567` (the server also advertises itself via mDNS/Bonjour as "SmashCart").
+
+**Hotspot option:** no router needed — enable the hotspot on one phone, connect the host machine *and* every other phone to that hotspot, then follow the steps above.
+
+Everything stays on the LAN. There is no internet matchmaking, account, or cloud dependency.
 
 ## Local Development
 
 ```bash
-npm ci
-npm run dev
+npm ci          # install exact locked dependencies
+npm run dev     # watch-mode server on port 2567
 ```
-
-Open `http://localhost:2567` in two tabs to test multiplayer. The Colyseus monitor is available at `http://localhost:2567/colyseus` and should be locked down in production.
 
 Useful commands:
 
@@ -56,7 +65,43 @@ npm start              # run the production build
 npm run clean          # remove dist/ cross-platform
 ```
 
+Open `http://localhost:2567` in two browser tabs to test multiplayer locally.
+
+## Project Layout
+
+```text
+src/
+  index.ts                 Express + ws bootstrap, mDNS advertisement
+  server/RoomHost.ts       transport glue: join handshake, validation,
+                           rate limiting, leader checks, event fan-out
+  sim/GameSim.ts           framework-free authoritative simulation:
+                           flight, bots, combat, pickups
+  sim/types.ts             sim interfaces + serializable snapshot
+  shared/protocol.ts       frozen wire contract (client ⇄ server messages)
+  shared/constants.ts      gameplay tuning constants
+  shared/                  shared vector math, flight model, loadout data
+  client/                  browser TypeScript sources (menu.ts, net-ws.ts, ...)
+public/
+  index.html               menu and HUD shell
+  js/                      generated client bundles + hand-authored render3d.js
+  css/                     UI styling
+  vendor/                  vendored three.js browser runtime
+  assets/                  audio and art assets
+scripts/                   build helpers
+tests/                     Vitest suites (sim math + RoomHost protocol)
+openspec/changes/archive/  historical change specs
+deploy/                    docker/systemd/nginx deployment helpers
+```
+
+Removed during the local-only rebuild: Colyseus rooms/schema, P2P signaling and host migration, the `/colyseus` monitor, Sentry error tracking, and the leaderboard backend.
+
+## Tuning
+
+Gameplay tuning lives in `src/shared/constants.ts`. `public/js/constants.js` is generated from that shared source via `npm run build-client`; do not hand-edit the generated constants bundle.
+
 ## Deployment
+
+The same server runs on any machine on the LAN — a laptop, a mini PC, or a Pi. Two conveniences are kept in the repo:
 
 ### Docker
 
@@ -74,30 +119,7 @@ sudo cp deploy/smashcart.service /etc/systemd/system/
 sudo systemctl daemon-reload && sudo systemctl enable --now smashcart
 ```
 
-If you front the app with nginx, keep WebSocket upgrade headers enabled for Colyseus.
-
-## Project Layout
-
-```text
-src/
-  index.ts                 Express + Colyseus bootstrap
-  rooms/ArenaRoom.ts       authoritative match loop, bots, combat, pickups
-  schema/ArenaState.ts     synchronized room state
-  shared/                  shared constants and flat-world vector math
-  client/                  browser TypeScript sources
-public/
-  index.html               menu and HUD shell
-  js/                      generated client bundles + hand-authored render3d.js
-  css/                     UI styling
-  vendor/                  vendored three.js and colyseus browser runtime
-  assets/                  audio and legacy art assets
-scripts/                   build helpers
-openspec/changes/          proposals, specs, and tasks for tracked changes
-```
-
-## Tuning
-
-Gameplay tuning lives in `src/shared/constants.ts`. `public/js/constants.js` is generated from that shared source via `npm run build-client`; do not hand-edit the generated constants bundle.
+If you front the app with a reverse proxy, keep WebSocket upgrade headers enabled for `/ws`.
 
 ## License
 

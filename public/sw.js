@@ -1,7 +1,10 @@
 // SmashCart service worker — cache-first precache shell.
-// BUMP "smashcart-v1" whenever any bundle in public/js/ or precached assets change.
-const CACHE = "smashcart-v1";
+// BUMP "smashcart-v2" whenever any bundle in public/js/ or precached assets change.
+const CACHE = "smashcart-v2";
 
+// Exactly what index.html loads plus the audio files fetched at runtime.
+// net-ws.js is intentionally NOT precached: net-ws.ts is bundled into
+// js/main.js by build-client.mjs and never loaded as its own script.
 const PRECACHE = [
   "/",
   "/index.html",
@@ -11,7 +14,6 @@ const PRECACHE = [
   "/js/main.js",
   "/js/constants.js",
   "/js/sphere.js",
-  "/js/net.js",
   "/js/input.js",
   "/js/render3d.js",
   "/js/audio.js",
@@ -20,8 +22,6 @@ const PRECACHE = [
   "/js/qr.js",
   "/vendor/three.core.min.js",
   "/vendor/three.module.min.js",
-  "/vendor/colyseus.js",
-  "/vendor/jsqr.min.js",
   "/assets/audio/engine.wav",
   "/assets/audio/explosion.wav",
   "/assets/audio/fire.wav",

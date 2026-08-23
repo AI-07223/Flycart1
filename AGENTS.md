@@ -2,17 +2,18 @@
 
 ## Project Structure & Module Organization
 
-SmashCart is a Node.js/TypeScript multiplayer air-combat game with a server-authoritative flat-world flight model.
+SmashCart is a Node.js/TypeScript local Wi-Fi air-combat game with a server-authoritative flat-world flight model.
 
-- `src/index.ts` boots Express and Colyseus.
-- `src/rooms/ArenaRoom.ts` contains the match loop, bots, combat, and pickup logic.
-- `src/schema/ArenaState.ts` defines synchronized room state.
-- `src/shared/` holds gameplay constants and shared 3D vector math.
-- `src/client/` is the source for browser TypeScript; `public/js/*.js` is generated from it.
+- `src/index.ts` boots Express, the plain `ws` WebSocketServer on `/ws`, and mDNS advertisement.
+- `src/server/RoomHost.ts` is the transport glue: join handshake, validation, rate limiting, leader checks, and event fan-out for the single room the process hosts.
+- `src/sim/GameSim.ts` is the framework-free authoritative simulation: match loop, bots, combat, and pickup logic.
+- `src/shared/protocol.ts` defines the frozen wire contract between client and server.
+- `src/shared/` also holds gameplay constants and shared 3D vector math.
+- `src/client/` is the source for browser TypeScript (`menu.ts`, `net-ws.ts`, ...); `public/js/*.js` is generated from it.
 - `public/js/render3d.js` is the hand-authored Three.js renderer for the flat battlefield.
 - `public/` also contains HTML, CSS, audio, images, and vendored browser libraries.
-- `tests/` contains Vitest coverage for shared math and room simulation.
-- `openspec/changes/` stores proposals, designs, specs, and task lists for planned changes.
+- `tests/` contains Vitest coverage for shared math and RoomHost protocol behavior.
+- `openspec/changes/archive/` stores historical proposals, designs, specs, and task lists.
 
 Do not edit generated client files in `public/js/` except `render3d.js`.
 
@@ -33,7 +34,7 @@ Use two-space indentation, double quotes, semicolons, and trailing commas in mul
 
 ## Testing Guidelines
 
-Vitest discovers `tests/**/*.test.ts`. Name tests after the subject, for example `arena.test.ts`. Add deterministic coverage for movement, altitude limits, projectile collisions, bot-safe bounds, and latency-sensitive helpers. Prefer math- and simulation-level tests over timing-dependent browser tests.
+Vitest discovers `tests/**/*.test.ts`. Name tests after the subject, for example `roomhost.test.ts`. Add deterministic coverage for movement, altitude limits, projectile collisions, bot-safe bounds, and latency-sensitive helpers. Prefer math- and simulation-level tests over timing-dependent browser tests.
 
 ## Commit & Pull Request Guidelines
 

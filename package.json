@@ -1,7 +1,7 @@
 {
   "name": "smashcart",
   "version": "0.1.0",
-  "description": "SmashCart — online 3D plane combat arena (Colyseus + Three.js)",
+  "description": "SmashCart — local Wi-Fi only 3D plane combat arena (Express + ws + Three.js)",
   "license": "MIT",
   "type": "commonjs",
   "main": "dist/index.js",
@@ -9,7 +9,6 @@
     "dev": "tsx watch src/index.ts",
     "build": "npm run build-client && tsc",
     "start": "node dist/index.js",
-    "vendor": "node scripts/vendor-three-addons.mjs",
     "gen-audio": "node scripts/gen-audio.mjs",
     "test": "vitest run",
     "clean": "node -e \"require('fs').rmSync('dist', { recursive: true, force: true })\"",

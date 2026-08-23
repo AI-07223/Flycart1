@@ -162,18 +162,18 @@ export class RoomHost {
 
     switch (msg.type) {
       case "input":
-        if (this.rateOk(conn.id, C.INPUT_RATE_MAX)) {
+        if (this.rateOk(conn.id, "input", C.INPUT_RATE_MAX)) {
           this.sim.applyInput(conn.id, msg.input);
         }
         break;
       case "ready":
-        if (this.rateOk(conn.id, C.READY_RATE_MAX)) {
+        if (this.rateOk(conn.id, "ready", C.READY_RATE_MAX)) {
           this.sim.setReady(conn.id);
           this.broadcastRosterChange();
         }
         break;
       case "host-start":
-        if (!this.rateOk(conn.id, C.HOST_MSG_RATE_MAX)) break;
+        if (!this.rateOk(conn.id, "host", C.HOST_MSG_RATE_MAX)) break;
         if (this.sim.hostId !== conn.id) {
           this.sendTo(conn, this.error("not-leader", "only the leader can start"));
           break;
@@ -235,7 +235,7 @@ export class RoomHost {
   }
 
   private handleKick(conn: Conn, targetId: unknown): void {
-    if (!this.rateOk(conn.id, C.HOST_KICK_RATE_MAX)) return;
+    if (!this.rateOk(conn.id, "kick", C.HOST_KICK_RATE_MAX)) return;
     if (this.sim.hostId !== conn.id) {
       this.sendTo(conn, this.error("not-leader", "only the leader can kick"));
       return;
@@ -254,7 +254,7 @@ export class RoomHost {
   }
 
   private handleSettings(conn: Conn, data: unknown): void {
-    if (!this.rateOk(conn.id, C.HOST_MSG_RATE_MAX)) return;
+    if (!this.rateOk(conn.id, "host", C.HOST_MSG_RATE_MAX)) return;
     if (this.sim.hostId !== conn.id) {
       this.sendTo(conn, this.error("not-leader", "only the leader can change settings"));
       return;
@@ -310,13 +310,16 @@ export class RoomHost {
   }
 
   // -------------------------------------------------------------------------
-  // Send helpers + rate limiting (sliding window, ported from ArenaRoom)
+  // Send helpers + rate limiting (sliding window per message type, ported
+  // from ArenaRoom; bucketed by type so e.g. a host-start never eats the
+  // input budget — the *_RATE_MAX constants are per-category limits)
   // -------------------------------------------------------------------------
 
-  private rateOk(id: string, max: number): boolean {
+  private rateOk(id: string, bucket: string, max: number): boolean {
+    const key = `${id}:${bucket}`;
     const now = Date.now();
-    let arr = this.msgTimes.get(id);
-    if (!arr) { arr = []; this.msgTimes.set(id, arr); }
+    let arr = this.msgTimes.get(key);
+    if (!arr) { arr = []; this.msgTimes.set(key, arr); }
     while (arr.length && now - arr[0] > 1000) arr.shift();
     if (arr.length >= max) return false;
     arr.push(now);
