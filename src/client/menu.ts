@@ -698,11 +698,24 @@ function wireHome(): void {
 
 let hotspotOn = false;
 
+async function apkAvailable(): Promise<boolean> {
+  try {
+    const res = await fetch("/apk/smashcart.apk", { method: "HEAD" });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
 function wireHotspotCard(): void {
   const native = isNativeApp();
   const card = $("sc-hotspot-card");
   const pill = $("sc-apk-pill");
-  if (pill) pill.classList.toggle("sc-hidden", native); // download only makes sense in a browser
+  // Download only makes sense in a browser, and only when the APK is actually
+  // built — it is a release artifact, not tracked in the repo, so a fresh
+  // checkout serves 404 until `npm run build-apk` runs.
+  if (pill && !native) void apkAvailable().then((ok) => pill.classList.toggle("sc-hidden", !ok));
+  else if (pill) pill.classList.add("sc-hidden");
   if (!card) return;
   card.classList.toggle("sc-hidden", !native);
   if (!native) return;

@@ -1375,11 +1375,20 @@
     wireHotspotCard();
   }
   var hotspotOn = false;
+  async function apkAvailable() {
+    try {
+      const res = await fetch("/apk/smashcart.apk", { method: "HEAD" });
+      return res.ok;
+    } catch {
+      return false;
+    }
+  }
   function wireHotspotCard() {
     const native = isNativeApp();
     const card = $("sc-hotspot-card");
     const pill = $("sc-apk-pill");
-    if (pill) pill.classList.toggle("sc-hidden", native);
+    if (pill && !native) void apkAvailable().then((ok) => pill.classList.toggle("sc-hidden", !ok));
+    else if (pill) pill.classList.add("sc-hidden");
     if (!card) return;
     card.classList.toggle("sc-hidden", !native);
     if (!native) return;
@@ -1393,7 +1402,7 @@
   async function reflectHotspotState() {
     try {
       const st = await gameHotspotStatus();
-      setHotspotUi(st.active ? { active: true, ssid: st.ssid, passphrase: st.passphrase } : null);
+      setHotspotUi(st.active ? { ssid: st.ssid, passphrase: st.passphrase } : null);
       hotspotOn = Boolean(st.active);
     } catch {
     }

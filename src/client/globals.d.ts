@@ -259,13 +259,6 @@ interface RendererAPI {
   hideMenu?(): void;
 }
 
-declare function jsQR(
-  data: Uint8ClampedArray,
-  width: number,
-  height: number,
-  opts?: { inversionAttempts?: "dontInvert" | "onlyInvert" | "attemptBoth" | "invertFirst" }
-): { data: string } | null;
-
 declare interface Window {
   GAME: GameConstants;
   Sphere: SphereAPI;
@@ -275,5 +268,4 @@ declare interface Window {
   Input: InputAPI;
   QR: QRAPI;
   Renderer: RendererAPI;
-  jsQR: typeof jsQR;
 }

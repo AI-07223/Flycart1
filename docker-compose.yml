@@ -7,15 +7,9 @@ services:
     environment:
       - NODE_ENV=production
       - PORT=2567
-      - DATA_DIR=/app/data
-    volumes:
-      - smashdata:/app/data
     healthcheck:
       test: ["CMD", "wget", "-qO", "/dev/null", "http://localhost:2567/healthz"]
       interval: 30s
       timeout: 5s
       retries: 3
       start_period: 10s
-
-volumes:
-  smashdata:
