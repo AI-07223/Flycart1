@@ -1,4 +1,4 @@
-﻿// menu.ts -- SmashCart screen router (home / join / hangar / settings / lobby)
+// menu.ts -- SmashCart screen router (home / join / hangar / settings / lobby)
 // plus the in-game pause overlay. All menu markup is generated here; index.html
 // only provides one empty host div (#arcade-start-screen).
 //
@@ -240,7 +240,12 @@ let root: HTMLElement | null = null;
 let router: HTMLElement | null = null;
 let handlers: MenuHandlers | null = null;
 let stack: ScreenId[] = ["home"];
+/** The screen currently on display. `stack` is history; this is the view. They
+ *  diverge during back navigation, when the stack is popped before the swap. */
+let displayed: ScreenId | null = null;
 const screens = new Map<ScreenId, HTMLElement>();
+/** Pending "remove is-active once the exit animation ends" timers, per element. */
+const exitTimers = new Map<HTMLElement, number>();
 const $ = <T extends HTMLElement = HTMLElement>(id: string): T => document.getElementById(id) as T;
 
 let busy = false;
@@ -444,7 +449,9 @@ function lobbyMarkup(): string {
         <h2 id="sc-lobby-room-name-view" class="sc-lobby-roomname">Private Room</h2>
         <input id="sc-lobby-room-name-edit" class="sc-input" maxlength="20" placeholder="Name this room..." autocomplete="off" aria-label="Room name" />
         <div class="sc-qr-frame">
-          <canvas id="sc-lobby-qr" width="0" height="0" aria-label="Join QR code"></canvas>
+          <!-- Starts hidden: a 0x0 canvas inside an 82px CSS box paints as a broken-image
+               placeholder. setLobbyQr() reveals it once a code is actually drawn. -->
+          <canvas id="sc-lobby-qr" class="sc-hidden" width="0" height="0" aria-label="Join QR code"></canvas>
         </div>
         <p class="sc-note sc-note--tight">${ICON.wifi}<span>Friends: join the same Wi-Fi, then scan this.</span></p>
         <p id="sc-lobby-url" class="sc-lobby-url mono"></p>
@@ -531,6 +538,9 @@ export function mountScreens(hostEl: HTMLElement, h: MenuHandlers): void {
   root.classList.remove("hidden");
   document.body.classList.add("sc-menu-open");
 
+  displayed = null;
+  exitTimers.clear();
+  stack = ["home"];
   router = $("sc-router");
   router.querySelectorAll<HTMLElement>(".sc-screen").forEach((el) => {
     const id = el.dataset.screen as ScreenId;
@@ -575,13 +585,31 @@ export function currentScreenId(): ScreenId {
 
 const TRANSITION_MS = 340;
 
+/** Retire a screen once its exit animation has run. Keyed per element and
+ *  cancellable, because a fast Back can re-activate a screen before its own
+ *  exit timer fires — an uncancelled timer would then blank the live screen. */
+function scheduleExit(el: HTMLElement): void {
+  cancelExit(el);
+  exitTimers.set(el, window.setTimeout(() => {
+    exitTimers.delete(el);
+    el.classList.remove("is-active", "anim-fwd-out", "anim-back-out");
+  }, TRANSITION_MS));
+}
+
+function cancelExit(el: HTMLElement): void {
+  const pending = exitTimers.get(el);
+  if (pending !== undefined) {
+    window.clearTimeout(pending);
+    exitTimers.delete(el);
+  }
+}
+
 export function showScreen(id: ScreenId, dir: NavDir = "forward"): void {
   if (!router) return;
-  if (currentScreenId() === id && screens.get(id)?.classList.contains("is-active")) return;
+  if (displayed === id) return;
 
   stopProbe();
-  const prevId = currentScreenId();
-  const prevEl = screens.get(prevId);
+  const prevEl = displayed ? screens.get(displayed) ?? null : null;
   const nextEl = screens.get(id);
   if (!nextEl) return;
 
@@ -589,22 +617,23 @@ export function showScreen(id: ScreenId, dir: NavDir = "forward"): void {
   if (id === "settings") populateSettingsUI();
   if (id === "join") startProbe();
 
-  stack.push(id);
+  // Back navigation is a pop, not a push: navBack() and resetToHome() have already
+  // positioned the stack. Pushing here left a duplicate entry, so the next Back
+  // press was swallowed re-showing the screen already on display.
+  if (dir !== "back") stack.push(id);
 
-  if (prevEl && prevEl !== nextEl && prevEl.classList.contains("is-active")) {
+  if (prevEl && prevEl !== nextEl) {
     prevEl.classList.add(dir === "back" ? "anim-back-out" : "anim-fwd-out");
     prevEl.setAttribute("aria-hidden", "true");
-    window.setTimeout(() => {
-      prevEl.classList.remove("is-active", "anim-fwd-out", "anim-back-out");
-    }, TRANSITION_MS);
+    scheduleExit(prevEl);
   }
 
+  cancelExit(nextEl);
   nextEl.classList.remove("anim-fwd-in", "anim-back-in", "anim-fwd-out", "anim-back-out");
   void nextEl.offsetWidth;
   nextEl.classList.add("is-active", dir === "back" ? "anim-back-in" : "anim-fwd-in");
   nextEl.removeAttribute("aria-hidden");
-
-  if (stack[stack.length - 1] !== id) stack.push(id);
+  displayed = id;
 
   const scroller = nextEl.querySelector(".sc-body") as HTMLElement | null;
   if (scroller) scroller.scrollTop = 0;
@@ -621,7 +650,11 @@ export function navBack(): void {
 export function resetToHome(): void {
   cancelHangarDraft();
   stack = ["home"];
-  for (const [, el] of screens) el.classList.remove("is-active", "anim-fwd-in", "anim-back-in", "anim-fwd-out", "anim-back-out");
+  for (const [, el] of screens) {
+    cancelExit(el);
+    el.classList.remove("is-active", "anim-fwd-in", "anim-back-in", "anim-fwd-out", "anim-back-out");
+  }
+  displayed = null;
   showScreen("home", "back");
   hidePause();
 }
@@ -1120,9 +1153,12 @@ export function setLobbyQr(joinUrl: string): void {
   if (!canvas) return;
   try {
     window.QR.render(canvas, joinUrl, { size: 220, margin: 2, errorCorrectionLevel: "M" });
+    canvas.classList.remove("sc-hidden");
   } catch {
-    canvas.width = 0;
-    canvas.height = 0;
+    // Zeroing the canvas left an 82px CSS box with no backing bitmap, which the
+    // browser paints as a broken-image placeholder. Hide it instead — the join
+    // URL below is printed either way, so the panel degrades to text.
+    canvas.classList.add("sc-hidden");
   }
   const urlEl = $("sc-lobby-url");
   if (urlEl) urlEl.textContent = joinUrl;

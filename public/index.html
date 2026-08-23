@@ -1,9 +1,9 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-  <title>SmashCart â€” Flat-World Air Combat</title>
+  <title>SmashCart — Flat-World Air Combat</title>
   <link rel="manifest" href="/manifest.webmanifest">
   <meta name="theme-color" content="#0b0f14">
   <link rel="icon" type="image/svg+xml" href="/icons/icon.svg">
@@ -26,7 +26,7 @@
     <div id="boot-overlay">
       <div class="boot-inner">
         <div class="boot-spinner" aria-hidden="true"></div>
-        <p class="boot-label">Loadingâ€¦</p>
+        <p class="boot-label">Loading…</p>
       </div>
     </div>
 
@@ -47,7 +47,7 @@
 
     <div id="rotate-overlay">
       <div class="rot-inner">
-        <div class="rot-icon">âŸ³</div>
+        <div class="rot-icon">⟳</div>
         <div class="rot-title">Rotate to Landscape</div>
         <div class="rot-sub">Turn your device sideways to play</div>
       </div>
@@ -58,12 +58,12 @@
       <div class="ch-v"></div>
     </div>
 
-    <div id="oob-warning" class="hidden" aria-live="assertive">âš  OUT OF BOUNDS â€” TURN BACK</div>
+    <div id="oob-warning" class="hidden" aria-live="assertive">⚠ OUT OF BOUNDS — TURN BACK</div>
 
     <div id="hud" class="hidden">
       <div class="hud-cluster hud-cluster--telemetry">
         <div class="hud-cluster-head">
-          <button id="ingame-menu-btn" class="hud-menu-btn" title="Menu" aria-label="Menu">â˜°</button>
+          <button id="ingame-menu-btn" class="hud-menu-btn" title="Menu" aria-label="Menu">☰</button>
           <button id="hud-room-chip" class="hidden" title="Show invite" aria-label="Show room invite"></button>
         </div>
         <div class="hud-row">
@@ -75,7 +75,7 @@
             <span class="hud-item-label">Boost</span>
             <span class="boost-bar"><span id="boost-fill"></span></span>
           </div>
-          <button id="mute-btn" class="icon-btn" title="Mute (M)">ðŸ”Š</button>
+          <button id="mute-btn" class="icon-btn" title="Mute (M)">🔊</button>
         </div>
         <div id="hud-team-score" class="hidden hud-team-score">
           <span id="hud-team-blue" class="hud-team hud-team--blue"><span class="hud-team-name">Blue</span> <span id="hud-tscore0">0</span></span>
@@ -89,18 +89,18 @@
 
     <div id="healthbar" class="hidden"><div id="healthfill"></div></div>
     <div id="killfeed"></div>
-    <div id="respawn" class="hidden"><div class="ks-burst">ðŸ’¥</div><div class="ks-title">SMASHED</div><div class="ks-by" id="respawn-by"></div><div class="ks-count" id="respawn-count"></div></div>
+    <div id="respawn" class="hidden"><div class="ks-burst">💥</div><div class="ks-title">SMASHED</div><div class="ks-by" id="respawn-by"></div><div class="ks-count" id="respawn-count"></div></div>
 
     <div id="touch-controls" class="hidden">
       <!-- D-Pad layout (scheme=dpad) -->
       <div class="touch-left" id="dpad-left">
         <div class="touch-stack horizontal">
-          <button class="tbtn arrow" id="left-btn" aria-label="Turn left">â—€</button>
-          <button class="tbtn arrow" id="right-btn" aria-label="Turn right">â–¶</button>
+          <button class="tbtn arrow" id="left-btn" aria-label="Turn left">◀</button>
+          <button class="tbtn arrow" id="right-btn" aria-label="Turn right">▶</button>
         </div>
         <div class="touch-stack vertical">
-          <button class="tbtn climb" id="climb-btn" aria-label="Climb">â–²</button>
-          <button class="tbtn dive" id="dive-btn" aria-label="Dive">â–¼</button>
+          <button class="tbtn climb" id="climb-btn" aria-label="Climb">▲</button>
+          <button class="tbtn dive" id="dive-btn" aria-label="Dive">▼</button>
         </div>
       </div>
       <!-- Joystick layout (scheme=joystick) -->
@@ -109,9 +109,9 @@
           <div id="joystick-thumb"></div>
         </div>
       </div>
-      <!-- Tilt layout (scheme=tilt) â€” just a calibrate button on left -->
+      <!-- Tilt layout (scheme=tilt) — just a calibrate button on left -->
       <div class="touch-left tilt-left hidden" id="tilt-left">
-        <button class="tbtn tilt-cal" id="tilt-cal-btn" aria-label="Recalibrate tilt">âŠ•<span>CAL</span></button>
+        <button class="tbtn tilt-cal" id="tilt-cal-btn" aria-label="Recalibrate tilt">⊕<span>CAL</span></button>
       </div>
       <!-- Right side: BOOST + FIRE (shared across all schemes) -->
       <div class="touch-right">

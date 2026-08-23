@@ -26,6 +26,9 @@ const POWERUPS: Record<string, PowerupMeta> = {
   star:        { label: "Star",        color: 0xffd700, icon: "⭐" },
   emp:         { label: "EMP Burst",   color: 0x66e0ff, icon: "🌀" },
   freeze:      { label: "Freeze Ray",  color: 0x9fdcff, icon: "❄️" },
+  // Colours match render3d.ts PICKUP_STYLES so the HUD chip and the world gem agree.
+  ghost:       { label: "Ghost",       color: 0xffffff, icon: "👻" },
+  magnet:      { label: "Magnet",      color: 0x00d2d3, icon: "🧲" },
 };
 
 (window as any).GAME = {

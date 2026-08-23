@@ -1,12 +1,15 @@
 // Cross-platform browser vendor sync for the flat-world client.
 // Copies the runtime browser libraries we actually ship and prunes dead
 // Three.js addon baggage left over from the old immersive/CSS3D renderer path.
+//
+// If the game ever loads .glb/.gltf assets, vendor GLTFLoader here
+// (node_modules/three/examples/jsm/loaders/GLTFLoader.js -> public/vendor/jsm/)
+// and add the matching "three/addons/" entry to the import map in index.html.
 import { copyFileSync, existsSync, mkdirSync, rmSync } from "node:fs";
 
 mkdirSync("public/vendor", { recursive: true });
 
 const files = [
-  ["node_modules/colyseus.js/dist/colyseus.js", "public/vendor/colyseus.js"],
   ["node_modules/three/build/three.module.min.js", "public/vendor/three.module.min.js"],
   ["node_modules/three/build/three.core.min.js", "public/vendor/three.core.min.js"],
 ];

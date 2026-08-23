@@ -50,9 +50,57 @@ import * as THREE from "three";
   let particles = [];
   let stageShadow = null;
   let stageBlend = 0;
-  const STAGE_POS = { x: 0, y: 92, z: -40 };
-  const STAGE_CAM_POS = new THREE.Vector3(STAGE_POS.x + 14.9, STAGE_POS.y + 11.4, STAGE_POS.z + 19.5);
-  const STAGE_CAM_LOOK = new THREE.Vector3(STAGE_POS.x, STAGE_POS.y - 5, STAGE_POS.z);
+  const STAGE_POS = { x: 0, y: 300, z: -620 };
+  const STAGE_CAM_DIR = new THREE.Vector3(14.9, -4, 19.5).normalize();
+  const STAGE_FILL = 0.62;
+  const stageView = { top: 0, height: 0, canvas: 0 };
+  function measureStageViewport() {
+    const canvasH = canvasEl && canvasEl.clientHeight || window.innerHeight;
+    const el = document.querySelector(".sc-hangar-stage");
+    stageView.canvas = canvasH;
+    if (el) {
+      const r = el.getBoundingClientRect();
+      stageView.top = r.top;
+      stageView.height = r.height;
+    } else {
+      stageView.top = 0;
+      stageView.height = canvasH;
+    }
+  }
+  const STAGE_CAM_POS = new THREE.Vector3();
+  const STAGE_CAM_LOOK = new THREE.Vector3();
+  const _stageBox = new THREE.Box3();
+  const _stageSize = new THREE.Vector3();
+  let stagePlaneSpan = 48;
+  function measureStagePlane(obj) {
+    if (!obj) return;
+    _stageBox.setFromObject(obj);
+    if (_stageBox.isEmpty()) return;
+    _stageBox.getSize(_stageSize);
+    stagePlaneSpan = Math.max(_stageSize.x, _stageSize.y, _stageSize.z) || stagePlaneSpan;
+  }
+  function applyStageLift(blend) {
+    if (!camera || !canvasEl) return;
+    const w = canvasEl.clientWidth || window.innerWidth;
+    const h = canvasEl.clientHeight || window.innerHeight;
+    if (blend <= 1e-3) {
+      if (camera.view && camera.view.enabled) camera.clearViewOffset();
+      return;
+    }
+    const stageCentre = stageView.height > 0 ? stageView.top + stageView.height / 2 : h / 2;
+    const lift = (h / 2 - stageCentre) * blend;
+    camera.setViewOffset(w, h, 0, lift, w, h);
+  }
+  function updateStageFraming() {
+    const halfV = Math.tan((camera ? camera.fov : 70) * Math.PI / 360);
+    const canvasH = stageView.canvas || canvasEl && canvasEl.clientHeight || window.innerHeight;
+    const stageShare = stageView.height > 0 ? stageView.height / canvasH : 1;
+    const fillOfFrame = Math.max(0.05, STAGE_FILL * stageShare);
+    const visibleH = stagePlaneSpan / fillOfFrame;
+    const dist = visibleH / (2 * halfV);
+    STAGE_CAM_POS.copy(STAGE_CAM_DIR).multiplyScalar(dist).add(new THREE.Vector3(STAGE_POS.x, STAGE_POS.y, STAGE_POS.z));
+    STAGE_CAM_LOOK.set(STAGE_POS.x, STAGE_POS.y, STAGE_POS.z);
+  }
   const camPos = new THREE.Vector3(0, 90, 160);
   const camLook = new THREE.Vector3(0, 30, 0);
   const stateMaps = {
@@ -1103,6 +1151,7 @@ import * as THREE from "three";
       renderer.setSize(window.innerWidth, window.innerHeight, false);
       camera.aspect = window.innerWidth / window.innerHeight;
       camera.updateProjectionMatrix();
+      measureStageViewport();
     },
     sync(state, dt, myId) {
       const rawDt = Math.min(dt, 0.05);
@@ -1418,6 +1467,7 @@ import * as THREE from "three";
     },
     draw(state, myId) {
       applySceneModeChrome();
+      if (camera && camera.view && camera.view.enabled) camera.clearViewOffset();
       this._updateCamera(myId);
       renderer.render(scene, camera);
       if (sceneMode === "playing") {
@@ -1447,8 +1497,10 @@ import * as THREE from "three";
       if (!menuDemo) {
         menuDemo = makePlane(cosmetic);
         scene.add(menuDemo);
+        measureStagePlane(menuDemo);
       }
       applySceneModeChrome();
+      updateStageFraming();
       const isCustomize = sceneMode === "customize";
       const blendTarget = isCustomize ? 1 : 0;
       const blendRate = menuStep / 0.35;
@@ -1505,6 +1557,7 @@ import * as THREE from "three";
       camLook.lerp(look, lerpSpeed + 0.02);
       camera.position.copy(camPos);
       camera.lookAt(camLook);
+      applyStageLift(stageBlend);
       renderer.render(scene, camera);
       if (mmctx) mmctx.clearRect(0, 0, minimap.width, minimap.height);
     },
@@ -1525,6 +1578,7 @@ import * as THREE from "three";
         }
         menuDemo = makePlane(cosmetic);
         scene.add(menuDemo);
+        measureStagePlane(menuDemo);
         return;
       }
       menuDemo.traverse((child) => {
@@ -1766,7 +1820,13 @@ import * as THREE from "three";
         particles: particles.length,
         geometries: memory ? memory.geometries : 0,
         textures: memory ? memory.textures : 0,
-        programs: renderer && renderer.info && renderer.info.programs ? renderer.info.programs.length : 0
+        programs: renderer && renderer.info && renderer.info.programs ? renderer.info.programs.length : 0,
+        sceneMode,
+        stageBlend: Number(stageBlend.toFixed(3)),
+        stagePlaneSpan: Number(stagePlaneSpan.toFixed(2)),
+        stageCam: [STAGE_CAM_POS.x, STAGE_CAM_POS.y, STAGE_CAM_POS.z].map((v) => Number(v.toFixed(1))),
+        camPos: camera ? [camera.position.x, camera.position.y, camera.position.z].map((v) => Number(v.toFixed(1))) : null,
+        camToStage: camera ? Number(camera.position.distanceTo(new THREE.Vector3(STAGE_POS.x, STAGE_POS.y, STAGE_POS.z)).toFixed(1)) : null
       };
     },
     setMenuSection() {
@@ -1778,10 +1838,12 @@ import * as THREE from "three";
     setSceneMode(mode) {
       sceneMode = mode || "preflight";
       applySceneModeChrome();
+      measureStageViewport();
     },
     setHangarOpen(open) {
       sceneMode = open ? "customize" : "preflight";
       applySceneModeChrome();
+      measureStageViewport();
     }
   };
   window.Renderer = Renderer;

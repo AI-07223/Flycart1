@@ -103,13 +103,65 @@
 .sc-paused-host .sc-router { display: none; }
 
 /* Native controls inside the menu inherit the app face, not the global
-   element-level chrome in style.css (Bahnschrift face + hard amber shadow). */
-.sc-root :is(button, input, select) {
+   element-level chrome in style.css.
+   style.css styles the bare `button` element with the legacy arcade skin: amber
+   gradient, a hard `0 6px 0 #ba8708` lip, 16px radius, uppercase, and hover/active
+   translate. That leaked onto every menu control, so any button without its own
+   box-shadow — tabs, swatches, the gear, segmented controls — wore an amber lip and
+   jumped on hover. Reset the whole legacy skin once, here, instead of patching each
+   component. `:where()` keeps specificity at zero so components always win. */
+.sc-root :where(button, input, select) {
   font-family: inherit;
   letter-spacing: inherit;
+  border-radius: 0;
+  padding: 0;
+  background: none;
+  color: inherit;
+  box-shadow: none;
+  text-transform: none;
+}
+.sc-root :where(button, input, select):is(:hover, :active) {
+  transform: none;
 }
 
 .mono { font-family: var(--sc-mono); }
+
+/* ── Scrollbars ──────────────────────────────────────────────────────────────
+   Menu panels scroll on short viewports (phone landscape is only ~375px tall),
+   and the default OS scrollbar is a wide light slab straight through the dark
+   chrome. Theme it, and keep it narrow so it does not eat panel padding. */
+.sc-root * {
+  scrollbar-width: thin;
+  scrollbar-color: var(--sc-cyan-line) transparent;
+}
+.sc-root ::-webkit-scrollbar { width: 6px; height: 6px; }
+.sc-root ::-webkit-scrollbar-track { background: transparent; }
+.sc-root ::-webkit-scrollbar-thumb {
+  background: var(--sc-cyan-line);
+  border-radius: 999px;
+}
+.sc-root ::-webkit-scrollbar-thumb:hover { background: var(--sc-cyan); }
+.sc-root ::-webkit-scrollbar-corner { background: transparent; }
+
+/* ── Touch hit areas ─────────────────────────────────────────────────────────
+   Several controls are deliberately compact (40px tabs, 32px chips, the 22px
+   bots checkbox) because vertical room is scarce in landscape. Rather than grow
+   them — which would push content back off a 375px-tall screen — extend only the
+   HIT area to the 44px minimum. Visual size is untouched. */
+@media (pointer: coarse) {
+  .sc-root :is(.sc-tab, .sc-swatch, .sc-btn--slim, .sc-segmented button, .sc-check-row input[type="checkbox"]) {
+    position: relative;
+  }
+  .sc-root :is(.sc-tab, .sc-swatch, .sc-btn--slim, .sc-segmented button, .sc-check-row input[type="checkbox"])::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    translate: -50% -50%;
+    width: max(100%, 44px);
+    height: max(100%, 44px);
+  }
+}
 
 /* Utility: late-enough specificity to win without !important. */
 .sc-root .sc-hidden { display: none; }
@@ -132,22 +184,22 @@
 
 .sc-screen.anim-fwd-in  {
   animation: scInFwd var(--sc-dur-screen) var(--sc-ease-out-quart) both;
-  z-index: 2;
+  z-index: var(--z-screen-in);
 }
 .sc-screen.anim-back-in {
   animation: scInBack var(--sc-dur-screen) var(--sc-ease-out-quart) both;
-  z-index: 2;
+  z-index: var(--z-screen-in);
 }
 .sc-screen.anim-fwd-out {
   display: flex;
   animation: scOutFwd var(--sc-dur-screen) var(--sc-ease-in) both;
-  z-index: 1;
+  z-index: var(--z-screen-out);
   pointer-events: none;
 }
 .sc-screen.anim-back-out {
   display: flex;
   animation: scOutBack var(--sc-dur-screen) var(--sc-ease-in) both;
-  z-index: 1;
+  z-index: var(--z-screen-out);
   pointer-events: none;
 }
 
@@ -302,7 +354,7 @@
   position: absolute;
   top: calc(env(safe-area-inset-top, 0px) + 12px);
   right: calc(env(safe-area-inset-right, 0px) + 16px);
-  z-index: 5;
+  z-index: var(--z-gear);
   width: var(--sc-tap);
   height: var(--sc-tap);
   display: flex;
@@ -689,6 +741,9 @@ body.touch-device .sc-touch-only { display: flex; }
 }
 
 .sc-hangar-sheet {
+  /* 0 0 auto, not 0 1 auto: the sheet must claim its max-height and let the
+     stage above shrink, otherwise flex shrinks the sheet first and the swatch
+     grid clips again. */
   flex: 0 0 auto;
   max-height: min(34vh, 264px);
   display: flex;
@@ -1025,7 +1080,7 @@ body.touch-device .sc-touch-only { display: flex; }
 .sc-pause {
   position: absolute;
   inset: 0;
-  z-index: 40;
+  z-index: var(--z-overlay);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1098,7 +1153,20 @@ body.touch-device .sc-touch-only { display: flex; }
   .sc-body { gap: 8px; padding: 8px 2px; }
   .sc-panel { gap: 8px; padding: 12px; }
   .sc-topbar { min-height: 40px; }
-  .sc-hangar-sheet { max-height: 38vh; }
+  /* Phone landscape has ~375px of height to split between the turntable and the
+     customize sheet. Two wrapped swatch rows need ~170px and left the plane a
+     50px sliver; 38vh (143px) instead cut the second row through its labels.
+     Break the wrap instead: one row that scrolls sideways — the standard mobile
+     swatch pattern — so the sheet needs ~100px and the plane keeps its stage. */
+  .sc-hangar-sheet { max-height: min(124px, 34vh); }
+  .sc-swatch-grid {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scroll-snap-type: x proximity;
+    padding-bottom: 4px;
+  }
+  .sc-swatch-grid > * { flex: 0 0 auto; scroll-snap-align: start; }
   .sc-lobby-roomname { font-size: var(--sc-fs-lg); }
   .sc-lobby-actions { gap: 8px; padding-top: 8px; }
   .sc-qr-frame canvas { width: min(130px, 22vh); }

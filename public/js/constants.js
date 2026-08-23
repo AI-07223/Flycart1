@@ -76,7 +76,10 @@
         mine: { label: "Air Mines", color: 3820122, icon: "\u{1F4A3}" },
         star: { label: "Star", color: 16766720, icon: "\u2B50" },
         emp: { label: "EMP Burst", color: 6742271, icon: "\u{1F300}" },
-        freeze: { label: "Freeze Ray", color: 10476799, icon: "\u2744\uFE0F" }
+        freeze: { label: "Freeze Ray", color: 10476799, icon: "\u2744\uFE0F" },
+        // Colours match render3d.ts PICKUP_STYLES so the HUD chip and the world gem agree.
+        ghost: { label: "Ghost", color: 16777215, icon: "\u{1F47B}" },
+        magnet: { label: "Magnet", color: 53971, icon: "\u{1F9F2}" }
       };
       window.GAME = {
         CRUISE_SPEED,

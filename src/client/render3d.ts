@@ -47,13 +47,99 @@ import * as THREE from "three";
   // customize from the preflight orbit so the camera doesn't snap.
   let stageShadow = null;
   let stageBlend = 0;
-  const STAGE_POS = { x: 0, y: 92, z: -40 };
-  // 3/4 hero angle ~27u out: close enough that the plane fills ~35-40% of frame width,
-  // offset up+right so we look slightly down at it; look target sits a touch below the
-  // plane so it lands in the upper-middle of the frame (~40% from top), clear of the
-  // bottom-42% customize sheet.
-  const STAGE_CAM_POS = new THREE.Vector3(STAGE_POS.x + 14.9, STAGE_POS.y + 11.4, STAGE_POS.z + 19.5);
-  const STAGE_CAM_LOOK = new THREE.Vector3(STAGE_POS.x, STAGE_POS.y - 5, STAGE_POS.z);
+  // The turntable sits in open air, deliberately clear of every LANDMARK footprint.
+  // It used to be (0, 92, -40) — which is inside the central tower (origin, radius 96,
+  // height 170), so the "plane preview" was actually the inside of the tower mesh.
+  // Nearest landmark to this point is mesa(-620,-340), ~670u away.
+  const STAGE_POS = { x: 0, y: 300, z: -620 };
+  // 3/4 hero angle. The distance is DERIVED, not fixed: a hard offset was tuned for a
+  // tall viewport and broke in phone landscape, where 70deg vertical FOV at ~27u leaves
+  // only ~38 world units of visible height for a ~30u aircraft — the plane filled the
+  // frame and clipped. Recompute per frame from the live FOV so framing holds at any
+  // aspect, and bias the look target down so the plane sits in the upper half, clear of
+  // the customize sheet across the bottom.
+  /* Slight LOW angle, looking up at the aircraft. A camera above it put the whole
+     backdrop on the ground — green field, a hard shadow band and a distant rock
+     field sitting right beside the nose. From just below, the backdrop is open sky
+     and the silhouette reads cleanly, which is the classic aircraft beauty shot. */
+  const STAGE_CAM_DIR = new THREE.Vector3(14.9, -4.0, 19.5).normalize();
+  /* Fraction of the STAGE — the open strip above the customize sheet — that the
+     aircraft's longest axis should span. Measuring against the whole canvas instead
+     made the plane grow with the viewport: correct at 812x375, nearly edge-to-edge
+     on desktop, because the stage is a much smaller share of a tall canvas.
+     It also reads smaller than the number suggests, since a 3/4 view projects well
+     under the full length. */
+  const STAGE_FILL = 0.62;
+  /* Measured stage rect in CSS pixels. Refreshed on resize and when the hangar
+     opens, not per frame — getBoundingClientRect in the draw loop forces layout. */
+  const stageView = { top: 0, height: 0, canvas: 0 };
+
+  function measureStageViewport() {
+    const canvasH = (canvasEl && canvasEl.clientHeight) || window.innerHeight;
+    const el = document.querySelector(".sc-hangar-stage");
+    stageView.canvas = canvasH;
+    if (el) {
+      const r = el.getBoundingClientRect();
+      stageView.top = r.top;
+      stageView.height = r.height;
+    } else {
+      stageView.top = 0;
+      stageView.height = canvasH;
+    }
+  }
+  const STAGE_CAM_POS = new THREE.Vector3();
+  const STAGE_CAM_LOOK = new THREE.Vector3();
+  const _stageBox = new THREE.Box3();
+  const _stageSize = new THREE.Vector3();
+  /** Measured span of the demo aircraft. Airframes differ (the Fighter's wings are
+   *  30u before the group's 1.35x scale; the Interceptor is far slimmer), so measure
+   *  rather than hard-code — a constant here is exactly what put the camera inside
+   *  the aircraft. Recomputed whenever the demo plane is rebuilt. */
+  let stagePlaneSpan = 48;
+
+  function measureStagePlane(obj) {
+    if (!obj) return;
+    _stageBox.setFromObject(obj);
+    if (_stageBox.isEmpty()) return;
+    _stageBox.getSize(_stageSize);
+    stagePlaneSpan = Math.max(_stageSize.x, _stageSize.y, _stageSize.z) || stagePlaneSpan;
+  }
+
+  /**
+   * Raise the rendered subject into the upper part of the canvas by sliding the
+   * frustum, leaving the camera's position and angle alone. Eased by the same
+   * stageBlend as the camera move so entering/leaving the hangar stays smooth.
+   */
+  function applyStageLift(blend) {
+    if (!camera || !canvasEl) return;
+    const w = canvasEl.clientWidth || window.innerWidth;
+    const h = canvasEl.clientHeight || window.innerHeight;
+    if (blend <= 0.001) {
+      if (camera.view && camera.view.enabled) camera.clearViewOffset();
+      return;
+    }
+    // Slide the frustum so the stage's centre lands where the canvas centre was.
+    const stageCentre = stageView.height > 0 ? stageView.top + stageView.height / 2 : h / 2;
+    const lift = (h / 2 - stageCentre) * blend;
+    camera.setViewOffset(w, h, 0, lift, w, h);
+  }
+
+  /** Reframe the hangar turntable for the current FOV, viewport and airframe. */
+  function updateStageFraming() {
+    const halfV = Math.tan(((camera ? camera.fov : 70) * Math.PI) / 360);
+    // STAGE_FILL is a share of the stage strip; convert it to a share of the full
+    // frustum height, which is what the camera distance is actually derived from.
+    const canvasH = stageView.canvas || (canvasEl && canvasEl.clientHeight) || window.innerHeight;
+    const stageShare = stageView.height > 0 ? stageView.height / canvasH : 1;
+    const fillOfFrame = Math.max(0.05, STAGE_FILL * stageShare);
+    const visibleH = stagePlaneSpan / fillOfFrame;
+    const dist = visibleH / (2 * halfV);
+    STAGE_CAM_POS.copy(STAGE_CAM_DIR).multiplyScalar(dist)
+      .add(new THREE.Vector3(STAGE_POS.x, STAGE_POS.y, STAGE_POS.z));
+    // Look straight at the aircraft: a level 3/4 view. Vertical placement is the
+    // frustum's job, applied at render time below.
+    STAGE_CAM_LOOK.set(STAGE_POS.x, STAGE_POS.y, STAGE_POS.z);
+  }
 
   const camPos = new THREE.Vector3(0, 90, 160);
   const camLook = new THREE.Vector3(0, 30, 0);
@@ -1306,6 +1392,9 @@ import * as THREE from "three";
       renderer.setSize(window.innerWidth, window.innerHeight, false);
       camera.aspect = window.innerWidth / window.innerHeight;
       camera.updateProjectionMatrix();
+      // The hangar stage strip changes size with the viewport; re-measure so the
+      // turntable reframes instead of keeping a stale rect.
+      measureStageViewport();
     },
 
     sync(state, dt, myId) {
@@ -1659,6 +1748,8 @@ import * as THREE from "three";
 
     draw(state, myId) {
       applySceneModeChrome();
+      // Gameplay always renders through an unshifted frustum, whatever the hangar left behind.
+      if (camera && camera.view && camera.view.enabled) camera.clearViewOffset();
       this._updateCamera(myId);
       renderer.render(scene, camera);
       if (sceneMode === "playing") {
@@ -1691,9 +1782,11 @@ import * as THREE from "three";
       if (!menuDemo) {
         menuDemo = makePlane(cosmetic);
         scene.add(menuDemo);
+        measureStagePlane(menuDemo);
       }
 
       applySceneModeChrome();
+      updateStageFraming();
       const isCustomize = sceneMode === "customize";
       // Blend factor eases the hard cut when entering/leaving the hangar stage: ramps
       // 0->1 over ~350ms so the camera/plane glide into the turntable pose instead of
@@ -1768,6 +1861,7 @@ import * as THREE from "three";
       camLook.lerp(look, lerpSpeed + 0.02);
       camera.position.copy(camPos);
       camera.lookAt(camLook);
+      applyStageLift(stageBlend);
       renderer.render(scene, camera);
       if (mmctx) mmctx.clearRect(0, 0, minimap.width, minimap.height);
     },
@@ -1791,6 +1885,7 @@ import * as THREE from "three";
         }
         menuDemo = makePlane(cosmetic);
         scene.add(menuDemo);
+        measureStagePlane(menuDemo);
         return;
       }
 
@@ -2099,6 +2194,14 @@ import * as THREE from "three";
         geometries: memory ? memory.geometries : 0,
         textures: memory ? memory.textures : 0,
         programs: renderer && renderer.info && renderer.info.programs ? renderer.info.programs.length : 0,
+        sceneMode,
+        stageBlend: Number(stageBlend.toFixed(3)),
+        stagePlaneSpan: Number(stagePlaneSpan.toFixed(2)),
+        stageCam: [STAGE_CAM_POS.x, STAGE_CAM_POS.y, STAGE_CAM_POS.z].map((v) => Number(v.toFixed(1))),
+        camPos: camera ? [camera.position.x, camera.position.y, camera.position.z].map((v) => Number(v.toFixed(1))) : null,
+        camToStage: camera
+          ? Number(camera.position.distanceTo(new THREE.Vector3(STAGE_POS.x, STAGE_POS.y, STAGE_POS.z)).toFixed(1))
+          : null,
       };
     },
 
@@ -2109,11 +2212,13 @@ import * as THREE from "three";
     setSceneMode(mode) {
       sceneMode = mode || "preflight";
       applySceneModeChrome();
+      measureStageViewport();
     },
 
     setHangarOpen(open) {
       sceneMode = open ? "customize" : "preflight";
       applySceneModeChrome();
+      measureStageViewport();
     },
   };
 

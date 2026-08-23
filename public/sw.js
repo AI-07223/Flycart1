@@ -1,6 +1,8 @@
 // SmashCart service worker — cache-first precache shell.
-// BUMP "smashcart-v2" whenever any bundle in public/js/ or precached assets change.
-const CACHE = "smashcart-v2";
+// The CACHE name below is GENERATED: scripts/build-client.mjs hashes the shipped
+// bundles, index.html, the manifest and the CSS, and rewrites this line on every
+// build. Do not hand-edit it — a stale name serves the previous client forever.
+const CACHE = "smashcart-5115104dc11c";
 
 // Exactly what index.html loads plus the audio files fetched at runtime.
 // net-ws.js is intentionally NOT precached: net-ws.ts is bundled into

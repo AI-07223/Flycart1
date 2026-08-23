@@ -143,6 +143,11 @@ Removed during the local-only rebuild: Colyseus rooms/schema, P2P signaling and 
 
 Gameplay tuning lives in `src/shared/constants.ts`. `public/js/constants.js` is generated from that shared source via `npm run build-client`; do not hand-edit the generated constants bundle.
 
+`npm run build-client` also stamps the service-worker cache name in `public/sw.js` with a hash of
+the shipped bundles, HTML, manifest and CSS. Because `sw.js` is cache-first, that stamp is what
+stops returning players from running the previous client after a deploy — it is generated, not
+hand-edited.
+
 ## Deployment
 
 The same server runs on any machine on the LAN — a laptop, a mini PC, or a Pi. Two conveniences are kept in the repo:

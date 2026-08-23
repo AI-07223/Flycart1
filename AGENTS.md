@@ -18,6 +18,8 @@ SmashCart is a Node.js/TypeScript local Wi-Fi air-combat game with a server-auth
 - `openspec/changes/archive/` stores historical proposals, designs, specs, and task lists.
 
 Do not edit generated client files in `public/js/` — every one of them is built from `src/client/`.
+The `CACHE` constant in `public/sw.js` is generated too: `build-client.mjs` hashes the shipped
+bundles, HTML, manifest and CSS and rewrites it, so a client change always rotates the cache.
 
 ## Build, Test, and Development Commands
 

@@ -950,7 +950,9 @@
   var router = null;
   var handlers = null;
   var stack = ["home"];
+  var displayed = null;
   var screens = /* @__PURE__ */ new Map();
+  var exitTimers = /* @__PURE__ */ new Map();
   var $ = (id) => document.getElementById(id);
   var busy = false;
   var hangarDraft = null;
@@ -1147,7 +1149,9 @@
         <h2 id="sc-lobby-room-name-view" class="sc-lobby-roomname">Private Room</h2>
         <input id="sc-lobby-room-name-edit" class="sc-input" maxlength="20" placeholder="Name this room..." autocomplete="off" aria-label="Room name" />
         <div class="sc-qr-frame">
-          <canvas id="sc-lobby-qr" width="0" height="0" aria-label="Join QR code"></canvas>
+          <!-- Starts hidden: a 0x0 canvas inside an 82px CSS box paints as a broken-image
+               placeholder. setLobbyQr() reveals it once a code is actually drawn. -->
+          <canvas id="sc-lobby-qr" class="sc-hidden" width="0" height="0" aria-label="Join QR code"></canvas>
         </div>
         <p class="sc-note sc-note--tight">${ICON.wifi}<span>Friends: join the same Wi-Fi, then scan this.</span></p>
         <p id="sc-lobby-url" class="sc-lobby-url mono"></p>
@@ -1228,6 +1232,9 @@
     </div>`;
     root.classList.remove("hidden");
     document.body.classList.add("sc-menu-open");
+    displayed = null;
+    exitTimers.clear();
+    stack = ["home"];
     router = $("sc-router");
     router.querySelectorAll(".sc-screen").forEach((el) => {
       const id = el.dataset.screen;
@@ -1264,30 +1271,42 @@
     return stack[stack.length - 1] || "home";
   }
   var TRANSITION_MS = 340;
+  function scheduleExit(el) {
+    cancelExit(el);
+    exitTimers.set(el, window.setTimeout(() => {
+      exitTimers.delete(el);
+      el.classList.remove("is-active", "anim-fwd-out", "anim-back-out");
+    }, TRANSITION_MS));
+  }
+  function cancelExit(el) {
+    const pending = exitTimers.get(el);
+    if (pending !== void 0) {
+      window.clearTimeout(pending);
+      exitTimers.delete(el);
+    }
+  }
   function showScreen(id, dir = "forward") {
     if (!router) return;
-    if (currentScreenId() === id && screens.get(id)?.classList.contains("is-active")) return;
+    if (displayed === id) return;
     stopProbe();
-    const prevId = currentScreenId();
-    const prevEl = screens.get(prevId);
+    const prevEl = displayed ? screens.get(displayed) ?? null : null;
     const nextEl = screens.get(id);
     if (!nextEl) return;
     if (id === "hangar") beginHangarDraft();
     if (id === "settings") populateSettingsUI();
     if (id === "join") startProbe();
-    stack.push(id);
-    if (prevEl && prevEl !== nextEl && prevEl.classList.contains("is-active")) {
+    if (dir !== "back") stack.push(id);
+    if (prevEl && prevEl !== nextEl) {
       prevEl.classList.add(dir === "back" ? "anim-back-out" : "anim-fwd-out");
       prevEl.setAttribute("aria-hidden", "true");
-      window.setTimeout(() => {
-        prevEl.classList.remove("is-active", "anim-fwd-out", "anim-back-out");
-      }, TRANSITION_MS);
+      scheduleExit(prevEl);
     }
+    cancelExit(nextEl);
     nextEl.classList.remove("anim-fwd-in", "anim-back-in", "anim-fwd-out", "anim-back-out");
     void nextEl.offsetWidth;
     nextEl.classList.add("is-active", dir === "back" ? "anim-back-in" : "anim-fwd-in");
     nextEl.removeAttribute("aria-hidden");
-    if (stack[stack.length - 1] !== id) stack.push(id);
+    displayed = id;
     const scroller = nextEl.querySelector(".sc-body");
     if (scroller) scroller.scrollTop = 0;
   }
@@ -1301,7 +1320,11 @@
   function resetToHome() {
     cancelHangarDraft();
     stack = ["home"];
-    for (const [, el] of screens) el.classList.remove("is-active", "anim-fwd-in", "anim-back-in", "anim-fwd-out", "anim-back-out");
+    for (const [, el] of screens) {
+      cancelExit(el);
+      el.classList.remove("is-active", "anim-fwd-in", "anim-back-in", "anim-fwd-out", "anim-back-out");
+    }
+    displayed = null;
     showScreen("home", "back");
     hidePause();
   }
@@ -1778,9 +1801,9 @@
     if (!canvas) return;
     try {
       window.QR.render(canvas, joinUrl, { size: 220, margin: 2, errorCorrectionLevel: "M" });
+      canvas.classList.remove("sc-hidden");
     } catch {
-      canvas.width = 0;
-      canvas.height = 0;
+      canvas.classList.add("sc-hidden");
     }
     const urlEl = $("sc-lobby-url");
     if (urlEl) urlEl.textContent = joinUrl;

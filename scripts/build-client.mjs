@@ -6,7 +6,8 @@
 // Three.js/Colyseus are NOT imported by these files (they use window.* globals).
 
 import { build } from "esbuild";
-import { readdirSync } from "fs";
+import { createHash } from "crypto";
+import { readdirSync, readFileSync, writeFileSync, existsSync } from "fs";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
 
@@ -37,6 +38,45 @@ const IIFE_ENTRIES = [
 ];
 const ESM_ENTRIES = ["render3d"];
 const ENTRY_NAMES = [...IIFE_ENTRIES, ...ESM_ENTRIES];
+
+/**
+ * public/sw.js is cache-first, so a stale CACHE name means returning players keep
+ * running the previous bundle after a deploy. The name used to be a hand-edited
+ * constant ("BUMP smashcart-v2 whenever a bundle changes") — a manual step that is
+ * trivially forgotten. Derive it from the shipped bytes instead: same content in,
+ * same name out; any change to a precached file rotates the cache automatically.
+ */
+function stampServiceWorkerCache() {
+  const swPath = join(ROOT, "public", "sw.js");
+  if (!existsSync(swPath)) return;
+
+  const hash = createHash("sha256");
+  const inputs = [
+    join(ROOT, "public", "index.html"),
+    join(ROOT, "public", "manifest.webmanifest"),
+    ...readdirSync(OUT_DIR).filter((f) => f.endsWith(".js")).sort()
+      .map((f) => join(OUT_DIR, f)),
+    ...readdirSync(join(ROOT, "public", "css")).filter((f) => f.endsWith(".css")).sort()
+      .map((f) => join(ROOT, "public", "css", f)),
+  ];
+  for (const file of inputs) {
+    if (!existsSync(file)) continue;
+    hash.update(file.replace(ROOT, ""));
+    hash.update(readFileSync(file));
+  }
+  const name = `smashcart-${hash.digest("hex").slice(0, 12)}`;
+
+  const src = readFileSync(swPath, "utf8");
+  const marker = /const CACHE = "[^"]*";/;
+  if (!marker.test(src)) {
+    console.warn("  ⚠ sw.js: no `const CACHE = \"...\";` line to stamp");
+    return;
+  }
+  const next = src.replace(marker, `const CACHE = "${name}";`);
+  // An unchanged build produces the same name; only write when it actually moved.
+  if (next !== src) writeFileSync(swPath, next);
+  console.log(`  ✓ sw.js cache name → ${name}`);
+}
 
 const availableFiles = new Set(
   readdirSync(SRC_DIR).filter((f) => f.endsWith(".ts") && !f.endsWith(".d.ts"))
@@ -84,6 +124,8 @@ try {
       }).then(() => console.log(`  ✓ ${name}.ts → js/${name}.js (${format})`))
     )
   );
+
+  stampServiceWorkerCache();
 
   console.log("Client build complete.");
 } catch (err) {

@@ -34,6 +34,7 @@ deepseek-harness/
 
 # process artifacts
 GATES.md
+.unlazy-hook-state.json
 
 # built android artifact — release asset, not source
 public/apk/
