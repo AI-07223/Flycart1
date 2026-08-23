@@ -402,6 +402,7 @@ export class GameSim {
 
       this.stepBullets(dt, playing);
       this.stepStarRams();
+      this.stepMagnet(dt);
       this.collectPickups();
       this.expirePowers();
     }
@@ -840,6 +841,8 @@ export class GameSim {
     if (this.now < (this.invulnUntil.get(victimId) ?? 0)) return false;
     // Star: absolute invulnerability while active — no damage of any kind gets through.
     if (p.power === "star" && p.powerLeft > 0) return false;
+    // Ghost: phased out — bullets, mines, and star-rams pass straight through.
+    if (p.power === "ghost" && p.powerLeft > 0) return false;
 
     const shield = this.shield.get(victimId) ?? 0;
     if (shield > 0) {
@@ -915,6 +918,29 @@ export class GameSim {
       if (roll <= 0) return type;
     }
     return C.POWERUP_TYPES[0];
+  }
+
+  /**
+   * Magnet powerup: each tick, any pickup within PICKUP_RADIUS*MAGNET_RADIUS_MULT
+   * (+PLANE_RADIUS) of an alive magnet-holder drifts one linear step toward the
+   * nearest holder (constant MAGNET_PULL_SPEED, no easing). Runs just before
+   * collectPickups so a pulled-in pickup can be grabbed the same tick.
+   */
+  private stepMagnet(dt: number): void {
+    const range = C.PICKUP_RADIUS * C.MAGNET_RADIUS_MULT + C.PLANE_RADIUS;
+    for (const pk of this.pickups.values()) {
+      let holder: SimPlayer | null = null;
+      let holderDist = Infinity;
+      for (const [, p] of this.players) {
+        if (!p.alive || p.power !== "magnet" || p.powerLeft <= 0) continue;
+        const dist = S.distance(getP(pk), getP(p));
+        if (dist < holderDist) { holderDist = dist; holder = p; }
+      }
+      if (!holder || holderDist > range || holderDist <= 1e-6) continue;
+      const dir = S.normalize(S.sub(getP(holder), getP(pk)));
+      const stepLen = Math.min(holderDist, C.MAGNET_PULL_SPEED * dt);
+      setP(pk, S.add(getP(pk), S.scale(dir, stepLen)));
+    }
   }
 
   private collectPickups(): void {
@@ -1119,8 +1145,15 @@ export class GameSim {
 
   private addBot(): void {
     const id = `bot_${this.botSeq++}`;
+    // Prefer unused call signs so the lobby roster never shows duplicates.
+    const used = new Set<string>();
+    for (const [, pl] of this.players) used.add(pl.name);
+    const free = C.BOT_NAMES.filter((n) => !used.has(n));
+    const name = free.length > 0
+      ? free[Math.floor(Math.random() * free.length)]
+      : `${C.BOT_NAMES[this.botSeq % C.BOT_NAMES.length]}${Math.floor(this.botSeq / C.BOT_NAMES.length) || ""}`;
     const p: SimPlayer = {
-      name: C.BOT_NAMES[Math.floor(Math.random() * C.BOT_NAMES.length)],
+      name,
       px: 0, py: 0, pz: 0,
       fx: 1, fy: 0, fz: 0,
       seq: 0,

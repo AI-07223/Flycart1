@@ -1,5 +1,5 @@
 // Orchestration: menu, HUD, connection, and render loop for the flat-world reboot.
-import { WebRtcTransport } from "./host-sim";
+import { WsTransport } from "./net-ws";
 import { ARCADE_MENU_HOST_ID, ARCADE_MENU_SCREEN_CLASS, arcadeScreenId, mountArcadeMenu } from "./arcadeMenu";
 import {
   ACCENT_OPTIONS,
@@ -25,6 +25,12 @@ import {
 } from "../shared/loadout";
 
 const dollar = (id: string) => document.getElementById(id)!;
+
+// Single transport for the local-only build: one raw WebSocket to the game
+// server that serves this page. Assigned to window.Net exactly once at boot.
+export const net = new WsTransport();
+(window as any).Net = net;
+
 const menuRoot = mountArcadeMenu()!;
 const useArcadeMenu = menuRoot.id === ARCADE_MENU_HOST_ID;
 const menuDollar = (...ids: string[]) => {
@@ -204,8 +210,6 @@ let currentLobbyCode: string | null = null;
 let currentLobbyServer: string | null = null;
 let currentRoomFriendlyName: string | null = null;
 let _settingsDebounce: ReturnType<typeof setTimeout> | null = null;
-let _colyseusNet: any = null;
-let _isP2PSession = false;
 let scannerOpen = false;
 let scanRafId: number | null = null;
 let _localScanInterval: ReturnType<typeof setInterval> | null = null;
@@ -366,7 +370,7 @@ function hideRoomChip(): void {
 }
 
 function updateRoomChip(): void {
-  if (!_isP2PSession || !currentLobbyCode) { hideRoomChip(); return; }
+  if (!currentLobbyCode) { hideRoomChip(); return; }
   const core = roomCodeCore(currentLobbyCode);
   els.hudRoomChip.textContent = currentRoomFriendlyName ? `📶 ${currentRoomFriendlyName} · ${core}` : `📶 ${core}`;
   els.hudRoomChip.classList.remove("hidden");
@@ -376,7 +380,7 @@ function updateLobbyMeta(): void {
   const state = window.Net.state;
   const modeLabel = state?.mode === "tdm" ? "Team Deathmatch" : "Free-for-all";
   const roundLength = typeof state?.roundLength === "number" ? state.roundLength : 150;
-  const roomLabel = currentLobbyCode ? `Code ${roomCodeCore(currentLobbyCode)}` : (_isP2PSession ? "Wi-Fi live" : "Private room");
+  const roomLabel = currentLobbyCode ? `Code ${roomCodeCore(currentLobbyCode)}` : "Private room";
   els.lobbyRoomChip.textContent = roomLabel;
   els.lobbyModeChip.textContent = `${modeLabel} · ${formatClock(roundLength)}`;
 }
@@ -934,213 +938,40 @@ function randomLocalRoomName(): string {
   return `${adj} ${noun}`;
 }
 
-// ─── LOCAL WI-FI HOST PATH ────────────────────────────────────────────────────
-// Starts continuous FFA immediately (no lobby ready-up gate) and broadcasts a
-// human-readable room name so guests can pick it from the list.
-async function startLocalRoom(): Promise<void> {
-  window.SFX.unlock();
-  enterImmersive();
-
-  const name     = (els.name.value || "Pilot").slice(0, 14);
-  const code     = "P-" + genCode();
-  const roomName = (els.localRoomName.value.trim() || els.localRoomName.placeholder || randomLocalRoomName()).slice(0, 20);
-
-  // Save Colyseus Net before swapping
-  if (!_isP2PSession) {
-    _colyseusNet = (window as any).Net;
-  }
-
-  const transport = new WebRtcTransport();
-  (window as any).Net = transport;
-  _isP2PSession = true;
-
-  transport.onKill       = onKill;
-  transport.onPickup     = onPickup;
-  transport.onDisconnect = onP2PDisconnect;
-
-  setStatus("Starting local room…");
-  setBusy(true);
-
-  try {
-    await (transport as any).startHost(name, code, selectedCosmetics, { roomName, continuous: true, bots: els.localBots.checked });
-  } catch (e: any) {
-    setStatus("Could not start local room: " + (e && e.message ? e.message : e));
-    setBusy(false);
-    (window as any).Net = _colyseusNet;
-    _colyseusNet  = null;
-    _isP2PSession = false;
-    return;
-  }
-
-  setStatus("");
-  setBusy(false);
-
-  currentLobbyCode   = code;
-  currentLobbyServer = null;
-  currentRoomFriendlyName = roomName;
-
-  // Show share bar — code is the primary invite; QR still encodes the full
-  // join URL so a phone camera can auto-join without typing.
-  const p2pUrl = buildP2PShareUrl(code);
-  activeShareUrl          = p2pUrl;
-  els.shareLink.value     = p2pUrl;
-  els.shareQrLink.value   = p2pUrl;
-  els.shareCodeBar.textContent = roomCodeCore(code);
-  els.shareQrRoom.textContent = roomName;
-  els.shareQrCode.textContent = roomCodeCore(code);
-  els.shareQrNote.textContent = `Scan on the same Wi-Fi to join "${roomName}".`;
-  els.copy.disabled           = false;
-  els.shareQrCopy.disabled    = false;
-  try {
-    window.QR.render(els.shareQrCanvas, p2pUrl, {
-      size: window.Input.isTouchDevice() ? 220 : 256,
-      errorCorrectionLevel: "M",
-    });
-    els.qrBtn.disabled = false;
-  } catch {
-    els.qrBtn.disabled = true;
-    els.shareQrCanvas.width = 0;
-  }
-  els.share.classList.remove("hidden");
-
-  // Show the room name prominently in the lobby header so the host can read it out
-  els.lobbyTitle.textContent = `${roomName} · ${roomCodeCore(code)}`;
-
-  transport.onStateChange = onLobbyStateChange;
-  renderLobbyRoster();
-  window.Net?.sendHostSettings?.({ botDifficulty });
-  applyMode("lobby");
-}
-
-// ─── LOCAL WI-FI SCAN ROOMS ───────────────────────────────────────────────────
-function stopLocalScanInterval(): void {
-  if (_localScanInterval !== null) {
-    clearInterval(_localScanInterval);
-    _localScanInterval = null;
-  }
-}
-
-async function runLocalScan(): Promise<void> {
-  els.localRoomList.innerHTML = '<article class="local-state-card"><p class="deck-label">Scanning hotspot</p><h4>Looking for active rooms</h4><p class="muted">Hosts on the same Wi-Fi appear here automatically.</p></article>';
-  let rooms: Array<{ code: string; name: string; hostName: string; count: number }> = [];
-  try {
-    rooms = await WebRtcTransport.listRooms();
-  } catch {
-    rooms = [];
-  }
-
-  if (!rooms.length) {
-    els.localRoomList.innerHTML =
-      '<article class="local-state-card"><p class="deck-label">No rooms found</p><h4>Nothing is broadcasting yet</h4><p class="muted">Ask the host to tap Create Room on the hotspot device, then scan again.</p></article>' +
-      '<button class="local-rescan-btn secondary" id="local-rescan-btn">Re-scan</button>';
-    const rescan = document.getElementById("local-rescan-btn");
-    if (rescan) rescan.addEventListener("click", () => { window.SFX.uiClick(); runLocalScan(); });
-    return;
-  }
-
-  els.localRoomList.innerHTML = rooms.map((r) =>
-    `<div class="local-room-row" data-room="${escapeHtml(r.code)}" role="button" tabindex="0" aria-label="Join ${escapeHtml(r.name || r.code)}">
-      <div class="local-room-row-info">
-        <div class="local-room-row-head">
-          <span class="local-room-row-name">${escapeHtml(r.name || r.code)}</span>
-          <span class="local-room-tag">${r.count} pilot${r.count !== 1 ? "s" : ""}</span>
-        </div>
-        <span class="local-room-row-meta">Hosted by ${escapeHtml(r.hostName || "Unknown")} · Same hotspot</span>
-      </div>
-      <button class="local-room-join-btn" data-room="${escapeHtml(r.code)}">Join</button>
-    </div>`
-  ).join("") + '<button class="local-rescan-btn secondary" id="local-rescan-btn">Re-scan</button>';
-
-  // Wire row taps and join buttons
-  els.localRoomList.querySelectorAll<HTMLElement>(".local-room-row").forEach((row) => {
-    const joinHandler = () => {
-      const roomCode = row.dataset.room;
-      if (!roomCode) return;
-      const matchedRoom = rooms.find((r) => r.code === roomCode);
-      const friendlyName = matchedRoom ? (matchedRoom.name || roomCode) : undefined;
-      stopLocalScanInterval();
-      window.SFX.uiClick();
-      joinP2PAsGuest(roomCode, friendlyName);
-    };
-    row.addEventListener("click", joinHandler);
-    row.addEventListener("keydown", (e: KeyboardEvent) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); joinHandler(); } });
-  });
-
-  // Join buttons inside rows — stop propagation so they don't double-fire
-  els.localRoomList.querySelectorAll<HTMLElement>(".local-room-join-btn").forEach((btn) => {
-    btn.addEventListener("click", (e: MouseEvent) => {
-      e.stopPropagation();
-      const roomCode = btn.dataset.room;
-      if (!roomCode) return;
-      const matchedRoom = rooms.find((r) => r.code === roomCode);
-      const friendlyName = matchedRoom ? (matchedRoom.name || roomCode) : undefined;
-      stopLocalScanInterval();
-      window.SFX.uiClick();
-      joinP2PAsGuest(roomCode, friendlyName);
-    });
-  });
-
-  const rescan = document.getElementById("local-rescan-btn");
-  if (rescan) rescan.addEventListener("click", () => { window.SFX.uiClick(); runLocalScan(); });
-}
-
-function startLocalScanWithAutoRefresh(): void {
-  runLocalScan();
-  stopLocalScanInterval();
-  // Auto-refresh every 3s while #arcade-screen-join is the active screen
-  _localScanInterval = setInterval(() => {
-    const joinScreen = document.getElementById(menuScreenElementId("join"));
-    if (!joinScreen || !joinScreen.classList.contains("active")) {
-      stopLocalScanInterval();
-      return;
-    }
-    runLocalScan();
-  }, 3000);
-}
-
-// ─── P2P GUEST PATH ──────────────────────────────────────────────────────────
-async function joinP2PAsGuest(code: string, friendlyName?: string): Promise<void> {
+// ─── SINGLE CONNECT FLOW ─────────────────────────────────────────────────────
+// Local-only build: create and join are the same operation — one WebSocket to
+// the server that serves this page. Room codes are decorative labels kept for
+// the share/QR UI; the server hosts a single room.
+async function joinRoom(code: string, friendlyName?: string): Promise<void> {
   window.SFX.unlock();
   enterImmersive();
 
   const name = (els.name.value || "Pilot").slice(0, 14);
 
-  // Save Colyseus Net before swapping
-  if (!_isP2PSession) {
-    _colyseusNet = (window as any).Net;
-  }
+  net.onKill = onKill;
+  net.onPickup = onPickup;
+  net.onDisconnect = onDisconnect;
+  net.onStateChange = onLobbyStateChange;
 
-  const transport = new WebRtcTransport();
-  (window as any).Net = transport;
-  _isP2PSession = true;
-
-  transport.onKill       = onKill;
-  transport.onPickup     = onPickup;
-  transport.onDisconnect = onP2PDisconnect;
-
-  setStatus("Connecting via P2P…");
+  setStatus("Connecting…");
   setBusy(true);
 
   try {
-    await transport.connect(name, code, selectedCosmetics, null);
+    await net.connect(name, code, selectedCosmetics, null);
   } catch (e: any) {
-    setStatus("Could not connect (P2P): " + (e && e.message ? e.message : e));
+    setStatus("Could not connect: " + (e && e.message ? e.message : e));
     setBusy(false);
-    (window as any).Net = _colyseusNet;
-    _colyseusNet  = null;
-    _isP2PSession = false;
     return;
   }
 
   setStatus("");
   setBusy(false);
 
-  currentLobbyCode   = code;
+  currentLobbyCode = code;
   currentLobbyServer = null;
   currentRoomFriendlyName = friendlyName || null;
 
-  // Share bar shows the invite (guest can also share it) — code first, QR still
-  // encodes the full join URL so a phone camera can auto-join.
+  // Share bar shows the invite label — code first, QR still encodes a join URL.
   const p2pUrl = buildP2PShareUrl(code);
   const core = roomCodeCore(code);
   activeShareUrl = p2pUrl;
@@ -1149,7 +980,7 @@ async function joinP2PAsGuest(code: string, friendlyName?: string): Promise<void
   els.shareCodeBar.textContent = core;
   els.shareQrRoom.textContent = friendlyName || `Room ${core}`;
   els.shareQrCode.textContent = core;
-  els.shareQrNote.textContent = `Scan on the same Wi-Fi to join ${core}.`;
+  els.shareQrNote.textContent = `Others can join from the same server.`;
   els.copy.disabled = false;
   els.shareQrCopy.disabled = false;
   try {
@@ -1164,42 +995,53 @@ async function joinP2PAsGuest(code: string, friendlyName?: string): Promise<void
   }
   els.share.classList.remove("hidden");
 
-  transport.onStateChange = onLobbyStateChange;
   els.lobbyTitle.textContent = friendlyName ? `${friendlyName} · ${core}` : `Room ${core}`;
   renderLobbyRoster();
   applyMode("lobby");
 
-  const phase = transport.getPhase();
+  const phase = net.getPhase();
   if (phase === "playing") {
-    transport.onStateChange = null;
+    net.onStateChange = null;
     enterPlayingFromLobby();
   }
 }
 
-// ─── P2P DISCONNECT HANDLER ───────────────────────────────────────────────────
-function onP2PDisconnect(info: any): void {
-  if (info && info.type === "host-migrating") {
-    // A new host is being elected — show the reconnecting overlay and wait.
-    if (window.SFX.suspend) window.SFX.suspend();
-    els.p2pMigratingOverlay.classList.remove("hidden");
-    return;
+// ─── CREATE ROOM PATH ────────────────────────────────────────────────────────
+// Same connect as joining; afterwards push initial settings (the creator is
+// normally elected leader and the server applies leader-only settings).
+async function startLocalRoom(): Promise<void> {
+  const roomName = (els.localRoomName.value.trim() || els.localRoomName.placeholder || randomLocalRoomName()).slice(0, 20);
+  await joinRoom("P-" + genCode(), roomName); // ponytail: code is a display label; server has one room
+  if (net.sessionId) {
+    net.sendHostSettings({ roomName, botsInRoom: els.localBots.checked, botDifficulty });
   }
-  if (info && info.type === "migration-complete") {
-    // Migration succeeded — hide the overlay and resume.
-    els.p2pMigratingOverlay.classList.add("hidden");
-    if (window.SFX.resume) window.SFX.resume();
-    return;
+}
+
+// ─── ROOM LIST (removed) ─────────────────────────────────────────────────────
+// TODO-for-menu-agent: there is exactly one server room now; rework the join
+// screen around a single "Join" button instead of a Wi-Fi scan list.
+function stopLocalScanInterval(): void {
+  if (_localScanInterval !== null) {
+    clearInterval(_localScanInterval);
+    _localScanInterval = null;
   }
-  if (info && (info.type === "host-left" || info.type === "kicked")) {
-    // Show the host-left overlay rather than the generic conn-lost screen.
-    // Also ensure the migrating overlay is hidden (covers timeout fallback path).
-    els.p2pMigratingOverlay.classList.add("hidden");
-    if (window.SFX.suspend) window.SFX.suspend();
-    showHostLeftOverlay();
-    return;
-  }
-  // Fall through to generic disconnect for other failures
-  onDisconnect(info);
+}
+
+function runLocalScan(): void {
+  els.localRoomList.innerHTML =
+    '<article class="local-state-card"><p class="deck-label">Single server</p><h4>One room hosts everyone</h4><p class="muted">Use Create Room to connect — no scanning needed.</p></article>';
+}
+
+function startLocalScanWithAutoRefresh(): void {
+  runLocalScan();
+  stopLocalScanInterval();
+}
+
+// ─── JOIN PATH ───────────────────────────────────────────────────────────────
+// Kept as a named entry point for the join-code / QR deep-link flows; the code
+// param is a display label only (single server room).
+async function joinP2PAsGuest(code: string, friendlyName?: string): Promise<void> {
+  await joinRoom(code, friendlyName);
 }
 
 // Called every time the Colyseus state changes while in the lobby
@@ -1673,20 +1515,8 @@ function resetToMenu(): void {
   currentLobbyServer = null;
   currentRoomFriendlyName = null;
   hideRoomChip();
-  // Hide migration overlay if visible (covers the "main menu" path from host-left overlay)
   els.p2pMigratingOverlay.classList.add("hidden");
   try { window.Net.leave(); } catch {}
-
-  // P2P teardown: restore the original Colyseus Net
-  if (_isP2PSession && _colyseusNet !== null) {
-    (window as any).Net = _colyseusNet;
-    _colyseusNet = null;
-    _isP2PSession = false;
-    // Re-wire callbacks to the restored Colyseus transport
-    window.Net.onKill = onKill;
-    window.Net.onPickup = onPickup;
-    window.Net.onDisconnect = onDisconnect;
-  }
 
   if (window.SFX.stopLoops) window.SFX.stopLoops();
   if (window.SFX.startMenuAmbient) window.SFX.startMenuAmbient();
@@ -1735,8 +1565,15 @@ function resetToMenu(): void {
   updateRotateOverlay();
 }
 
-function onDisconnect(_info?: any): void {
+function onDisconnect(info?: any): void {
   if (mode === "menu" || mode === "lost") return;
+  if (info && info.type === "kicked") {
+    // Kicked by the leader — host-left overlay, no reconnect attempt.
+    els.p2pMigratingOverlay.classList.add("hidden");
+    if (window.SFX.suspend) window.SFX.suspend();
+    showHostLeftOverlay();
+    return;
+  }
   if (window.SFX.suspend) window.SFX.suspend();
   els.connMsg.textContent = "Reconnecting…";
   els.connRetry.classList.add("hidden");

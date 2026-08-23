@@ -16,9 +16,11 @@ const SRC_DIR = join(ROOT, "src", "client");
 const OUT_DIR = join(ROOT, "public", "js");
 
 // Explicit allowlist of entry modules that index.html loads as standalone <script> tags.
-// net-p2p.ts, host-sim.ts, and transport.ts are NOT entry points — they are imported
-// by main.ts and bundled into main.js automatically. Do NOT add them here.
-// render3d.js is hand-written JS and is not compiled by this script.
+// net-ws.ts and transport.ts are NOT entry points — they are imported by main.ts
+// and bundled into main.js automatically. Do NOT add them here. (net-ws IS built
+// standalone so js/net-ws.js exists for debugging, but index.html does not load it;
+// window.Net is assigned by main.js.) render3d.js is hand-written JS and is not
+// compiled by this script.
 const ENTRY_NAMES = [
   "sphere",
   "constants",
@@ -26,7 +28,7 @@ const ENTRY_NAMES = [
   "audio",
   "assets",
   "input",
-  "net",
+  "net-ws",
   "qr",
   "main",
 ];

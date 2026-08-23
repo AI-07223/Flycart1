@@ -1,6 +1,6 @@
 // Type declarations for window.* globals used by the SmashCart client.
 
-// Inlined subset of TransportState for NetAPI — kept in sync with transport.ts.
+// Inlined subset of TransportState — kept in sync with transport.ts.
 // (Cannot import from transport.ts here without converting this file to a module,
 // which would break the global Window augmentation.)
 interface MapLike<K, V> {
@@ -227,60 +227,9 @@ interface Snapshot {
   players: Record<string, SnapshotPlayer>;
 }
 
-interface NetAPI {
-  client: any | null;
-  room: any | null;
-  /** Slice 2: abstracted state getter — use this instead of room.state in new code. */
-  readonly state: TransportState | null;
-  sessionId: string | null;
-  serverOrigin: string | null;
-  lastSent: { seq: number; turn: number; climb: number; boost: boolean; fire: boolean };
-  snaps: Snapshot[];
-  onKill: ((msg: any) => void) | null;
-  onPickup: ((msg: any) => void) | null;
-  onDisconnect: ((info: any) => void) | null;
-  onStateChange: (() => void) | null;
-  reconnectToken: string | null;
-  localPose: any;
-  endpoint(origin?: string | null): string;
-  connect(name: string, code: string, cosmetics: PlayerCosmetics, serverOrigin?: string | null): Promise<any>;
-  tryReconnect(): Promise<boolean>;
-  sample(renderTime: number): Record<string, SnapshotPlayer>;
-  stepLocal(dt: number): void;
-  sendInput(turn: number, climb: number, boost: boolean, fire: boolean): void;
-  setName(name: string): void;
-  // Slice 6 lobby methods
-  sendReady(): void;
-  sendHostStart(): void;
-  sendHostKick(targetId: string): void;
-  sendHostSettings(s: { roundLength?: number; roomName?: string; botsInRoom?: boolean; mode?: string; botDifficulty?: string }): void;
-  getPhase(): string | null;
-  getHostId(): string | null;
-  getRosterSnapshot(): Array<{ id: string; name: string; ready: boolean; bot: boolean; score: number; color: number }>;
-  leave(): void;
-}
-
-/**
- * Extended API available only on a WebRtcTransport instance.
- * Access via `(window.Net as WebRtcNetAPI)` after a P2P session starts.
- */
-interface WebRtcNetAPI extends NetAPI {
-  startHost(name: string, code: string, cosmetics: PlayerCosmetics): Promise<void>;
-  startOfflineQrOffer(canvas: HTMLCanvasElement): Promise<string>;
-  startOfflineQrAnswer(encoded: string, answerCanvas: HTMLCanvasElement): Promise<void>;
-  finishOfflineQrOffer(answerEncoded: string): Promise<void>;
-}
-
-/**
- * Disconnect/event info types emitted by WebRtcTransport via onDisconnect.
- * Used by onP2PDisconnect in main.ts.
- */
-type P2PDisconnectInfo =
-  | { type: "leave";              code?: number }
-  | { type: "host-left" }
-  | { type: "kicked" }
-  | { type: "host-migrating" }
-  | { type: "migration-complete" };
+// window.Net is typed as the WsTransport class instance via `declare global`
+// in net-ws.ts (a module can augment Window; this file deliberately stays
+// import-free to preserve global scope).
 
 interface QRRenderOptions {
   size?: number;
@@ -310,13 +259,6 @@ interface RendererAPI {
   hideMenu?(): void;
 }
 
-interface ColyseusClient {
-  new(endpoint: string): {
-    joinOrCreate(roomName: string, options: any): Promise<any>;
-    reconnect(token: string): Promise<any>;
-  };
-}
-
 declare function jsQR(
   data: Uint8ClampedArray,
   width: number,
@@ -331,9 +273,7 @@ declare interface Window {
   SFX: SFXAPI;
   Assets: AssetsAPI;
   Input: InputAPI;
-  Net: NetAPI;
   QR: QRAPI;
   Renderer: RendererAPI;
-  Colyseus: { Client: ColyseusClient };
   jsQR: typeof jsQR;
 }

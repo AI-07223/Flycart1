@@ -492,23 +492,185 @@ import * as THREE from "three";
     return group;
   }
 
+  // ---- Powerup pickup visuals: distinct color + glyph shape per type ----
+  // One shared radial-gradient canvas texture, tinted per type via SpriteMaterial.color
+  // (disposeObject frees materials/geometries but NOT textures, so the map survives).
+  let pickupGlowTex = null;
+  function getPickupGlowTexture() {
+    if (pickupGlowTex) return pickupGlowTex;
+    const size = 64;
+    const canvas = document.createElement("canvas");
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext("2d");
+    const grad = ctx.createRadialGradient(size / 2, size / 2, 2, size / 2, size / 2, size / 2);
+    grad.addColorStop(0, "rgba(255,255,255,0.95)");
+    grad.addColorStop(0.35, "rgba(255,255,255,0.38)");
+    grad.addColorStop(1, "rgba(255,255,255,0)");
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, size, size);
+    pickupGlowTex = new THREE.CanvasTexture(canvas);
+    pickupGlowTex.colorSpace = THREE.SRGBColorSpace;
+    return pickupGlowTex;
+  }
+
+  // Per-type look: palette + glyph geometry name. Unknown types fall back to the
+  // generic gem tinted from window.GAME.POWERUPS.
+  const PICKUP_STYLES = {
+    spread: { color: 0xff9f43, glyph: "ico" },
+    rapid: { color: 0xffd24a, glyph: "bolt" },
+    shield: { color: 0x49c0ff, glyph: "torus" },
+    afterburner: { color: 0xff5a3c, glyph: "cone" },
+    repair: { color: 0x8be34a, glyph: "cross" },
+    homing: { color: 0xf04fd6, glyph: "tetra" },
+    mine: { color: 0x39424c, glyph: "mineLamp" },
+    star: { color: 0xffd700, glyph: "star" },
+    emp: { color: 0x9b5bff, glyph: "knot" },
+    freeze: { color: 0xaee2ff, glyph: "crystal" },
+    ghost: { color: 0xffffff, glyph: "ico", translucent: true },
+    magnet: { color: 0x00d2d3, glyph: "horseshoe" },
+  };
+
+  function buildGlyphGeo(name) {
+    switch (name) {
+      case "ico": return new THREE.IcosahedronGeometry(7, 0);
+      case "bolt": { const g = new THREE.OctahedronGeometry(6.5, 0); g.scale(1, 1.7, 1); return g; }
+      case "torus": return new THREE.TorusGeometry(8, 2.6, 10, 18);
+      case "cone": return new THREE.ConeGeometry(6, 12, 7);
+      case "cross": return new THREE.BoxGeometry(13, 4.4, 4.4);
+      case "tetra": return new THREE.TetrahedronGeometry(8.5, 0);
+      case "mineLamp": return new THREE.IcosahedronGeometry(6.5, 0);
+      case "knot": return new THREE.TorusKnotGeometry(5.5, 1.8, 40, 8);
+      case "crystal": return new THREE.CylinderGeometry(6.5, 6.5, 10, 6);
+      case "horseshoe": return new THREE.TorusGeometry(7, 2.4, 8, 14, Math.PI);
+      case "star": {
+        const shape = new THREE.Shape();
+        const spikes = 5;
+        for (let i = 0; i < spikes * 2; i++) {
+          const r = i % 2 === 0 ? 9 : 4;
+          const a = (i / (spikes * 2)) * Math.PI * 2 - Math.PI / 2;
+          if (i === 0) shape.moveTo(Math.cos(a) * r, Math.sin(a) * r);
+          else shape.lineTo(Math.cos(a) * r, Math.sin(a) * r);
+        }
+        shape.closePath();
+        return new THREE.ExtrudeGeometry(shape, { depth: 2, bevelEnabled: false });
+      }
+      default: return new THREE.OctahedronGeometry(7, 0);
+    }
+  }
+
   function makePickup(type) {
-    const info = G.POWERUPS[type] || { color: 0xffffff };
+    const style = PICKUP_STYLES[type];
+    const info = G.POWERUPS[type] || null;
+    const color = style ? style.color : (info ? info.color : 0xffffff);
     const group = new THREE.Group();
-    const gem = new THREE.Mesh(
-      new THREE.OctahedronGeometry(7, 0),
-      new THREE.MeshStandardMaterial({ color: info.color, emissive: info.color, emissiveIntensity: 0.4, flatShading: true, roughness: 0.35 })
-    );
+
+    // Core glyph — fresh geometry+material per pickup so disposeObject stays safe.
+    const glyphMat = new THREE.MeshStandardMaterial({
+      color,
+      emissive: color,
+      emissiveIntensity: 0.45,
+      flatShading: true,
+      roughness: 0.35,
+      transparent: !!(style && style.translucent),
+      opacity: style && style.translucent ? 0.55 : 1,
+    });
+    const glyphName = style ? style.glyph : "generic";
+    const glyph = new THREE.Mesh(buildGlyphGeo(glyphName), glyphMat);
+    if (glyphName === "star" || glyphName === "horseshoe") glyph.material.side = THREE.DoubleSide;
+    group.add(glyph);
+
+    // Thin orbit ring keeps the classic powerup silhouette readable at distance.
     const ring = new THREE.Mesh(
       new THREE.TorusGeometry(11, 0.9, 10, 26),
-      new THREE.MeshBasicMaterial({ color: info.color, transparent: true, opacity: 0.6 })
+      new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.6 })
     );
     ring.rotation.x = Math.PI / 2;
-    group.add(gem);
     group.add(ring);
+
+    // Additive halo sprite tinted per type (shared texture, per-pickup material).
+    const glow = new THREE.Sprite(new THREE.SpriteMaterial({
+      map: getPickupGlowTexture(),
+      color,
+      transparent: true,
+      opacity: 0.55,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+    }));
+    glow.scale.setScalar(30);
+    group.add(glow);
+
+    // Mine pickups blink an armed red lamp (animated in sync()).
+    if (glyphName === "mineLamp") {
+      const lampMat = new THREE.MeshBasicMaterial({ color: 0xff3b30, transparent: true, opacity: 1 });
+      const lamp = new THREE.Mesh(new THREE.SphereGeometry(2.2, 6, 6), lampMat);
+      group.add(lamp);
+      group.userData.blinkMat = lampMat;
+    }
+
     group.userData.phase = Math.random() * Math.PI * 2;
     scene.add(group);
     return group;
+  }
+
+  // ---- Active-power feedback on planes ----
+
+  // Ghost: phase the whole plane translucent (~0.35 opacity). Stores each material's
+  // base opacity/transparent on first fade so legitimately translucent parts
+  // (exhaust cone, nozzle glow) restore exactly when the power ends.
+  function applyGhostFade(group, on) {
+    group.traverse((child) => {
+      if (!child.isMesh || !child.material) return;
+      const mats = Array.isArray(child.material) ? child.material : [child.material];
+      mats.forEach((mat) => {
+        if (mat.userData.baseOpacity == null) {
+          mat.userData.baseOpacity = mat.opacity;
+          mat.userData.baseTransparent = mat.transparent;
+        }
+        if (on) {
+          mat.transparent = true;
+          mat.opacity = Math.min(mat.userData.baseOpacity, 0.35);
+        } else {
+          mat.opacity = mat.userData.baseOpacity;
+          mat.transparent = mat.userData.baseTransparent;
+        }
+      });
+    });
+  }
+
+  // Magnet: faint teal attraction ring pulsing around the plane.
+  const magnetRingGeo = new THREE.TorusGeometry(30, 1.1, 8, 32);
+  function makeMagnetRing() {
+    const ring = new THREE.Mesh(
+      magnetRingGeo,
+      new THREE.MeshBasicMaterial({ color: 0x00d2d3, transparent: true, opacity: 0.28, depthWrite: false, blending: THREE.AdditiveBlending })
+    );
+    ring.rotation.x = Math.PI / 2;
+    return ring;
+  }
+
+  // Tinted halo for active powers without a dedicated plane-side effect
+  // (shield/star/freeze/emp/ghost/magnet have their own).
+  const POWER_HALO_COLORS = {
+    spread: 0xff9f43,
+    rapid: 0xffd24a,
+    afterburner: 0xff5a3c,
+    repair: 0x8be34a,
+    homing: 0xf04fd6,
+    mine: 0x8a97a3,
+  };
+
+  function makePowerHalo(color) {
+    const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
+      map: getPickupGlowTexture(),
+      color,
+      transparent: true,
+      opacity: 0.34,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+    }));
+    sprite.scale.setScalar(16);
+    return sprite;
   }
 
   // animatePlaneNose(mesh, speedRatio): spins the prop disc (fading in as a blur at
@@ -1171,6 +1333,10 @@ import * as THREE from "three";
             starAura: null,
             freezeOverlay: null,
             empRing: null,
+            magnetRing: null,
+            powerHalo: null,
+            powerHaloColor: null,
+            ghostOn: false,
             bank: 0,
             wasAlive: !!p.alive,
             wasHp: p.hp != null ? p.hp : 100,
@@ -1299,6 +1465,46 @@ import * as THREE from "three";
         } else if (view.empRing) {
           view.empRing.visible = false;
         }
+
+        // GHOST: phase the plane translucent while active; restore on end/death.
+        const ghostActive = p.power === "ghost" && pose.alive && (p.powerLeft || 0) > 0;
+        if (view.ghostOn !== ghostActive) {
+          view.ghostOn = ghostActive;
+          applyGhostFade(view.mesh, ghostActive);
+        }
+
+        // MAGNET: faint teal attraction ring pulsing around the plane.
+        if (p.power === "magnet" && pose.alive && (p.powerLeft || 0) > 0) {
+          if (!view.magnetRing) {
+            view.magnetRing = makeMagnetRing();
+            scene.add(view.magnetRing);
+          }
+          view.magnetRing.visible = true;
+          view.magnetRing.position.set(pose.p.x, pose.p.y, pose.p.z);
+          view.magnetRing.rotation.z += step * 1.6;
+          view.magnetRing.material.opacity = 0.2 + 0.14 * (0.5 + 0.5 * Math.sin(time * 6));
+        } else if (view.magnetRing) {
+          view.magnetRing.visible = false;
+        }
+
+        // Remaining powers get a tinted halo orb so every active power reads visually.
+        const haloColor = POWER_HALO_COLORS[p.power];
+        if (pose.alive && haloColor != null && (p.powerLeft || 0) > 0) {
+          if (!view.powerHalo || view.powerHaloColor !== haloColor) {
+            if (view.powerHalo) {
+              scene.remove(view.powerHalo);
+              disposeObject(view.powerHalo);
+            }
+            view.powerHalo = makePowerHalo(haloColor);
+            view.powerHaloColor = haloColor;
+            scene.add(view.powerHalo);
+          }
+          view.powerHalo.visible = true;
+          view.powerHalo.position.set(pose.p.x, pose.p.y, pose.p.z);
+          view.powerHalo.scale.setScalar(15 + 3 * Math.sin(time * 7));
+        } else if (view.powerHalo) {
+          view.powerHalo.visible = false;
+        }
       });
 
       for (const [id, view] of stateMaps.views) {
@@ -1320,6 +1526,14 @@ import * as THREE from "three";
         if (view.empRing) {
           scene.remove(view.empRing);
           disposeObject(view.empRing);
+        }
+        if (view.magnetRing) {
+          scene.remove(view.magnetRing);
+          disposeObject(view.magnetRing);
+        }
+        if (view.powerHalo) {
+          scene.remove(view.powerHalo);
+          disposeObject(view.powerHalo);
         }
         stateMaps.views.delete(id);
       }
@@ -1388,6 +1602,10 @@ import * as THREE from "three";
         }
         mesh.position.set(pk.px, pk.py + Math.sin(time * 2 + mesh.userData.phase) * 3, pk.pz);
         mesh.rotation.y += step * 1.4;
+        if (mesh.userData.blinkMat) {
+          const blinkT = 0.5 + 0.5 * Math.sin(time * 9 + mesh.userData.phase);
+          mesh.userData.blinkMat.opacity = 0.25 + blinkT * 0.75;
+        }
       });
       for (const [key, mesh] of stateMaps.pickups) {
         if (pickupSeen.has(key)) continue;
@@ -1461,6 +1679,8 @@ import * as THREE from "three";
         if (view.starAura) view.starAura.visible = false;
         if (view.freezeOverlay) view.freezeOverlay.visible = false;
         if (view.empRing) view.empRing.visible = false;
+        if (view.magnetRing) view.magnetRing.visible = false;
+        if (view.powerHalo) view.powerHalo.visible = false;
       }
       // Hide all name labels during menu
       for (const [, div] of nameLabelPool) div.style.display = "none";
@@ -1673,7 +1893,8 @@ import * as THREE from "three";
       });
 
       state.pickups.forEach((pk) => {
-        mmctx.fillStyle = "#6bff8b";
+        const st = PICKUP_STYLES[pk.type];
+        mmctx.fillStyle = st ? "#" + st.color.toString(16).padStart(6, "0") : "#6bff8b";
         mmctx.fillRect(toMapX(pk.px) - 2, toMapY(pk.pz) - 2, 4, 4);
       });
 

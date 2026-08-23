@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="SmashCart">
+  <rect width="512" height="512" rx="96" fill="#0b0f14"/>
+  <g fill="none" stroke="#4fd1ff" stroke-width="26" stroke-linecap="round" stroke-linejoin="round">
+    <!-- paper plane: bold folded glyph -->
+    <path d="M96 256 L416 128 L320 400 L248 312 Z"/>
+    <path d="M248 312 L416 128"/>
+    <path d="M232 344 L232 408 L272 360"/>
+  </g>
+</svg>

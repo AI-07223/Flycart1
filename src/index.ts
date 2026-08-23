@@ -1,31 +1,14 @@
 import http from "http";
 import path from "path";
 import express from "express";
-import { Server } from "colyseus";
-import { WebSocketTransport } from "@colyseus/ws-transport";
-import { monitor } from "@colyseus/monitor";
-import crypto from "crypto";
-import { ArenaRoom } from "./rooms/ArenaRoom";
-import * as leaderboard from "./leaderboard";
+import { WebSocketServer } from "ws";
+import { Bonjour } from "bonjour-service";
+import { RoomHost } from "./server/RoomHost";
 import { log } from "./logger";
-import { createSignalServer } from "./signal";
-
-// Initialize Sentry if DSN is provided (must be before other imports that might throw)
-if (process.env.SENTRY_DSN) {
-  try {
-    const Sentry = require("@sentry/node");
-    Sentry.init({ dsn: process.env.SENTRY_DSN, tracesSampleRate: 0.1 });
-    log("info", "sentry initialized", { dsn: process.env.SENTRY_DSN });
-  } catch (e) {
-    log("warn", "sentry init failed", { error: (e as Error).message });
-  }
-}
 
 const PORT = Number(process.env.PORT) || 2567;
-leaderboard.init();
 
 const app = express();
-app.use(express.json({ limit: "16kb" }));
 
 // Lightweight security headers (defense-in-depth; no extra dependency).
 // X-Frame-Options blocks foreign embeds/clickjacking; nosniff + no-referrer are cheap hardening.
@@ -40,74 +23,43 @@ app.use((_req, res, next) => {
 const publicDir = path.join(__dirname, "..", "public");
 app.use(express.static(publicDir));
 
-// Lightweight health check for the VPS / load balancer.
+// Lightweight health check for the LAN host machine / reverse proxies.
 app.get("/healthz", (_req, res) => res.json({ ok: true }));
 
-// Read-only global leaderboard (top-N by best round score). Writes happen only inside the
-// room at round end from authoritative state — there is intentionally no write endpoint.
-let lbCache: { t: number; data: { name: string; score: number }[] } | null = null;
-app.get("/leaderboard", (req, res) => {
-  const now = Date.now();
-  if (!lbCache || now - lbCache.t > 2000) lbCache = { t: now, data: leaderboard.top(50) }; // brief cache vs refresh spam
-  const n = Math.max(1, Math.min(50, Number(req.query.n) || 10));
-  res.json(lbCache.data.slice(0, n));
-});
-
-// Client error reporting endpoint — forwards browser errors to Sentry
-app.post("/api/errors", (req, res) => {
-  const { message, filename, lineno, colno, stack } = req.body || {};
-  log("error", "client error", { message, filename, lineno, colno, stack });
-  try {
-    const Sentry = require("@sentry/node");
-    Sentry.captureException(new Error(message || "Client error"), {
-      tags: { source: "client" },
-      extra: { filename, lineno, colno, stack },
-    });
-  } catch {}
-  res.status(204).end();
-});
-
-// Colyseus monitor dashboard — protected with HTTP Basic Auth.
-// Credentials come from env (MONITOR_USER / MONITOR_PASS). If no password is
-// configured the dashboard is disabled outright rather than left open.
-const MONITOR_USER = process.env.MONITOR_USER || "admin";
-const MONITOR_PASS = process.env.MONITOR_PASS || "";
-
-function safeEqual(a: string, b: string): boolean {
-  const ab = Buffer.from(a);
-  const bb = Buffer.from(b);
-  return ab.length === bb.length && crypto.timingSafeEqual(ab, bb);
-}
-
-if (MONITOR_PASS) {
-  function monitorAuth(req: express.Request, res: express.Response, next: express.NextFunction) {
-    const [scheme, encoded] = (req.headers.authorization || "").split(" ");
-    if (scheme === "Basic" && encoded) {
-      const [user, pass] = Buffer.from(encoded, "base64").toString().split(":");
-      if (safeEqual(user || "", MONITOR_USER) && safeEqual(pass || "", MONITOR_PASS)) {
-        return next();
-      }
-    }
-    res.set("WWW-Authenticate", 'Basic realm="SmashCart Monitor"');
-    return res.status(401).end();
-  }
-  app.use("/colyseus", monitorAuth, monitor());
-}
-
 const server = http.createServer(app);
-const gameServer = new Server({
-  transport: new WebSocketTransport({ server }),
-});
 
-// One room type. `filterBy(['code'])` groups joinOrCreate() requests by room
-// code: Quick Play uses code "PUBLIC", private rooms use a share code.
-gameServer.define("arena", ArenaRoom).filterBy(["code"]);
-
-// Wire the WebRTC signaling broker at ws://<host>/signal.
-// MUST be called after gameServer.define() so that Colyseus's upgrade listener
-// is already registered before createSignalServer() re-routes it.
-createSignalServer(server);
+// One room per process — the server IS the room. All game sockets share /ws.
+const roomHost = new RoomHost();
+const wss = new WebSocketServer({ server, path: "/ws" });
+wss.on("connection", (ws, req) => roomHost.attach(ws, req));
 
 server.listen(PORT, () => {
   log("info", "server started", { port: PORT });
 });
+
+// mDNS advertisement so guests see the room when browsing the LAN. Failure is
+// non-fatal — players can always type the printed URL directly.
+let bonjour: Bonjour | null = null;
+try {
+  bonjour = new Bonjour();
+  bonjour.publish({ name: "SmashCart", type: "http", port: PORT, txt: { game: "smashcart" } });
+} catch (e) {
+  bonjour = null;
+  log("warn", "mdns publish failed", { error: (e as Error).message });
+}
+
+let shuttingDown = false;
+function shutdown(): void {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  roomHost.shutdown();
+  try {
+    if (bonjour) bonjour.unpublishAll(() => bonjour?.destroy());
+  } catch {}
+  server.close(() => process.exit(0));
+  // Force exit if lingering sockets block close().
+  setTimeout(() => process.exit(0), 2000).unref();
+}
+
+process.on("SIGINT", shutdown);
+process.on("SIGTERM", shutdown);

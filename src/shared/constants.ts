@@ -96,7 +96,7 @@ export const RAPID_FACTOR = 0.55;
 export const SPREAD_ANGLE = 0.12;
 export const AFTERBURNER_FACTOR = 1.22;
 export const HOMING_TURN = 1.45;
-export const POWERUP_TYPES = ["spread", "rapid", "shield", "afterburner", "repair", "homing", "mine", "star", "emp", "freeze"];
+export const POWERUP_TYPES = ["spread", "rapid", "shield", "afterburner", "repair", "homing", "mine", "star", "emp", "freeze", "ghost", "magnet"];
 export const POWERUP_WEIGHTS: Record<string, number> = {
   spread: 1,
   rapid: 1,
@@ -108,6 +108,8 @@ export const POWERUP_WEIGHTS: Record<string, number> = {
   star: 0.4,
   emp: 0.7,
   freeze: 0.8,
+  ghost: 0.6,
+  magnet: 0.8,
 };
 
 // Mines (air mine powerup).
@@ -129,6 +131,14 @@ export const EMP_DURATION = 3;
 
 // Freeze ray (bullets that lock victim controls).
 export const FREEZE_DURATION = 2.2;
+
+// Ghost (phase out: bullets/mines/star-rams pass through harmlessly).
+// Translucency rendering is client-side; this is the opacity clients should use.
+export const GHOST_OPACITY = 0.35;
+
+// Magnet (pickup attraction field).
+export const MAGNET_RADIUS_MULT = 4;   // attraction range = PICKUP_RADIUS × this (+PLANE_RADIUS)
+export const MAGNET_PULL_SPEED = 120;  // world units/sec a pickup drifts toward the holder
 
 // Hardening.
 export const DT_MAX = 0.05;
