@@ -1,0 +1,11 @@
+{
+  "appId": "com.smashcart.game",
+  "appName": "SmashCart",
+  "webDir": "public",
+  "android": {
+    "allowMixedContent": true
+  },
+  "server": {
+    "androidScheme": "http"
+  }
+}

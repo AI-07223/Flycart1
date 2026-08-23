@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">SmashCart</string>
+    <string name="title_activity_main">SmashCart</string>
+    <string name="package_name">com.smashcart.game</string>
+    <string name="custom_url_scheme">com.smashcart.game</string>
+</resources>

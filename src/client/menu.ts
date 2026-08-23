@@ -25,6 +25,7 @@ import {
   type CosmeticLoadout,
   type CosmeticOption,
 } from "../shared/loadout";
+import { gameHotspotStatus, isNativeApp, startGameHotspot, stopGameHotspot } from "./appshell";
 
 // --- Public API --------------------------------------------------------------
 
@@ -103,6 +104,7 @@ const ICON = {
   pause: svg('<path d="M8 5v14M16 5v14"/>'),
   flag: svg('<path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><path d="M4 22v-7"/>'),
   bolt: '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M13 2 3 14h7l-1 8 11-13h-7l1-7z"/></svg>',
+  download: svg('<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/>'),
 };
 
 // --- Profile persistence (smashcart-profile v2 + legacy mirrors) -------------
@@ -291,12 +293,29 @@ function homeMarkup(): string {
           <button type="button" class="sc-btn sc-btn--ghost" data-nav-go="hangar">${ICON.plane}<span>HANGAR</span></button>
         </div>
       </div>
-
       <p id="sc-home-status" class="sc-status" aria-live="polite"></p>
     </div>
+
+    <section class="sc-panel sc-hotspot-card sc-hidden" id="sc-hotspot-card">
+      <div class="sc-panel-header">
+        <h3 class="sc-panel-title">Game Wi-Fi</h3>
+        <button type="button" class="sc-btn sc-btn--primary sc-btn--slim" id="sc-hotspot-toggle">
+          ${ICON.wifi}<span>START</span>
+        </button>
+      </div>
+      <p class="sc-note"><span id="sc-hotspot-hint">Open a local game network from this phone.</span></p>
+      <div class="sc-hotspot-creds sc-hidden" id="sc-hotspot-creds">
+        <div class="sc-hotspot-row"><span class="sc-field-label">Network</span><code class="sc-input sc-input--mono" id="sc-hotspot-ssid">--</code></div>
+        <div class="sc-hotspot-row"><span class="sc-field-label">Password</span><code class="sc-input sc-input--mono" id="sc-hotspot-pass">--</code></div>
+      </div>
+    </section>
+
     <footer class="sc-home-foot">
-      <span>${ICON.wifi}</span><span>Same Wi-Fi as your friends -- one player hosts, everyone else joins.</span>
+      <span>${ICON.wifi}</span><span id="sc-home-foot-text">Same Wi-Fi as your friends -- one player hosts, everyone else joins.</span>
     </footer>
+    <a class="sc-btn sc-btn--ghost sc-apk-pill sc-hidden" id="sc-apk-pill" href="/apk/smashcart.apk" download>
+      ${ICON.download}<span>GET THE ANDROID APP</span>
+    </a>
   `);
 }
 
@@ -672,6 +691,84 @@ function wireHome(): void {
       nameInput.blur();
     }
   });
+  wireHotspotCard();
+}
+
+// --- HOME hotspot card (native APK only) + APK download pill ------------------
+
+let hotspotOn = false;
+
+function wireHotspotCard(): void {
+  const native = isNativeApp();
+  const card = $("sc-hotspot-card");
+  const pill = $("sc-apk-pill");
+  if (pill) pill.classList.toggle("sc-hidden", native); // download only makes sense in a browser
+  if (!card) return;
+  card.classList.toggle("sc-hidden", !native);
+  if (!native) return;
+
+  const footText = $("sc-home-foot-text");
+  if (footText) footText.textContent = "Start the game Wi-Fi here, then run SmashCart on your PC joined to this network.";
+
+  void reflectHotspotState();
+
+  $("sc-hotspot-toggle")?.addEventListener("click", () => {
+    void toggleHotspot();
+  });
+}
+
+async function reflectHotspotState(): Promise<void> {
+  try {
+    const st = await gameHotspotStatus();
+    setHotspotUi(st.active ? { ssid: st.ssid, passphrase: st.passphrase } : null);
+    hotspotOn = Boolean(st.active);
+  } catch {}
+}
+
+async function toggleHotspot(): Promise<void> {
+  const btn = $("sc-hotspot-toggle");
+  const status = $("sc-home-status");
+  buzz(12);
+  if (hotspotOn) {
+    await stopGameHotspot();
+    hotspotOn = false;
+    setHotspotUi(null);
+    if (status) status.textContent = "";
+    return;
+  }
+  if (btn) btn.classList.add("is-busy");
+  try {
+    const info = await startGameHotspot();
+    hotspotOn = true;
+    setHotspotUi(info);
+    if (status) status.textContent = "Game network live. Friends join this Wi-Fi, you join from your PC's SmashCart.";
+  } catch (e) {
+    if (status) status.textContent = (e as Error)?.message || "Could not open the game network.";
+  } finally {
+    btn?.classList.remove("is-busy");
+  }
+}
+
+function setHotspotUi(info: { ssid: string | null; passphrase: string | null } | null): void {
+  const creds = $("sc-hotspot-creds");
+  const ssidEl = $("sc-hotspot-ssid");
+  const passEl = $("sc-hotspot-pass");
+  const hint = $("sc-hotspot-hint");
+  const btn = $("sc-hotspot-toggle");
+  if (!creds || !ssidEl || !passEl || !hint || !btn) return;
+  if (!info) {
+    creds.classList.add("sc-hidden");
+    hint.textContent = "Open a local game network from this phone.";
+    const label = btn.querySelector("span");
+    if (label) label.textContent = "START";
+    return;
+  }
+  ssidEl.textContent = info.ssid || "Android Hotspot";
+  passEl.textContent = info.passphrase || "(see Android hotspot settings)";
+  creds.classList.remove("sc-hidden");
+  hint.textContent = "Friends: connect to this network, then open the address your PC shows.";
+  const label = btn.querySelector("span");
+  if (label) label.textContent = "STOP";
 }
 
 // --- JOIN (mDNS probe + manual address) --------------------------------------

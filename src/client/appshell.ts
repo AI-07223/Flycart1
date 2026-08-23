@@ -122,3 +122,52 @@ export async function promptInstall(): Promise<boolean> {
     return false;
   }
 }
+
+// --- Capacitor native shell --------------------------------------------------
+// ponytail: zero-dep bridge via window.Capacitor.Plugins — the HotspotPlugin is
+// registered natively in MainActivity; on web this is all undefined-safe no-ops.
+
+export interface HotspotInfo {
+  active: boolean;
+  ssid: string | null;
+  passphrase: string | null;
+}
+
+export function isNativeApp(): boolean {
+  try {
+    const cap = (window as any).Capacitor;
+    return Boolean(cap?.isNativePlatform?.());
+  } catch {
+    return false;
+  }
+}
+
+function hotspotPlugin(): { start(): Promise<HotspotInfo>; stop(): Promise<void>; status(): Promise<HotspotInfo> } | null {
+  try {
+    return (window as any).Capacitor?.Plugins?.Hotspot ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export async function startGameHotspot(): Promise<HotspotInfo> {
+  const plugin = hotspotPlugin();
+  if (!plugin) throw new Error("Not available in browser");
+  return plugin.start();
+}
+
+export async function stopGameHotspot(): Promise<void> {
+  try {
+    await hotspotPlugin()?.stop();
+  } catch {}
+}
+
+export async function gameHotspotStatus(): Promise<HotspotInfo> {
+  const plugin = hotspotPlugin();
+  if (!plugin) return { active: false, ssid: null, passphrase: null };
+  try {
+    return await plugin.status();
+  } catch {
+    return { active: false, ssid: null, passphrase: null };
+  }
+}

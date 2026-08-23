@@ -1134,3 +1134,43 @@ body.touch-device .sc-touch-only { display: flex; }
   .sc-segmented button:not(.is-on):hover { color: var(--sc-text); }
   .sc-player.is-kickable:hover { border-color: rgba(255, 107, 107, 0.4); }
 }
+
+/* --- Home: game Wi-Fi card (APK) + Android app pill (browser) ---------------- */
+
+.sc-hotspot-card {
+  width: min(420px, calc(100% - 32px));
+  margin: 0 auto 12px;
+}
+
+.sc-hotspot-card .sc-panel-header { margin-bottom: 8px; }
+
+.sc-hotspot-row {
+  display: grid;
+  grid-template-columns: 84px 1fr;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.sc-hotspot-row .sc-field-label { margin: 0; }
+
+.sc-hotspot-row code {
+  display: block;
+  padding: 10px 14px;
+  font-size: var(--sc-fs-md);
+  letter-spacing: 0.08em;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.sc-btn.is-busy { opacity: 0.55; pointer-events: none; }
+
+.sc-apk-pill {
+  align-self: center;
+  margin: -4px auto calc(env(safe-area-inset-bottom, 0px) + 14px);
+  gap: 8px;
+  padding: 8px 16px;
+  border-radius: 999px;
+  font-size: var(--sc-fs-2xs);
+  letter-spacing: 0.09em;
+}

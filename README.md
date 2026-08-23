@@ -46,6 +46,20 @@ Use the on-screen `LEFT`, `RIGHT`, `CLIMB`, `DIVE`, `BOOST`, and `FIRE` buttons.
 
 **Hotspot option:** no router needed — enable the hotspot on one phone, connect the host machine *and* every other phone to that hotspot, then follow the steps above.
 
+## Android app (APK)
+
+A Capacitor-wrapped APK ships with the repo and is served by the game itself:
+
+- **Download:** open the game in any browser and tap **GET THE ANDROID APP** on the home screen (`/apk/smashcart.apk`).
+- **One-tap game Wi-Fi:** inside the APK, the home screen has a **Game Wi-Fi** card — tap START to open a local-only hotspot (Android's `startLocalOnlyHotspot`, no internet needed). Friends join that network; connect your host PC to it and run the server as above.
+- **Rebuild the APK** after client changes:
+  ```bash
+  npm run build-apk     # build-client + cap sync + gradle assembleDebug -> public/apk/smashcart.apk
+  ```
+  Requires JDK 17+ and an Android SDK (platform 36 + build-tools).
+
+The APK bundles the UI for instant offline launch but still connects to a LAN server for matches.
+
 Everything stays on the LAN. There is no internet matchmaking, account, or cloud dependency.
 
 ## Local Development

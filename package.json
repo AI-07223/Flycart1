@@ -13,14 +13,18 @@
     "test": "vitest run",
     "clean": "node -e \"require('fs').rmSync('dist', { recursive: true, force: true })\"",
     "build-client": "node scripts/build-client.mjs",
+    "build-apk": "node scripts/build-apk.mjs",
     "host": "node scripts/host.js"
   },
   "dependencies": {
+    "@capacitor/core": "^8.5.0",
     "bonjour-service": "^1.4.4",
     "express": "^4.21.2",
     "ws": "^8.18.0"
   },
   "devDependencies": {
+    "@capacitor/android": "^8.5.0",
+    "@capacitor/cli": "^8.5.0",
     "@types/express": "^4.17.21",
     "@types/node": "^22.10.0",
     "@types/ws": "^8.5.13",
