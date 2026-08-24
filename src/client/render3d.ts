@@ -78,8 +78,10 @@ import * as THREE from "three";
     const canvasH = (canvasEl && canvasEl.clientHeight) || window.innerHeight;
     const el = document.querySelector(".sc-hangar-stage");
     stageView.canvas = canvasH;
-    if (el) {
-      const r = el.getBoundingClientRect();
+    const r = el ? el.getBoundingClientRect() : null;
+    // A hidden screen measures 0x0; treat that as "unknown" and use the full
+    // canvas rather than pinning the frustum to a phantom strip.
+    if (r && r.height > 40) {
       stageView.top = r.top;
       stageView.height = r.height;
     } else {
@@ -95,14 +97,16 @@ import * as THREE from "three";
    *  30u before the group's 1.35x scale; the Interceptor is far slimmer), so measure
    *  rather than hard-code — a constant here is exactly what put the camera inside
    *  the aircraft. Recomputed whenever the demo plane is rebuilt. */
-  let stagePlaneSpan = 48;
+  let stagePlaneSpan = 48;   // widest horizontal extent (wingspan/length)
+  let stagePlaneRise = 14;   // vertical extent
 
   function measureStagePlane(obj) {
     if (!obj) return;
     _stageBox.setFromObject(obj);
     if (_stageBox.isEmpty()) return;
     _stageBox.getSize(_stageSize);
-    stagePlaneSpan = Math.max(_stageSize.x, _stageSize.y, _stageSize.z) || stagePlaneSpan;
+    stagePlaneSpan = Math.max(_stageSize.x, _stageSize.z) || stagePlaneSpan;
+    stagePlaneRise = _stageSize.y || stagePlaneRise;
   }
 
   /**
@@ -120,20 +124,30 @@ import * as THREE from "three";
     }
     // Slide the frustum so the stage's centre lands where the canvas centre was.
     const stageCentre = stageView.height > 0 ? stageView.top + stageView.height / 2 : h / 2;
-    const lift = (h / 2 - stageCentre) * blend;
+    const lift = Math.max(-h * 0.14, Math.min(h * 0.14, (h / 2 - stageCentre) * blend));
     camera.setViewOffset(w, h, 0, lift, w, h);
   }
 
-  /** Reframe the hangar turntable for the current FOV, viewport and airframe. */
+  /**
+   * Reframe the hangar turntable for the current FOV, viewport and airframe.
+   * Two constraints, take the binding one: the WINGSPAN must fit the visible
+   * WIDTH (vertical FOV x aspect) and the fuselage HEIGHT must fit the stage
+   * strip's share of the visible height. The first version fitted the wingspan
+   * against the vertical FOV — on a 2.2:1 phone that meant a frustum ~3x taller
+   * than the aircraft, which rendered as a 9%-of-screen speck.
+   */
+  const STAGE_FILL_W = 0.72; // wingspan as a share of visible width
   function updateStageFraming() {
     const halfV = Math.tan(((camera ? camera.fov : 70) * Math.PI) / 360);
-    // STAGE_FILL is a share of the stage strip; convert it to a share of the full
-    // frustum height, which is what the camera distance is actually derived from.
+    const aspect = camera ? camera.aspect : 16 / 9;
     const canvasH = stageView.canvas || (canvasEl && canvasEl.clientHeight) || window.innerHeight;
     const stageShare = stageView.height > 0 ? stageView.height / canvasH : 1;
-    const fillOfFrame = Math.max(0.05, STAGE_FILL * stageShare);
-    const visibleH = stagePlaneSpan / fillOfFrame;
-    const dist = visibleH / (2 * halfV);
+    // Generous floor: the Box3 rise includes the propeller disc, so the visible
+    // fuselage reads ~40% smaller than the number suggests.
+    const fillH = Math.max(0.5, STAGE_FILL * stageShare);
+    const distW = stagePlaneSpan / (STAGE_FILL_W * 2 * halfV * aspect);
+    const distH = stagePlaneRise / (fillH * 2 * halfV);
+    const dist = Math.max(distW, distH, stagePlaneSpan * 0.55); // never inside the model
     STAGE_CAM_POS.copy(STAGE_CAM_DIR).multiplyScalar(dist)
       .add(new THREE.Vector3(STAGE_POS.x, STAGE_POS.y, STAGE_POS.z));
     // Look straight at the aircraft: a level 3/4 view. Vertical placement is the
@@ -1786,6 +1800,11 @@ import * as THREE from "three";
       }
 
       applySceneModeChrome();
+      // Self-heal: a rotation, address-bar collapse, or a measure taken while the
+      // hangar screen was still hidden leaves stageView stale — detect via canvas
+      // height and re-measure before framing.
+      const liveH = (canvasEl && canvasEl.clientHeight) || window.innerHeight;
+      if (stageView.canvas !== liveH) measureStageViewport();
       updateStageFraming();
       const isCustomize = sceneMode === "customize";
       // Blend factor eases the hard cut when entering/leaving the hangar stage: ramps

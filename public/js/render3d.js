@@ -58,8 +58,8 @@ import * as THREE from "three";
     const canvasH = canvasEl && canvasEl.clientHeight || window.innerHeight;
     const el = document.querySelector(".sc-hangar-stage");
     stageView.canvas = canvasH;
-    if (el) {
-      const r = el.getBoundingClientRect();
+    const r = el ? el.getBoundingClientRect() : null;
+    if (r && r.height > 40) {
       stageView.top = r.top;
       stageView.height = r.height;
     } else {
@@ -72,12 +72,14 @@ import * as THREE from "three";
   const _stageBox = new THREE.Box3();
   const _stageSize = new THREE.Vector3();
   let stagePlaneSpan = 48;
+  let stagePlaneRise = 14;
   function measureStagePlane(obj) {
     if (!obj) return;
     _stageBox.setFromObject(obj);
     if (_stageBox.isEmpty()) return;
     _stageBox.getSize(_stageSize);
-    stagePlaneSpan = Math.max(_stageSize.x, _stageSize.y, _stageSize.z) || stagePlaneSpan;
+    stagePlaneSpan = Math.max(_stageSize.x, _stageSize.z) || stagePlaneSpan;
+    stagePlaneRise = _stageSize.y || stagePlaneRise;
   }
   function applyStageLift(blend) {
     if (!camera || !canvasEl) return;
@@ -88,16 +90,19 @@ import * as THREE from "three";
       return;
     }
     const stageCentre = stageView.height > 0 ? stageView.top + stageView.height / 2 : h / 2;
-    const lift = (h / 2 - stageCentre) * blend;
+    const lift = Math.max(-h * 0.14, Math.min(h * 0.14, (h / 2 - stageCentre) * blend));
     camera.setViewOffset(w, h, 0, lift, w, h);
   }
+  const STAGE_FILL_W = 0.72;
   function updateStageFraming() {
     const halfV = Math.tan((camera ? camera.fov : 70) * Math.PI / 360);
+    const aspect = camera ? camera.aspect : 16 / 9;
     const canvasH = stageView.canvas || canvasEl && canvasEl.clientHeight || window.innerHeight;
     const stageShare = stageView.height > 0 ? stageView.height / canvasH : 1;
-    const fillOfFrame = Math.max(0.05, STAGE_FILL * stageShare);
-    const visibleH = stagePlaneSpan / fillOfFrame;
-    const dist = visibleH / (2 * halfV);
+    const fillH = Math.max(0.5, STAGE_FILL * stageShare);
+    const distW = stagePlaneSpan / (STAGE_FILL_W * 2 * halfV * aspect);
+    const distH = stagePlaneRise / (fillH * 2 * halfV);
+    const dist = Math.max(distW, distH, stagePlaneSpan * 0.55);
     STAGE_CAM_POS.copy(STAGE_CAM_DIR).multiplyScalar(dist).add(new THREE.Vector3(STAGE_POS.x, STAGE_POS.y, STAGE_POS.z));
     STAGE_CAM_LOOK.set(STAGE_POS.x, STAGE_POS.y, STAGE_POS.z);
   }
@@ -1500,6 +1505,8 @@ import * as THREE from "three";
         measureStagePlane(menuDemo);
       }
       applySceneModeChrome();
+      const liveH = canvasEl && canvasEl.clientHeight || window.innerHeight;
+      if (stageView.canvas !== liveH) measureStageViewport();
       updateStageFraming();
       const isCustomize = sceneMode === "customize";
       const blendTarget = isCustomize ? 1 : 0;
