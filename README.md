@@ -69,7 +69,13 @@ artifact, not tracked in git — a fresh clone has no `public/apk/smashcart.apk`
   ```bash
   npm run build-apk     # build-client + cap sync + gradle assembleDebug -> public/apk/smashcart.apk
   ```
-  Requires JDK 17+ and an Android SDK (platform 36 + build-tools).
+  Requires JDK 17+ and an Android SDK (platform 36 + build-tools). To update the copy the
+  deployed demo serves, publish the fresh build as the rolling release the Dockerfile
+  fetches at image-build time:
+  ```bash
+  gh release delete apk-latest --yes --cleanup-tag
+  gh release create apk-latest public/apk/smashcart.apk --title "SmashCart APK (rolling)"
+  ```
 
 The APK bundles the UI for instant offline launch but still connects to a LAN server for matches.
 

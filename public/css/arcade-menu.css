@@ -913,7 +913,31 @@ body.touch-device .sc-touch-only { display: flex; }
 
 #sc-lobby-room-name-edit { width: 100%; }
 
+.sc-qr-modal {
+  position: absolute;
+  inset: 0;
+  z-index: var(--z-overlay);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  background: rgba(6, 10, 16, 0.96);
+  cursor: pointer;
+}
+.sc-qr-modal canvas {
+  width: min(80vw, 80vh);
+  height: min(80vw, 80vh);
+  border-radius: 12px;
+  background: #fff;
+  padding: 10px;
+  box-sizing: border-box;
+}
+.sc-qr-modal-hint { color: var(--sc-muted); font-size: var(--sc-fs-sm); letter-spacing: var(--sc-track); }
+
 .sc-qr-frame {
+  border: none;
+  cursor: pointer;
   padding: 16px;
   border-radius: var(--sc-radius-md);
   background: #f2f8fc;
@@ -1139,7 +1163,7 @@ body.touch-device .sc-touch-only { display: flex; }
   .sc-lobby-body { flex-direction: column; }
   .sc-lobby-qr-panel { flex: 0 0 auto; flex-direction: row; flex-wrap: wrap; justify-content: center; }
   .sc-lobby-qr-panel > * { flex: 1 1 100%; }
-  .sc-qr-frame canvas { width: min(150px, 24vh); }
+  .sc-qr-frame canvas { width: clamp(120px, 24vh, 180px); }
   .sc-home-center { justify-content: flex-start; padding-top: 8vh; }
   .sc-hangar-sheet { max-height: 42vh; }
 }
@@ -1169,7 +1193,9 @@ body.touch-device .sc-touch-only { display: flex; }
   .sc-swatch-grid > * { flex: 0 0 auto; scroll-snap-align: start; }
   .sc-lobby-roomname { font-size: var(--sc-fs-lg); }
   .sc-lobby-actions { gap: 8px; padding-top: 8px; }
-  .sc-qr-frame canvas { width: min(130px, 22vh); }
+  /* Never below 110px: at min(130px,22vh) a 360px-tall phone got a 79px code
+     no camera could read. The tap-to-enlarge modal is the guaranteed path. */
+  .sc-qr-frame canvas { width: clamp(110px, 24vh, 150px); }
   .sc-lobby-url { display: none; }
 }
 

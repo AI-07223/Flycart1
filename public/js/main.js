@@ -1148,12 +1148,12 @@
         <p class="sc-field-label">ROOM</p>
         <h2 id="sc-lobby-room-name-view" class="sc-lobby-roomname">Private Room</h2>
         <input id="sc-lobby-room-name-edit" class="sc-input" maxlength="20" placeholder="Name this room..." autocomplete="off" aria-label="Room name" />
-        <div class="sc-qr-frame">
+        <button type="button" class="sc-qr-frame" id="sc-qr-zoom" aria-label="Enlarge join QR code">
           <!-- Starts hidden: a 0x0 canvas inside an 82px CSS box paints as a broken-image
                placeholder. setLobbyQr() reveals it once a code is actually drawn. -->
           <canvas id="sc-lobby-qr" class="sc-hidden" width="0" height="0" aria-label="Join QR code"></canvas>
-        </div>
-        <p class="sc-note sc-note--tight">${ICON.wifi}<span>Friends: join the same Wi-Fi, then scan this.</span></p>
+        </button>
+        <p class="sc-note sc-note--tight">${ICON.wifi}<span>Friends: join the same Wi-Fi, then scan this. Tap to enlarge.</span></p>
         <p id="sc-lobby-url" class="sc-lobby-url mono"></p>
       </section>
 
@@ -1229,6 +1229,10 @@
         ${lobbyMarkup()}
       </div>
       ${pauseMarkup()}
+      <div class="sc-qr-modal sc-hidden" id="sc-qr-modal" role="dialog" aria-label="Join QR code, enlarged">
+        <canvas id="sc-qr-modal-canvas"></canvas>
+        <p class="sc-qr-modal-hint">Scan to join &middot; tap anywhere to close</p>
+      </div>
     </div>`;
     root.classList.remove("hidden");
     document.body.classList.add("sc-menu-open");
@@ -1246,6 +1250,7 @@
     wireHangar();
     wireSettings();
     wireLobby();
+    wireQrModal();
     wirePause();
     showScreen("home");
     reflectProfileIntoUI();
@@ -1796,7 +1801,29 @@
       }
     });
   }
+  var lobbyJoinUrl = "";
+  function openQrModal() {
+    if (!lobbyJoinUrl) return;
+    const modal = $("sc-qr-modal");
+    const canvas = $("sc-qr-modal-canvas");
+    if (!modal || !canvas) return;
+    const side = Math.floor(Math.min(window.innerWidth, window.innerHeight) * 0.8);
+    try {
+      window.QR.render(canvas, lobbyJoinUrl, { size: side, margin: 2, errorCorrectionLevel: "M" });
+    } catch {
+      return;
+    }
+    modal.classList.remove("sc-hidden");
+  }
+  function wireQrModal() {
+    $("sc-qr-zoom")?.addEventListener("click", () => {
+      uiTap();
+      openQrModal();
+    });
+    $("sc-qr-modal")?.addEventListener("click", () => $("sc-qr-modal")?.classList.add("sc-hidden"));
+  }
   function setLobbyQr(joinUrl) {
+    lobbyJoinUrl = joinUrl;
     const canvas = $("sc-lobby-qr");
     if (!canvas) return;
     try {
@@ -2708,8 +2735,12 @@
         window.SFX.resume();
       }
     });
-    window.addEventListener("orientationchange", updateRotateOverlay);
-    window.addEventListener("resize", updateRotateOverlay);
+    const onViewportChange = () => {
+      updateRotateOverlay();
+      if (window.Renderer && window.Renderer.resize) window.Renderer.resize();
+    };
+    window.addEventListener("orientationchange", onViewportChange);
+    window.addEventListener("resize", onViewportChange);
     try {
       const portraitMq = window.matchMedia("(orientation: portrait)");
       const mqHandler = () => updateRotateOverlay();

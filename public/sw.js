@@ -2,7 +2,7 @@
 // The CACHE name below is GENERATED: scripts/build-client.mjs hashes the shipped
 // bundles, index.html, the manifest and the CSS, and rewrites this line on every
 // build. Do not hand-edit it — a stale name serves the previous client forever.
-const CACHE = "smashcart-5115104dc11c";
+const CACHE = "smashcart-4db2d1880bff";
 
 // Exactly what index.html loads plus the audio files fetched at runtime.
 // net-ws.js is intentionally NOT precached: net-ws.ts is bundled into

@@ -33,5 +33,10 @@ COPY package*.json ./
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/public ./public
+# The Android APK is a build artifact (gitignored), published as a rolling GitHub
+# release by the dev machine that runs `npm run build-apk`. Fetch it here so the
+# deployed demo serves /apk/smashcart.apk and the in-game download pill shows.
+# Non-fatal on purpose: a missing release just hides the pill.
+RUN apk add --no-cache curl  && mkdir -p public/apk  && (curl -fsSL -o public/apk/smashcart.apk       https://github.com/AI-07223/Flycart1/releases/download/apk-latest/smashcart.apk       || echo "APK release not found — deploying without it")
 EXPOSE 2567
 CMD ["node", "dist/index.js"]

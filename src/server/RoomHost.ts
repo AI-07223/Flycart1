@@ -54,21 +54,30 @@ function normalizeName(value: unknown, fallback: string): string {
 }
 
 export class RoomHost {
-  private readonly sim: GameSim;
+  private sim: GameSim;
   private readonly conns = new Map<string, Conn>();
   private readonly msgTimes = new Map<string, number[]>();
   private readonly tickInterval: NodeJS.Timeout;
 
   constructor() {
-    // Local room behaves like the old private room: lobby phase, host controls
-    // enabled, bots maintained by the sim once the match starts.
-    this.sim = new GameSim({
+    this.sim = this.freshSim();
+    this.tickInterval = setInterval(() => this.tick(), C.TICK_MS);
+  }
+
+  /** Local room behaves like the old private room: lobby phase, host controls
+   *  enabled, bots maintained by the sim once the match starts. */
+  private freshSim(): GameSim {
+    return new GameSim({
       botsEnabled: true,
       isPublic: false,
       onEvent: (e) => this.handleSimEvent(e),
     });
+  }
 
-    this.tickInterval = setInterval(() => this.tick(), C.TICK_MS);
+  /** True while at least one joined human is connected. */
+  private hasHumans(): boolean {
+    for (const conn of this.conns.values()) if (conn.joined) return true;
+    return false;
   }
 
   // -------------------------------------------------------------------------
@@ -279,6 +288,18 @@ export class RoomHost {
     // No reconnection window: the frozen wire protocol has no resume message,
     // so a dropped socket leaves the match immediately (deliberate simplification).
     this.sim.removePlayer(conn.id);
+
+    // Last human out closes the room: rebuild the sim so the next joiner gets a
+    // fresh lobby with default settings. Without this the room was immortal —
+    // phase stayed "playing", bots kept fighting an empty arena, and every later
+    // PLAY landed mid-way through a stale match instead of in a lobby.
+    // Rebuilding via the constructor IS the reset; a reset() method would have to
+    // mirror every sim field forever.
+    if (!this.hasHumans()) {
+      this.sim = this.freshSim();
+      log("info", "room reset", { reason: "last human left" });
+      return; // nobody left to notify
+    }
     this.broadcastRosterChange();
   }
 

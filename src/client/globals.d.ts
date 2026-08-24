@@ -253,6 +253,7 @@ interface RendererAPI {
   killPopup(killerId: string, mine: boolean): void;
   hitStop(ms: number): void;
   startTakeoff?(): void;
+  resize?(): void;
   setMenuSection?(sec: string): void;
   setSceneMode?(mode: string): void;
   showMenu?(): void;

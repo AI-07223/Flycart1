@@ -324,3 +324,86 @@ describe("RoomHost", () => {
   });
 });
 
+
+describe("room lifecycle", () => {
+  let rh: RoomHost;
+  beforeEach(() => { rh = makeRoom(); });
+  afterEach(() => { teardownRoom(rh); rh = null as unknown as RoomHost; });
+
+  it("resets to a fresh default lobby after the last human leaves", () => {
+    const a = joinClient(rh, "Host");
+    const b = joinClient(rh, "Guest");
+
+    // Dirty every piece of room state a stale room would leak.
+    a.message({ type: "host-settings", settings: { roomName: "Stale", roundLength: 300, botDifficulty: "high" } });
+    a.message({ type: "host-start" });
+    tickOnce(rh);
+    expect(rh.roomInfo().phase).toBe("playing");
+    expect(rh.roomInfo().name).toBe("Stale");
+
+    a.emitClose();
+    b.emitClose();
+
+    // Next joiner must land in a clean lobby, not the stale match.
+    const c = joinClient(rh, "Fresh");
+    tickOnce(rh);
+    const welcome = lastMsg(c, "welcome")!;
+    expect(welcome.leaderId).toBe(welcome.sessionId); // first human of a fresh room leads
+    expect(welcome.room.name).toBe("");
+    expect(welcome.room.roundLength).toBe(C.ROUND_SECONDS);
+    expect(welcome.room.botDifficulty).toBe(C.DEFAULT_BOT_DIFFICULTY);
+    expect(rh.roomInfo().phase).toBe("lobby");
+
+    const snap = snapOf(c)!;
+    expect(snap.players.length).toBe(1); // no leftover bots or corpses
+    expect(snap.timeLeft).toBe(0);
+  });
+
+  it("does not reset while a human remains", () => {
+    const a = joinClient(rh, "Host");
+    const b = joinClient(rh, "Guest");
+    a.message({ type: "host-settings", settings: { roomName: "Keep" } });
+    a.message({ type: "host-start" });
+    tickOnce(rh);
+
+    a.emitClose(); // host leaves, guest stays
+    tickOnce(rh);
+
+    expect(rh.roomInfo().phase).toBe("playing"); // match continues
+    expect(rh.roomInfo().name).toBe("Keep");
+    const snap = snapOf(b)!;
+    expect(snap.hostId).toBe(lastMsg(b, "welcome")!.sessionId); // promoted to the survivor
+  });
+
+  it("a pre-join socket closing does not reset an active room", () => {
+    const a = joinClient(rh, "Host");
+    a.message({ type: "host-settings", settings: { roomName: "Mine" } });
+    const lurker = makeClient(rh); // never joins
+    lurker.emitClose();
+    tickOnce(rh);
+    expect(rh.roomInfo().name).toBe("Mine");
+  });
+});
+
+describe("settings burst", () => {
+  let rh: RoomHost;
+  beforeEach(() => { rh = makeRoom(); });
+  afterEach(() => { teardownRoom(rh); rh = null as unknown as RoomHost; });
+
+  it("applies name, round length, bots and difficulty changed within one second", () => {
+    const a = joinClient(rh, "Host");
+    // The settings panel emits one message per control; a leader touching the
+    // whole panel fires them back-to-back. All four must land.
+    a.message({ type: "host-settings", settings: { roomName: "Burst" } });
+    a.message({ type: "host-settings", settings: { roundLength: 90 } });
+    a.message({ type: "host-settings", settings: { botsInRoom: false } });
+    a.message({ type: "host-settings", settings: { botDifficulty: "high" } });
+    tickOnce(rh);
+
+    const snap = snapOf(a)!;
+    expect(snap.roomName).toBe("Burst");
+    expect(snap.roundLength).toBe(90);
+    expect(snap.botsInRoom).toBe(false);
+    expect(snap.botDifficulty).toBe("high");
+  });
+});

@@ -151,7 +151,11 @@ export const NAME_RATE_MAX = 5;
 export const LOBBY_READY_TIMEOUT = 120;
 export const LOBBY_RECONNECT_WINDOW = 5;
 export const READY_RATE_MAX = 4;
-export const HOST_MSG_RATE_MAX = 2;
+// 8/s, not 2/s: a leader adjusting the settings panel (name + round + bots +
+// difficulty) easily emits 3-4 messages inside a second, and the limiter DROPS
+// silently — the third change never reached the sim while the leader's own UI
+// showed it applied. The limit only exists to stop floods, not real clicking.
+export const HOST_MSG_RATE_MAX = 8;
 export const HOST_KICK_RATE_MAX = 4;
 
 // Team Deathmatch: two teams, indexed 0 (blue) and 1 (red).

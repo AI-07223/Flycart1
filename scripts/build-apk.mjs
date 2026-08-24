@@ -31,9 +31,10 @@ step("build client bundles", "npm run build-client");
 
 step("cap sync android", "npx cap sync android");
 
-step("gradle assembleDebug", process.platform === "win32" ? "gradlew.bat assembleDebug" : "./gradlew assembleDebug", {
-  cwd: ANDROID,
-});
+// Absolute wrapper path: with shell:true the bare "gradlew.bat" resolves against
+// whatever shell npm hands us (sh on this machine), which has no cwd-first lookup.
+const GRADLEW = join(ANDROID, process.platform === "win32" ? "gradlew.bat" : "gradlew");
+step("gradle assembleDebug", `"${GRADLEW}" assembleDebug`, { cwd: ANDROID });
 
 statSync(APK_OUT); // throws if gradle lied about success
 mkdirSync(DEST_DIR, { recursive: true });

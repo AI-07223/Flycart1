@@ -850,8 +850,16 @@ function init(): void {
       window.SFX.resume();
     }
   });
-  window.addEventListener("orientationchange", updateRotateOverlay);
-  window.addEventListener("resize", updateRotateOverlay);
+  // Renderer.resize was never wired to anything, so the WebGL backing store kept
+  // its boot-time size forever. Every phone boots behind the portrait rotate gate,
+  // then rotates — leaving the canvas portrait-sized and CSS-stretched across a
+  // landscape screen (squashed, cropped 3D). Address-bar show/hide did it too.
+  const onViewportChange = (): void => {
+    updateRotateOverlay();
+    if (window.Renderer && window.Renderer.resize) window.Renderer.resize();
+  };
+  window.addEventListener("orientationchange", onViewportChange);
+  window.addEventListener("resize", onViewportChange);
   try {
     const portraitMq = window.matchMedia("(orientation: portrait)");
     const mqHandler = () => updateRotateOverlay();
