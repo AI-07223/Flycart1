@@ -509,12 +509,22 @@ export class GameSim {
     // All rooms auto-restart into a fresh round — continuous play with automatic
     // respawn in every mode (public, private, LAN, P2P). No return-to-lobby stall:
     // players stay in the fight and rounds keep cycling.
+    //
+    // This path is the one startMatch() does not run. It has to honor the host's
+    // roundLength (the first round does, via startMatch) and it has to drop
+    // projectiles: stepBullets only runs while phase === "playing", so anything
+    // in the air when the clock hit zero sat frozen through the whole
+    // intermission and otherwise resumed — and scored — in the next round.
+    this.bullets.clear();
+    this.bulletLife.clear();
+    this.teamScore0 = 0;
+    this.teamScore1 = 0;
     for (const [id, p] of this.players) {
       p.score = 0;
       this.spawn(id, p);
     }
     this.phase = "playing";
-    this.timeLeft = C.ROUND_SECONDS;
+    this.timeLeft = this.roundLength;
   }
 
   private stepPlane(id: string, p: SimPlayer, dt: number, playing: boolean): void {

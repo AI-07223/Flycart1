@@ -239,6 +239,35 @@ describe("round flow", () => {
     expect(b.alive).toBe(true);
   });
 
+  it("restarts on the host round length and drops projectiles from the previous round", () => {
+    const { sim, events } = makeSim();
+    const { a, b } = setupDuel(sim);
+    sim.roundLength = 60;
+    sim.teamScore0 = 4;
+    sim.teamScore1 = 2;
+    // A shot already in the air, pointed at B, with enough life to connect
+    // once bullets start moving again. It must not survive intermission.
+    sim.spawnBullet("a", S.vec(a.px, a.py, a.pz), S.vec(1, 0, 0), false);
+    b.hp = C.BULLET_DAMAGE;
+    sim.phase = "intermission";
+    sim.timeLeft = 0.05;
+
+    sim.tick(0.1);
+
+    expect(sim.phase).toBe("playing");
+    expect(sim.timeLeft).toBe(60);
+    expect(sim.bullets.size).toBe(0);
+    expect(sim.teamScore0).toBe(0);
+    expect(sim.teamScore1).toBe(0);
+
+    // The next playing ticks would have delivered that bullet if it had been kept.
+    sim.tick(0.6);
+    expect(b.alive).toBe(true);
+    expect(b.hp).toBe(C.MAX_HP);
+    expect(a.score).toBe(0);
+    expect(kills(events)).toHaveLength(0);
+  });
+
   it("does not resolve bullets or award kills while intermission is running", () => {
     const { sim, events } = makeSim();
     const { a, b } = setupDuel(sim);
