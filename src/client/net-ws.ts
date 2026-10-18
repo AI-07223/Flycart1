@@ -123,6 +123,10 @@ export class WsTransport implements ITransport {
   private _snaps: Snapshot[] = [];
   private _lastSent: InputState = { seq: 0, turn: 0, climb: 0, boost: false, fire: false };
   private _lastSentAt = 0;
+  /** Newest sample that arrived inside the coalesce window. Flushed when the
+   *  window ends so a pause/tab-hide release is not discarded. */
+  private _pendingInput: { turn: number; climb: number; boost: boolean; fire: boolean } | null = null;
+  private _flushTimer: ReturnType<typeof setTimeout> | null = null;
   private _leaderId = "";
   private _leaving = false;
 
@@ -161,6 +165,7 @@ export class WsTransport implements ITransport {
     this.localPose.active = false;
     this._lastSent = { seq: 0, turn: 0, climb: 0, boost: false, fire: false };
     this._lastSentAt = 0;
+    this._clearPendingInput();
 
     if (this._ws) { try { this._ws.close(); } catch {} this._ws = null; }
 
@@ -198,7 +203,9 @@ export class WsTransport implements ITransport {
     };
 
     ws.onmessage = (ev) => { this._onMessage(ev.data); };
-    ws.onclose = () => { this._onSocketClose(); };
+    // Ignore a close from a socket connect() already replaced. Otherwise the
+    // old socket's close event nulls the live one and fails the new join.
+    ws.onclose = () => { if (this._ws === ws) this._onSocketClose(); };
     ws.onerror = () => { /* onclose always follows */ };
 
     return welcome;
@@ -206,6 +213,7 @@ export class WsTransport implements ITransport {
 
   leave(): void {
     this._leaving = true;
+    this._clearPendingInput();
     if (this._welcomeWait) { this._welcomeWait = null; }
     if (this._ws) { try { this._ws.close(); } catch {} this._ws = null; }
     this._st = null;
@@ -283,9 +291,43 @@ export class WsTransport implements ITransport {
   sendInput(turn: number, climb: number, boost: boolean, fire: boolean): void {
     if (!this._ws || this._ws.readyState !== WebSocket.OPEN) return;
     const now = performance.now();
-    // Coalesce to ~25 Hz: within the window just drop the sample; the next call
-    // (≤1 frame later at 60 fps) carries the freshest input state anyway.
-    if (now - this._lastSentAt < INPUT_INTERVAL_MS) return;
+    // Coalesce to ~25 Hz, but keep the newest sample. Dropping it assumed another
+    // sendInput would follow within a frame — pause and tab-hide send one
+    // all-zero release and then stop, so the release was discarded and the
+    // server kept turning, boosting, and firing for the whole time the menu
+    // was up.
+    if (now - this._lastSentAt < INPUT_INTERVAL_MS) {
+      this._pendingInput = { turn, climb, boost, fire };
+      if (this._flushTimer == null) {
+        const wait = Math.max(0, INPUT_INTERVAL_MS - (now - this._lastSentAt));
+        this._flushTimer = setTimeout(() => this._flushPendingInput(), wait);
+      }
+      return;
+    }
+    this._emitInput(turn, climb, boost, fire, now);
+  }
+
+  /** Drop a held sample. Must run before the socket is replaced — otherwise the
+   *  timer can fire on the next connection and inject the previous session's
+   *  input before join. */
+  private _clearPendingInput(): void {
+    this._pendingInput = null;
+    if (this._flushTimer != null) {
+      clearTimeout(this._flushTimer);
+      this._flushTimer = null;
+    }
+  }
+
+  private _flushPendingInput(): void {
+    this._flushTimer = null;
+    const pending = this._pendingInput;
+    this._pendingInput = null;
+    if (!pending) return;
+    if (!this._ws || this._ws.readyState !== WebSocket.OPEN) return;
+    this._emitInput(pending.turn, pending.climb, pending.boost, pending.fire, performance.now());
+  }
+
+  private _emitInput(turn: number, climb: number, boost: boolean, fire: boolean, now: number): void {
     const seq = this._lastSent.seq + 1;
     this._lastSent = { seq, turn, climb, boost, fire };
     this._lastSentAt = now;
@@ -372,6 +414,7 @@ export class WsTransport implements ITransport {
 
   private _onSocketClose(): void {
     this._ws = null;
+    this._clearPendingInput();
     if (this._leaving) return;
     const waiter = this._welcomeWait;
     if (waiter) {

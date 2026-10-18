@@ -297,17 +297,65 @@ describe("input coalescing", () => {
     net.sendInput(1, 0, false, false);
     expect(sock.lastFrame("input")).toMatchObject({ input: { seq: 1, turn: 1 } });
 
-    // Inside the window: dropped, and the sequence does not advance.
+    // Inside the window: held, not sent, and the sequence does not advance.
     clock.advance(INPUT_INTERVAL_MS - 1);
     net.sendInput(-1, 1, true, true);
     expect(sock.frames.filter((f) => f.type === "input")).toHaveLength(1);
 
-    // Past the window: the freshest sample goes out as seq 2.
-    clock.advance(2);
-    net.sendInput(-1, 1, true, true);
+    // When the window elapses the held sample is flushed as seq 2, even if
+    // sendInput is not called again.
+    clock.advance(1);
     const inputs = sock.frames.filter((f) => f.type === "input");
     expect(inputs).toHaveLength(2);
     expect(inputs[1].input).toEqual({ seq: 2, turn: -1, climb: 1, boost: true, fire: true });
+  });
+
+  it("flushes the latest held sample so a pause release replaces an in-flight turn", async () => {
+    const { net, sock } = await connected();
+
+    net.sendInput(1, -1, true, true);
+    clock.advance(5);
+    net.sendInput(1, -1, true, true);
+    // Pause / tab-hide sends one all-zero sample and then stops calling sendInput.
+    net.sendInput(0, 0, false, false);
+    expect(sock.frames.filter((f) => f.type === "input")).toHaveLength(1);
+
+    clock.advance(INPUT_INTERVAL_MS);
+    const inputs = sock.frames.filter((f) => f.type === "input");
+    expect(inputs).toHaveLength(2);
+    expect(inputs[1].input).toEqual({ seq: 2, turn: 0, climb: 0, boost: false, fire: false });
+  });
+
+  it("ignores a close from a socket connect() already replaced", async () => {
+    const { net, sock } = await connected();
+
+    const pending = net.connect("Pilot", "", COSMETICS);
+    const sock2 = latestSocket();
+    sock2.serverOpen();
+    sock.serverClose();
+    sock2.serverSend({ type: "welcome", sessionId: "me2", leaderId: "me2", room: {} });
+
+    await expect(pending).resolves.toMatchObject({ sessionId: "me2" });
+    expect(net.sessionId).toBe("me2");
+  });
+
+  it("cancels a held input on leave so it cannot leak onto the next join", async () => {
+    const { net } = await connected();
+
+    net.sendInput(1, 0, true, true);
+    clock.advance(5);
+    net.sendInput(0, 0, false, true);
+    net.leave();
+
+    const pending = net.connect("Pilot", "", COSMETICS);
+    const sock2 = latestSocket();
+    sock2.serverOpen();
+    clock.advance(INPUT_INTERVAL_MS);
+    expect(sock2.frames.filter((f) => f.type === "input")).toHaveLength(0);
+    expect(sock2.lastFrame("join")).toBeTruthy();
+
+    sock2.serverSend({ type: "welcome", sessionId: "me", leaderId: "me", room: {} });
+    await pending;
   });
 
   it("sends nothing once the socket is gone", async () => {
