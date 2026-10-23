@@ -509,12 +509,17 @@ export class GameSim {
     // All rooms auto-restart into a fresh round — continuous play with automatic
     // respawn in every mode (public, private, LAN, P2P). No return-to-lobby stall:
     // players stay in the fight and rounds keep cycling.
+    // Bullets and mines are not stepped during intermission, so their lifetimes
+    // freeze. A mine lives 20s; leaving it armed would detonate in the next
+    // round (spawn invuln is only 1.2s) and score the kill on the fresh board.
+    this.bullets.clear();
+    this.bulletLife.clear();
     for (const [id, p] of this.players) {
       p.score = 0;
       this.spawn(id, p);
     }
     this.phase = "playing";
-    this.timeLeft = C.ROUND_SECONDS;
+    this.timeLeft = this.roundLength;
   }
 
   private stepPlane(id: string, p: SimPlayer, dt: number, playing: boolean): void {

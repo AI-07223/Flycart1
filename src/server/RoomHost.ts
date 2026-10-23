@@ -255,6 +255,14 @@ export class RoomHost {
     const target = this.conns.get(kicked);
     if (target) {
       this.sendTo(target, { type: "event", event: { type: "kicked" } });
+      // Drop the seat now. ws.close() does not emit "close" until the
+      // handshake finishes — up to the 30s close timeout when the peer is
+      // already gone. Leaving the socket in `conns` until then kept it
+      // counted as a joined human, so a host who left after the kick never
+      // reset the room (handleClose bails once the player is gone from the
+      // sim) and the slot stayed taken. `joined` stays true so an in-flight
+      // "join" on this socket cannot re-enter.
+      this.conns.delete(target.id);
       target.ws.close();
       // handleClose sees the player already removed from the sim and skips
       // the second removePlayer/roster broadcast.
