@@ -239,6 +239,39 @@ describe("round flow", () => {
     expect(b.alive).toBe(true);
   });
 
+  it("restarts at the host round length and drops bullets and mines from the previous round", () => {
+    const { sim } = makeSim();
+    const { a, b } = setupDuel(sim);
+    sim.roundLength = 60;
+    sim.spawnBullet("a", S.vec(a.px, a.py, a.pz), S.vec(1, 0, 0), false);
+    // Mines share the bullet map. Arm one on top of the victim so a leftover
+    // fuse would be a kill once spawn invulnerability expired.
+    sim.bullets.set("mine-leftover", {
+      px: b.px, py: b.py, pz: b.pz,
+      fx: 1, fy: 0, fz: 0,
+      owner: "a",
+      homing: false,
+      kind: "mine",
+    });
+    (sim as any).bulletLife.set("mine-leftover", C.MINE_LIFE);
+    expect(sim.bullets.size).toBe(2);
+
+    sim.phase = "intermission";
+    sim.timeLeft = 0.05;
+    sim.tick(0.1);
+
+    expect(sim.phase).toBe("playing");
+    expect(sim.timeLeft).toBe(60);
+    expect(sim.bullets.size).toBe(0);
+    expect((sim as any).bulletLife.size).toBe(0);
+
+    // Past spawn invuln, with the old mine's remaining fuse. Nothing detonates.
+    sim.tick(C.SPAWN_INVULN + 0.2);
+    expect(b.alive).toBe(true);
+    expect(b.hp).toBe(C.MAX_HP);
+    expect(a.score).toBe(0);
+  });
+
   it("does not resolve bullets or award kills while intermission is running", () => {
     const { sim, events } = makeSim();
     const { a, b } = setupDuel(sim);

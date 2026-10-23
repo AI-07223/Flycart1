@@ -210,6 +210,28 @@ describe("RoomHost", () => {
     expect(eventCount(c1, "roster-change")).toBe(rostersBefore + 1);
   });
 
+  it("frees a kicked seat before the socket close event arrives", () => {
+    const clients: FakeSocket[] = [];
+    for (let i = 0; i < C.MAX_CLIENTS; i++) clients.push(joinClient(rh!, `P${i}`));
+    const leader = clients[0];
+    const victim = clients[1];
+
+    leader.message({ type: "host-kick", targetId: session(victim) });
+    expect(victim.closed).toBe(true);
+    // Close handshake has not completed; the seat must already be free.
+    expect(rh!.roomInfo().humans).toBe(C.MAX_CLIENTS - 1);
+
+    const replacement = joinClient(rh!, "Replacement");
+    expect(lastMsg(replacement, "welcome")).toBeTruthy();
+    expect(replacement.closed).toBe(false);
+
+    victim.emitClose();
+    tickOnce(rh!);
+    const ids = snapOf(leader)!.players.map(([id]) => id);
+    expect(ids).toContain(session(replacement));
+    expect(ids).not.toContain(session(victim));
+  });
+
   it("applies leader settings with clamping; bots-off sticks", () => {
     const c1 = joinClient(rh!, "Leader");
     const c2 = joinClient(rh!, "Other");
@@ -373,6 +395,42 @@ describe("room lifecycle", () => {
     expect(rh.roomInfo().name).toBe("Keep");
     const snap = snapOf(b)!;
     expect(snap.hostId).toBe(lastMsg(b, "welcome")!.sessionId); // promoted to the survivor
+  });
+
+  it("resets when the host leaves after a kick, before that socket closes", () => {
+    const a = joinClient(rh, "Host");
+    const b = joinClient(rh, "Guest");
+
+    a.message({ type: "host-settings", settings: { roomName: "Stale", roundLength: 300, botDifficulty: "high" } });
+    a.message({ type: "host-start" });
+    tickOnce(rh);
+    expect(rh.roomInfo().phase).toBe("playing");
+
+    a.message({ type: "host-kick", targetId: lastMsg(b, "welcome")!.sessionId });
+    expect(b.closed).toBe(true);
+    // Kick only starts the close. The close event is still outstanding, which
+    // is how a dropped phone looks for up to the websocket close timeout.
+    expect(rh.roomInfo().humans).toBe(1);
+
+    a.emitClose();
+    expect(rh.roomInfo().phase).toBe("lobby");
+    expect(rh.roomInfo().name).toBe("SmashCart");
+    expect(rh.roomInfo().humans).toBe(0);
+
+    // The late close must not throw or bring the stale match back.
+    b.emitClose();
+    expect(rh.roomInfo().phase).toBe("lobby");
+
+    const c = joinClient(rh, "Fresh");
+    tickOnce(rh);
+    const welcome = lastMsg(c, "welcome")!;
+    expect(welcome.leaderId).toBe(welcome.sessionId);
+    expect(welcome.room.name).toBe("");
+    expect(welcome.room.roundLength).toBe(C.ROUND_SECONDS);
+    expect(welcome.room.botDifficulty).toBe(C.DEFAULT_BOT_DIFFICULTY);
+    expect(snapOf(c)!.players).toHaveLength(1);
+    expect(snapOf(c)!.phase).toBe("lobby");
+    expect(snapOf(c)!.timeLeft).toBe(0);
   });
 
   it("a pre-join socket closing does not reset an active room", () => {
