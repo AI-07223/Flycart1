@@ -299,7 +299,9 @@ function togglePause(): void {
   if (mode === "playing") {
     applyMode("paused");
     showPause();
-    window.Net.sendInput(0, 0, false, false);
+    // The render loop stops sending while paused. A coalesced drop here would
+    // leave the last stick (often fire + boost) latched for the whole menu.
+    window.Net.releaseControls();
     window.SFX.setEngine(0, false);
   } else if (mode === "paused") {
     hidePause();
@@ -844,7 +846,9 @@ function init(): void {
 
   document.addEventListener("visibilitychange", () => {
     if (document.hidden) {
-      if (window.Net.state) window.Net.sendInput(0, 0, false, false);
+      // rAF stops while hidden, so this is the last input until the player
+      // returns. It must not be swallowed by the 25 Hz coalesce window.
+      if (window.Net.state) window.Net.releaseControls();
       if (window.SFX.suspend) window.SFX.suspend();
     } else if (mode === "playing" && window.SFX.resume) {
       window.SFX.resume();

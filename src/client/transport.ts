@@ -52,7 +52,8 @@ export interface ITransport {
   leave(): void;
   tryReconnect(): Promise<boolean>;
 
-  sendInput(turn: number, climb: number, boost: boolean, fire: boolean): void;
+  sendInput(turn: number, climb: number, boost: boolean, fire: boolean, immediate?: boolean): void;
+  releaseControls(): void;
   sendReady(): void;
   sendHostStart(): void;
   sendHostKick(targetId: string): void;

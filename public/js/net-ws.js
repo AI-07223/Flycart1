@@ -263,14 +263,18 @@
       return out;
     }
     // ── INPUT ───────────────────────────────────────────────────────────────────
-    sendInput(turn, climb, boost, fire) {
+    sendInput(turn, climb, boost, fire, immediate = false) {
       if (!this._ws || this._ws.readyState !== WebSocket.OPEN) return;
       const now = performance.now();
-      if (now - this._lastSentAt < INPUT_INTERVAL_MS) return;
+      if (!immediate && now - this._lastSentAt < INPUT_INTERVAL_MS) return;
       const seq = this._lastSent.seq + 1;
       this._lastSent = { seq, turn, climb, boost, fire };
       this._lastSentAt = now;
       this._send({ type: "input", input: { seq, turn, climb, boost, fire } });
+    }
+    /** Neutral controls, delivered even inside the coalesce window. */
+    releaseControls() {
+      this.sendInput(0, 0, false, false, true);
     }
     // ── SOCKET PLUMBING ─────────────────────────────────────────────────────────
     _send(msg) {
