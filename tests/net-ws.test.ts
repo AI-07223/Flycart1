@@ -310,6 +310,21 @@ describe("input coalescing", () => {
     expect(inputs[1].input).toEqual({ seq: 2, turn: -1, climb: 1, boost: true, fire: true });
   });
 
+  it("releaseControls bypasses the coalesce window so a pause cannot latch fire", async () => {
+    const { net, sock } = await connected();
+
+    net.sendInput(1, 0.5, true, true);
+    expect(sock.lastFrame("input")!.input).toMatchObject({ seq: 1, fire: true, boost: true });
+
+    // Pause and tab-hide happen inside this window, then the sender stops.
+    clock.advance(INPUT_INTERVAL_MS - 1);
+    net.releaseControls();
+
+    const inputs = sock.frames.filter((f) => f.type === "input");
+    expect(inputs).toHaveLength(2);
+    expect(inputs[1].input).toEqual({ seq: 2, turn: 0, climb: 0, boost: false, fire: false });
+  });
+
   it("sends nothing once the socket is gone", async () => {
     const { net, sock } = await connected();
     sock.serverClose();

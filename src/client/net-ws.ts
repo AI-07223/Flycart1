@@ -280,16 +280,24 @@ export class WsTransport implements ITransport {
 
   // ── INPUT ───────────────────────────────────────────────────────────────────
 
-  sendInput(turn: number, climb: number, boost: boolean, fire: boolean): void {
+  sendInput(turn: number, climb: number, boost: boolean, fire: boolean, immediate = false): void {
     if (!this._ws || this._ws.readyState !== WebSocket.OPEN) return;
     const now = performance.now();
     // Coalesce to ~25 Hz: within the window just drop the sample; the next call
     // (≤1 frame later at 60 fps) carries the freshest input state anyway.
-    if (now - this._lastSentAt < INPUT_INTERVAL_MS) return;
+    // `immediate` is for the one sample sent as the loop stops (pause, tab
+    // hidden). Dropping that sample latches boost/turn/fire on the server for
+    // the whole time the player is away — nothing else will overwrite it.
+    if (!immediate && now - this._lastSentAt < INPUT_INTERVAL_MS) return;
     const seq = this._lastSent.seq + 1;
     this._lastSent = { seq, turn, climb, boost, fire };
     this._lastSentAt = now;
     this._send({ type: "input", input: { seq, turn, climb, boost, fire } });
+  }
+
+  /** Neutral controls, delivered even inside the coalesce window. */
+  releaseControls(): void {
+    this.sendInput(0, 0, false, false, true);
   }
 
   // ── SOCKET PLUMBING ─────────────────────────────────────────────────────────
