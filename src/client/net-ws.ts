@@ -183,6 +183,7 @@ export class WsTransport implements ITransport {
     });
 
     ws.onopen = () => {
+      if (this._ws !== ws) return;
       // Wire cosmetics use legacy key `color`; the protocol calls it `skin`.
       this._send({
         type: "join",
@@ -197,8 +198,19 @@ export class WsTransport implements ITransport {
       });
     };
 
-    ws.onmessage = (ev) => { this._onMessage(ev.data); };
-    ws.onclose = () => { this._onSocketClose(); };
+    // Events belong to the socket that received them. leave() and a newer
+    // connect() both replace this._ws before the old close handshake finishes,
+    // and a dropped phone can deliver that close (or a last frame) seconds
+    // later. Applying it nulls the live socket: the new join is rejected or
+    // onDisconnect fires, while the server still has the pilot.
+    ws.onmessage = (ev) => {
+      if (this._ws !== ws) return;
+      this._onMessage(ev.data);
+    };
+    ws.onclose = () => {
+      if (this._ws !== ws) return;
+      this._onSocketClose();
+    };
     ws.onerror = () => { /* onclose always follows */ };
 
     return welcome;

@@ -170,6 +170,7 @@
         }, WELCOME_TIMEOUT_MS);
       });
       ws.onopen = () => {
+        if (this._ws !== ws) return;
         this._send({
           type: "join",
           name,
@@ -183,9 +184,11 @@
         });
       };
       ws.onmessage = (ev) => {
+        if (this._ws !== ws) return;
         this._onMessage(ev.data);
       };
       ws.onclose = () => {
+        if (this._ws !== ws) return;
         this._onSocketClose();
       };
       ws.onerror = () => {

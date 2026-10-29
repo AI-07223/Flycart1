@@ -194,6 +194,46 @@ describe("connect handshake", () => {
     expect(disconnects).toBe(0);
   });
 
+  it("ignores a late close from the socket a reconnect replaced", async () => {
+    // Leave starts the closing handshake and returns before onclose. Play again
+    // immediately (or retry after a join timeout) opens a new socket while that
+    // close is still in flight — on a dropped phone the old close can arrive
+    // seconds later. Applying it to the new session nulls the live socket and
+    // either rejects the handshake or fires onDisconnect without closing the
+    // socket the server already joined, leaving a ghost pilot in the room.
+    const net = new WsTransport();
+    const first = net.connect("Pilot", "", COSMETICS);
+    const sock1 = latestSocket();
+    sock1.serverOpen();
+    sock1.serverSend({ type: "welcome", sessionId: "s1", leaderId: "s1", room: {} });
+    await first;
+
+    net.leave();
+
+    const second = net.connect("Pilot", "", COSMETICS);
+    const sock2 = latestSocket();
+    expect(sock2).not.toBe(sock1);
+    sock2.serverOpen();
+
+    sock1.serverClose();
+
+    sock2.serverSend({ type: "welcome", sessionId: "s2", leaderId: "s2", room: { name: "Fresh" } });
+    await second;
+
+    let disconnects = 0;
+    net.onDisconnect = () => { disconnects++; };
+    sock1.serverClose();
+    sock1.serverSend({ type: "event", event: { type: "kicked" } });
+
+    expect(disconnects).toBe(0);
+    expect(net.sessionId).toBe("s2");
+    expect(net.state).toMatchObject({ roomName: "Fresh" });
+
+    net.sendReady();
+    expect(sock2.lastFrame("ready")).toEqual({ type: "ready" });
+    expect(sock2.closeCalls).toBe(0);
+  });
+
   it("reports an unexpected close as a disconnect", async () => {
     const { net, sock } = await connected();
     const seen: any[] = [];
