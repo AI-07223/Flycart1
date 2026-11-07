@@ -2,7 +2,8 @@
 // Disconnect behavior: mid-session drops remove the player and inform
 // survivors; leader drops promote the earliest remaining human.
 
-import { describe, expect, it, beforeEach, afterEach } from "vitest";
+import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
+import * as C from "../src/shared/constants";
 import {
   joinClient,
   makeClient,
@@ -76,6 +77,71 @@ describe("disconnects", () => {
     tickOnce(rh!);
     expect(snapOf(c2)!.phase).toBe("playing");
     expect(snapOf(c3)!.phase).toBe("playing");
+  });
+
+  it("drops a silent peer and resets the room once nobody is left", () => {
+    const a = joinClient(rh!, "Host");
+    a.message({ type: "host-settings", settings: { roomName: "Stale", roundLength: 300 } });
+    a.message({ type: "host-start" });
+    tickOnce(rh!);
+    expect(rh!.roomInfo().phase).toBe("playing");
+    expect(rh!.roomInfo().name).toBe("Stale");
+
+    // No frames, no protocol pongs — a phone that left the Wi-Fi.
+    vi.advanceTimersByTime(15_000);
+
+    expect(a.closed).toBe(true);
+    expect(a.pings).toBeGreaterThan(0);
+    expect(rh!.roomInfo().humans).toBe(0);
+    expect(rh!.roomInfo().phase).toBe("lobby");
+    expect(rh!.roomInfo().name).toBe("SmashCart");
+
+    const next = joinClient(rh!, "Next");
+    tickOnce(rh!);
+    expect(snapOf(next)!.phase).toBe("lobby");
+    expect(snapOf(next)!.roomName).toBe("");
+    expect(lastMsg(next, "welcome")!.room.roundLength).toBe(C.ROUND_SECONDS);
+  });
+
+  it("keeps a peer that answers pings and drops only the silent one", () => {
+    const host = joinClient(rh!, "Host");
+    const guest = joinClient(rh!, "Guest");
+    host.autoPong = true;
+    host.message({ type: "host-start" });
+    tickOnce(rh!);
+
+    vi.advanceTimersByTime(20_000);
+
+    expect(host.closed).toBe(false);
+    expect(host.pings).toBeGreaterThan(0);
+    expect(guest.closed).toBe(true);
+    expect(rh!.roomInfo().humans).toBe(1);
+    expect(rh!.roomInfo().phase).toBe("playing");
+
+    tickOnce(rh!);
+    const ids = snapOf(host)!.players.map(([id]) => id);
+    expect(ids).toContain(session(host));
+    expect(ids).not.toContain(session(guest));
+  });
+
+  it("treats inbound messages as liveness when pongs never arrive", () => {
+    const a = joinClient(rh!, "Host");
+    a.message({ type: "host-start" });
+    tickOnce(rh!);
+
+    vi.advanceTimersByTime(10_000);
+    expect(a.closed).toBe(false);
+    a.message({ type: "input", input: { seq: 1, turn: 0, climb: 0, boost: true, fire: true } });
+
+    vi.advanceTimersByTime(10_000);
+    expect(a.closed).toBe(false);
+    expect(rh!.roomInfo().humans).toBe(1);
+
+    // One more silent window past the timeout, with margin for tick alignment.
+    vi.advanceTimersByTime(6_000);
+    expect(a.closed).toBe(true);
+    expect(rh!.roomInfo().humans).toBe(0);
+    expect(rh!.roomInfo().phase).toBe("lobby");
   });
 
   it("pre-join socket close is a no-op for joined players", () => {

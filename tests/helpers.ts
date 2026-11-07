@@ -57,6 +57,9 @@ export class FakeSocket {
   sent: string[] = [];
   closed = false;
   closeCode: number | undefined;
+  /** When set, ping() answers with a protocol pong the way a browser does. */
+  autoPong = false;
+  pings = 0;
 
   private handlers = new Map<string, Array<(...args: unknown[]) => void>>();
 
@@ -95,6 +98,24 @@ export class FakeSocket {
 
   /** No-op: RoomHost registers handlers inside attach(); nothing to fire. */
   open(): void {}
+
+  /** Protocol ping. Browsers answer automatically; tests opt in with autoPong. */
+  ping(): void {
+    this.pings += 1;
+    if (!this.autoPong) return;
+    for (const cb of [...(this.handlers.get("pong") ?? [])]) cb();
+  }
+
+  /**
+   * Abrupt destroy. Unlike close(), this does not wait for a handshake —
+   * the close listeners run now, matching ws.Socket#terminate.
+   */
+  terminate(): void {
+    if (this.closed) return;
+    this.closed = true;
+    this.readyState = FakeSocket.CLOSED;
+    for (const cb of [...(this.handlers.get("close") ?? [])]) cb();
+  }
 
   /** Client-side trigger: simulate the transport dropping the connection. */
   emitClose(): void {
