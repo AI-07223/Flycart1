@@ -23,6 +23,13 @@ const FIXED_DT = 1 / C.TICK_RATE;
 const JOIN_TIMEOUT_MS = 5000;
 const MAX_FRAME_BYTES = 4096;
 const BAD_MESSAGE_LIMIT = 5;
+// A phone that walks out of Wi-Fi range often never sends a TCP FIN. Writes
+// keep succeeding into the kernel buffer while it retransmits (minutes), and
+// the sim keeps flying that pilot on their last input — still occupying a
+// seat, still blocking the empty-room reset. Protocol pings are answered by
+// the browser even when the page is paused; silence means the peer is gone.
+const PING_INTERVAL_MS = 5000;
+const SILENT_TIMEOUT_MS = 15000;
 
 interface Conn {
   id: string;
@@ -31,6 +38,9 @@ interface Conn {
   joined: boolean;
   strikes: number;
   joinTimer: NodeJS.Timeout | null;
+  /** Last inbound sign of life: any frame, or a protocol pong. */
+  lastSeen: number;
+  lastPing: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -85,12 +95,15 @@ export class RoomHost {
   // -------------------------------------------------------------------------
 
   attach(ws: WebSocket, _req: IncomingMessage): void {
+    const now = Date.now();
     const conn: Conn = {
       id: crypto.randomUUID(),
       ws,
       joined: false,
       strikes: 0,
       joinTimer: null,
+      lastSeen: now,
+      lastPing: now,
     };
     this.conns.set(conn.id, conn);
 
@@ -102,6 +115,7 @@ export class RoomHost {
     }, JOIN_TIMEOUT_MS);
 
     ws.on("message", (data: RawData) => this.onMessage(conn, data));
+    ws.on("pong", () => { conn.lastSeen = Date.now(); });
     ws.on("close", () => this.handleClose(conn));
     ws.on("error", () => {
       /* close event follows; nothing to do here */
@@ -136,6 +150,7 @@ export class RoomHost {
   // -------------------------------------------------------------------------
 
   private onMessage(conn: Conn, data: RawData): void {
+    conn.lastSeen = Date.now();
     // RawData is Buffer | ArrayBuffer | Buffer[] — normalize for the size check.
     const buf = Buffer.isBuffer(data)
       ? data
@@ -308,6 +323,7 @@ export class RoomHost {
   // -------------------------------------------------------------------------
 
   private tick(): void {
+    this.sweepSilentSockets();
     try {
       this.sim.tick(FIXED_DT);
     } catch (e) {
@@ -335,6 +351,38 @@ export class RoomHost {
   // from ArenaRoom; bucketed by type so e.g. a host-start never eats the
   // input budget — the *_RATE_MAX constants are per-category limits)
   // -------------------------------------------------------------------------
+
+  /**
+   * Reap peers that stopped answering. terminate() destroys the socket
+   * instead of waiting out the close handshake (which never finishes when
+   * the peer is already gone). handleClose is idempotent, so a late close
+   * event from that destroy is a no-op.
+   */
+  private sweepSilentSockets(): void {
+    const now = Date.now();
+    for (const conn of [...this.conns.values()]) {
+      if (now - conn.lastSeen >= SILENT_TIMEOUT_MS) {
+        this.dropSilent(conn);
+        continue;
+      }
+      if (now - conn.lastPing < PING_INTERVAL_MS) continue;
+      if (conn.ws.readyState !== conn.ws.OPEN) continue;
+      conn.lastPing = now;
+      try {
+        conn.ws.ping();
+      } catch {
+        /* a dead send surfaces as silence and is reaped next sweep */
+      }
+    }
+  }
+
+  private dropSilent(conn: Conn): void {
+    log("info", "dropping silent socket", { id: conn.id });
+    // Destroy rather than close(): a vanished peer never finishes the
+    // handshake, and the seat has to be free before the next tick.
+    try { conn.ws.terminate(); } catch { /* free the seat below */ }
+    if (this.conns.has(conn.id)) this.handleClose(conn);
+  }
 
   private rateOk(id: string, bucket: string, max: number): boolean {
     const key = `${id}:${bucket}`;
